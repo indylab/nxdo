@@ -1,0 +1,42 @@
+name: grl
+channels:
+  - defaults
+dependencies:
+  - python=3.6
+  - pip
+  - psutil
+  - jupyter
+  - pytorch=1.4
+  - torchvision
+  - cudatoolkit
+  - tensorflow-gpu=1.15
+  - pip:
+    - ray
+    - opencv-python
+    - plotly
+    - dm-sonnet
+    - IPython
+    - tensorflow-probability
+    - cvxopt
+    - networkx
+    - mock
+    - matplotlib
+    - nashpy
+    - scipy
+    - attrs
+    - absl-py
+    - numpy
+    - progress
+    - pyglet
+    - gym
+    - pandas
+    - tabulate
+    - bidict
+    - minio
+    - lz4
+    - setproctitle
+    - dataclasses
+    - deepdish
+    - grpcio-tools
+
+

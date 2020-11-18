@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+
+message EvalJob {
+    repeated string json_policy_specs_for_each_player = 1;
+    int64 required_games_to_play = 2;
+}
+
+message EvalJobResult {
+    repeated string json_policy_specs_for_each_player = 1;
+    repeated float payoffs_for_each_player = 2;
+    int64 games_played = 3;
+}
+
+message EvalConfirmation {
+    bool result = 1;
+}
+
+service EvalDispatcher {
+    rpc TakeEvalJob (google.protobuf.Empty) returns (EvalJob) {}
+    rpc SubmitEvalJobResult (EvalJobResult) returns (EvalConfirmation) {}
+}
