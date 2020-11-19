@@ -1,13 +1,24 @@
 import time
 import numpy as np
 
+import deepdish
 import ray
+
 from ray.rllib.utils import merge_dicts
 
 from ray.rllib.agents.sac import SACTorchPolicy, DEFAULT_CONFIG as DEFAULT_SAC_CONFIG
 from grl.eval_dispatcher.remote import RemoteEvalDispatcherClient
 from grl.rl_examples.kuhn_poker.poker_multi_agent_env import PokerMultiAgentEnv
 from grl.rl_examples.kuhn_poker.config import kuhn_sac_params
+from grl.payoff_table import PayoffTableStrategySpec
+
+
+def load_weights(policy: SACTorchPolicy, pure_strat_spec: PayoffTableStrategySpec):
+    pure_strat_checkpoint_path = pure_strat_spec.metadata["checkpoint_path"]
+    checkpoint_data = deepdish.io.load(path=pure_strat_checkpoint_path)
+    weights = checkpoint_data["weights"]
+    weights = {k.replace("_dot_", "."): v for k, v in weights.items()}
+    policy.set_weights(weights=weights)
 
 
 def run_poker_evaluation_loop(poker_game="kuhn_poker", eval_dispatcher_port=4536, eval_dispatcher_host="127.0.0.1"):
@@ -18,15 +29,26 @@ def run_poker_evaluation_loop(poker_game="kuhn_poker", eval_dispatcher_port=4536
     env = PokerMultiAgentEnv(env_config={'version': poker_game})
     num_players = 2
 
-    policies = [SACTorchPolicy(env.observation_space, env.action_space, merge_dicts(DEFAULT_SAC_CONFIG, kuhn_sac_params)) for _ in range(num_players)]
+
+
+    policies = [SACTorchPolicy(env.observation_space, env.action_space, merge_dicts(DEFAULT_SAC_CONFIG, kuhn_sac_params(action_space=env.action_space))) for _ in range(num_players)]
 
     while True:
         policy_specs_for_each_player, required_games_to_play = eval_dispatcher.take_eval_job()
+
         if policy_specs_for_each_player is None:
             time.sleep(2)
         else:
             if len(policy_specs_for_each_player) != 2:
-                raise NotImplemented("This evaluation code only supports two player games.")
+                raise NotImplementedError(f"This evaluation code only supports two player games. "
+                                          f"{len(policy_specs_for_each_player)} players were requested.")
+
+            print(f"Got eval matchup:")
+            for spec in policy_specs_for_each_player:
+                print(f"spec: {spec.to_json()}")
+
+            for policy, spec in zip(policies, policy_specs_for_each_player):
+                load_weights(policy=policy, pure_strat_spec=spec)
 
             total_payoffs_per_player = np.zeros(shape=num_players, dtype=np.float64)
 
@@ -36,7 +58,7 @@ def run_poker_evaluation_loop(poker_game="kuhn_poker", eval_dispatcher_port=4536
             time_since_last_output = time.time()
 
             for game in range(required_games_to_play):
-                if game % 10 == 0:
+                if game % 100 == 0:
                     now = time.time()
                     print(f"{policy_specs_for_each_player[0].id} vs "
                           f"{policy_specs_for_each_player[1].id}: "
@@ -58,7 +80,7 @@ def run_poker_evaluation_loop(poker_game="kuhn_poker", eval_dispatcher_port=4536
                     acting_player, acting_agent_observation = list(obs.items())[0]
 
                     action_index, new_policy_state, action_info = policies[acting_player].compute_single_action(
-                        obs=obs, state=policy_states[acting_player])
+                        obs=obs[acting_player], state=policy_states[acting_player])
 
                     policy_states[acting_player] = new_policy_state
 

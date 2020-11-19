@@ -96,20 +96,22 @@ class P2SROManagerWithServer(P2SROManager):
     """
     def __init__(self,
                  n_players,
-                 is_two_player_symmetric: bool,
+                 is_two_player_symmetric_zero_sum: bool,
                  do_external_payoff_evals_for_new_fixed_policies: bool,
                  games_per_external_payoff_eval: int,
                  eval_dispatcher_port: int = 4536,
                  manager_logger: P2SROManagerLogger = None,
+                 payoff_table_exponential_average_coeff: float = None,
                  port=4535):
 
         super(P2SROManagerWithServer, self).__init__(
             n_players=n_players,
-            is_two_player_symmetric=is_two_player_symmetric,
+            is_two_player_symmetric_zero_sum=is_two_player_symmetric_zero_sum,
             do_external_payoff_evals_for_new_fixed_policies=do_external_payoff_evals_for_new_fixed_policies,
             games_per_external_payoff_eval=games_per_external_payoff_eval,
             eval_dispatcher_port=eval_dispatcher_port,
-            manager_logger=manager_logger
+            manager_logger=manager_logger,
+            payoff_table_exponential_average_coeff=payoff_table_exponential_average_coeff
         )
         self._grpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=1))
         servicer = _P2SROMangerServerServicerImpl(manager=self)
@@ -222,9 +224,10 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     manager = P2SROManagerWithServer(
         n_players=2,
-        is_two_player_symmetric=True,
+        is_two_player_symmetric_zero_sum=True,
         do_external_payoff_evals_for_new_fixed_policies=True,
-        games_per_external_payoff_eval=1000
+        games_per_external_payoff_eval=3000,
+        payoff_table_exponential_average_coeff=0.001
     )
     print(f"Launched P2SRO Manager with server.")
     manager.wait_for_server_termination()

@@ -56,7 +56,7 @@ class EvalDispatcher(object):
         self._games_per_eval = games_per_eval
         self._eval_queue = _EvalQueue(drop_duplicates=drop_duplicate_requests,
                                       game_is_two_player_symmetric=game_is_two_player_symmetric)
-        self._unclaimed_eval_results = []
+        self._on_eval_result_callbacks = []
 
     def submit_eval_request(self, policy_specs_for_each_player: Tuple[PayoffTableStrategySpec]):
         self._eval_queue.put(policy_spec_tuple=policy_specs_for_each_player)
@@ -69,9 +69,8 @@ class EvalDispatcher(object):
         eval_result = EvalResult(policy_specs_for_each_player=policy_specs_for_each_player_tuple,
                                  payoff_for_each_player=payoffs_for_each_player,
                                  games_played=games_played)
-        self._unclaimed_eval_results.append(eval_result)
+        for callback in self._on_eval_result_callbacks:
+            callback(eval_result)
 
-    def get_unclaimed_eval_results(self):
-        latest_results = self._unclaimed_eval_results
-        self._unclaimed_eval_results = []
-        return latest_results
+    def add_on_eval_result_callback(self, on_eval_result):
+        self._on_eval_result_callbacks.append(on_eval_result)

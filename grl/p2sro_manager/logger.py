@@ -1,11 +1,13 @@
 import os
 import json
 from typing import Tuple
-
+import logging
 from abc import ABC, abstractmethod
 
-from grl.payoff_table import PayoffTableStrategySpec
+from grl.payoff_table import PayoffTable, PayoffTableStrategySpec
 from grl.utils import ensure_dir
+
+logger = logging.getLogger(__name__)
 
 
 class P2SROManagerLogger(ABC):
@@ -27,18 +29,11 @@ class P2SROManagerLogger(ABC):
     def on_active_policy_moved_to_fixed(self, player: int, policy_num: int, fixed_policy_spec: PayoffTableStrategySpec):
         pass
 
-    def on_external_eval_result(self,
+    def on_payoff_result(self,
                                 policy_specs_for_each_player: Tuple[PayoffTableStrategySpec],
                                 payoffs_for_each_player: Tuple[float],
                                 games_played: int,
                                 overrode_all_previous_results: bool):
-        pass
-
-    def on_submitted_empirical_payoff_result(self,
-                                             policy_specs_for_each_player: Tuple[PayoffTableStrategySpec],
-                                             payoffs_for_each_player: Tuple[float],
-                                             games_played: int,
-                                             overrode_all_previous_results: bool):
         pass
 
 
@@ -55,7 +50,16 @@ class SimpleP2SROManagerLogger(P2SROManagerLogger):
         self._payoff_table_checkpoint_dir = os.path.join(self._log_dir, "payoff_table_checkpoints")
         self._payoff_table_checkpoint_count = 0
 
+    def on_new_active_policy(self, player: int, new_policy_num: int, new_policy_spec: PayoffTableStrategySpec):
+        logger.info(f"Player {player} active policy {new_policy_num} claimed")
+
+    def on_new_active_policy_metadata(self, player: int, policy_num: int, new_policy_spec: PayoffTableStrategySpec):
+        logger.info(f"Player {player} active policy {policy_num} new metadata: {new_policy_spec.metadata}")
+
     def on_active_policy_moved_to_fixed(self, player: int, policy_num: int, fixed_policy_spec: PayoffTableStrategySpec):
+        logger.info(f"Player {player} policy {policy_num} moved to fixed.")
+
+        # save a checkpoint of the payoff table
         data = self._manager.get_copy_of_latest_data()
         latest_payoff_table, active_policy_nums_per_player, fixed_policy_nums_per_player = data
         pt_checkpoint_path = os.path.join(self._payoff_table_checkpoint_dir,
@@ -79,3 +83,21 @@ class SimpleP2SROManagerLogger(P2SROManagerLogger):
             json.dump(obj=player_policy_nums, fp=policy_nums_file)
 
         self._payoff_table_checkpoint_count += 1
+
+    def on_payoff_result(self, policy_specs_for_each_player: Tuple[PayoffTableStrategySpec],
+                                payoffs_for_each_player: Tuple[float], games_played: int,
+                                overrode_all_previous_results: bool):
+        json_specs = [spec.to_json() for spec in policy_specs_for_each_player]
+        logger.debug(f"Payoff result for {json_specs}, payoffs: {payoffs_for_each_player}, games: {games_played},"
+                    f" overrides existing results: {overrode_all_previous_results}")
+
+        data = self._manager.get_copy_of_latest_data()
+        latest_payoff_table, active_policy_nums_per_player, fixed_policy_nums_per_player = data
+        latest_payoff_table: PayoffTable = latest_payoff_table
+        print("Player 0 matrix ---------------------------------------")
+        print(latest_payoff_table.get_payoff_matrix_for_player(0))
+        print("------------------------------------------------------")
+        print("Player 1 matrix ---------------------------------------")
+        print(latest_payoff_table.get_payoff_matrix_for_player(1))
+        print("------------------------------------------------------")
+

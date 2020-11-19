@@ -274,6 +274,7 @@ class PayoffTable(object):
                 strat_index_for_player = self.get_strategy_index_for_player_and_strat_id(player=player,
                                                                                          strat_id=strat_id)
                 strat_indexes_per_player.append([strat_index_for_player])
+            print(f"strat indexes for each player {strat_indexes_per_player}")
 
             if override_all_previous_results:
                 new_games_played = games_played
