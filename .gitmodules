@@ -1,0 +1,9 @@
+[submodule "dependencies/robosumo"]
+	path = dependencies/robosumo
+	url = https://github.com/openai/robosumo
+[submodule "dependencies/google-research"]
+	path = dependencies/google-research
+	url = https://github.com/google-research/google-research
+[submodule "dependencies/multiagent-particle-envs"]
+	path = dependencies/multiagent-particle-envs
+	url = https://github.com/openai/multiagent-particle-envs

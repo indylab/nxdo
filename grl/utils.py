@@ -67,3 +67,22 @@ def ensure_dir(file_path):
 
 def string_to_int_tuple(s) -> Tuple[int]:
     return tuple(int(number) for number in s.replace('(', '').replace(')', '').replace('...', '').split(','))
+
+
+# Copies attributes of one object to a destination object
+# https://stackoverflow.com/questions/50003851/python-how-to-override-a-memory-at-a-pointer-location
+def copy_attributes(src_obj, dst_obj):
+    if not isinstance(src_obj, type(dst_obj)) and not isinstance(dst_obj, type(src_obj)):
+        raise TypeError("source and target object types must be related somehow")
+    # fast path if both have __dict__
+    if hasattr(src_obj, "__dict__") and hasattr(dst_obj, "__dict__"):
+        dst_obj.__dict__.update(src_obj.__dict__)
+        return
+    # copy one attribute at a time
+    names = getattr(type(src_obj), "__slots__", ()) and getattr(src_obj, "__dict__", ())
+    slots = set(getattr(type(dst_obj), "__slots__", ()))
+    if slots and not all(name in slots for name in names):
+        raise AttributeError("target lacks a slot for an attribute from source")
+    for name in names:
+        setattr(dst_obj, getattr(src_obj, name))
+

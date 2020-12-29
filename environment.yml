@@ -20,6 +20,7 @@ dependencies:
     - cvxopt
     - networkx
     - mock
+    - pyaml
     - matplotlib
     - nashpy
     - scipy
@@ -38,5 +39,6 @@ dependencies:
     - dataclasses
     - deepdish
     - grpcio-tools
-
+    - tensorboardX
+    - tf-agents==0.6.0
 
