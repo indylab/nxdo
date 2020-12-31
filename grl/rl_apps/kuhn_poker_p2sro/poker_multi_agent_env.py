@@ -22,7 +22,9 @@ MATRIX_RPS = 'matrix_rps'
 PARTIALLY_OBSERVABLE = "partially_observable"
 DEFAULT_CONFIG = {
     'version': KUHN_POKER,
-    'fixed_players': False
+    'fixed_players': True,
+    'dummy_action_multiplier': 1,
+    'continuous_action_space': False,
 }
 
 OBS_SHAPES = {
@@ -50,6 +52,11 @@ class PokerMultiAgentEnv(MultiAgentEnv):
         self._fixed_players = env_config['fixed_players']
         self.game_version = env_config['version']
 
+        if not isinstance(env_config['dummy_action_multiplier'], int) and env_config['dummy_action_multiplier'] > 0:
+            raise ValueError("dummy_action_multiplier must be a positive non-zero int")
+        self._dummy_action_multiplier = env_config['dummy_action_multiplier']
+        self._continuous_action_space = env_config['continuous_action_space']
+
         if self.game_version in [KUHN_POKER, LEDUC_POKER]:
             open_spiel_env_config = {
                 "players": 2
@@ -60,7 +67,15 @@ class PokerMultiAgentEnv(MultiAgentEnv):
         self.openspiel_env = Environment(game_name=self.game_version, discount=1.0,
                                          **open_spiel_env_config)
 
-        self.action_space = Discrete(self.openspiel_env.action_spec()["num_actions"])
+        self.base_num_discrete_actions = self.openspiel_env.action_spec()["num_actions"]
+        self.num_discrete_actions = int(self.base_num_discrete_actions * self._dummy_action_multiplier)
+        self._base_action_space = Discrete(self.base_num_discrete_actions)
+
+        if self._continuous_action_space:
+            self.action_space = Box(low=-1, high=1, shape=1)
+        else:
+            self.action_space = Discrete(self.num_discrete_actions)
+
         # observation_length = OBS_SHAPES[self.game_version][0] + VALID_ACTIONS_SHAPES[self.game_version][0]
         observation_length = OBS_SHAPES[self.game_version][0]
         self.observation_space = Box(low=0.0, high=1.0, shape=(observation_length,))
@@ -104,11 +119,11 @@ class PokerMultiAgentEnv(MultiAgentEnv):
         """
         self.curr_time_step = self.openspiel_env.reset()
 
-        # swap player mapping in half of the games
         if self._fixed_players:
             self.player_map = lambda p: p
         else:
-            assert False, "debugging assert"
+            # swap player mapping in half of the games
+            assert False, "debugging assert, ok to remove"
             self.player_map = random.choice((lambda p: p,
                                              lambda p: (1 - p)))
 
@@ -133,6 +148,29 @@ class PokerMultiAgentEnv(MultiAgentEnv):
         legal_actions = self.curr_time_step.observations["legal_actions"][curr_player_id]
 
         player_action = action_dict[self.player_map(curr_player_id)]
+        orig_player_action = player_action
+
+        if self._continuous_action_space:
+            # player action is between -1 and 1, normalize to 0 and 1 and then quantize to a discrete action
+            player_action = (player_action / 2.0) + 1.0
+            assert 0.0 - 1e-9 <= player_action <= 1.0 + 1e-9
+            # place discrete actions in [0, 1] and find closest corresponding discrete action to player action
+            nearest_discrete_action = min(range(0, self.num_discrete_actions),
+                                          key=lambda x: abs(x/(self.num_discrete_actions - 1) - player_action))
+            # player action is now a discrete action
+            player_action = nearest_discrete_action
+
+        if self._dummy_action_multiplier != 1:
+            # extended dummy action space is just the base discrete actions repeated multiple times
+            # convert to the base discrete action space.
+            player_action = player_action % self.base_num_discrete_actions
+
+        if player_action not in self._base_action_space:
+            raise ValueError("Processed player action isn't in the base action space.\n"
+                             f"orig action: {orig_player_action}\n"
+                             f"processed action: {player_action}\n"
+                             f"action space: {self.action_space}\n"
+                             f"base action space: {self._base_action_space}")
 
         # If action is illegal, do a random legal action instead
         if player_action not in legal_actions:
