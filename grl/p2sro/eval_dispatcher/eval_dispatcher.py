@@ -41,6 +41,9 @@ class _EvalQueue(object):
                 self._unique_set.add(policy_spec_tuple)
             self._queue.put(policy_spec_tuple)
 
+    def __len__(self):
+        with self._lock:
+            return self._queue.qsize()
 
 class EvalResult(object):
 

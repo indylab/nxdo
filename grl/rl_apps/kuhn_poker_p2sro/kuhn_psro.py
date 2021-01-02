@@ -244,7 +244,7 @@ def train_poker_best_response(player, print_train_results=True):
         "multiagent": {
             "policies_to_train": [f"best_response"],
             "policies": {
-                f"metanash": (SimpleQTorchPolicy, tmp_env.observation_space, tmp_env.action_space, {}),
+                f"metanash": (SimpleQTorchPolicy, tmp_env.observation_space, tmp_env.action_space, {"explore": False}),
                 f"best_response": (SimpleQTorchPolicy, tmp_env.observation_space, tmp_env.action_space, {}),
             },
             "policy_mapping_fn": select_policy,

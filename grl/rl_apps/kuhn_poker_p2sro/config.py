@@ -73,8 +73,7 @@ def kuhn_dqn_params(action_space: Space) -> Dict:
             # Config for the Exploration class' constructor:
             "initial_epsilon": 0.06,
             "final_epsilon": 0.001,
-            # "epsilon_timesteps": int(700),  # Timesteps over which to anneal epsilon.
-            "epsilon_timesteps": int(3e7),
+            "epsilon_timesteps": int(3e7), # Timesteps over which to anneal epsilon.
             # For soft_q, use:
             # "exploration_config" = {
             #   "type": "SoftQ"
