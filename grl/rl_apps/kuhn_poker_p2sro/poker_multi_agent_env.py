@@ -25,6 +25,7 @@ DEFAULT_CONFIG = {
     'fixed_players': True,
     'dummy_action_multiplier': 1,
     'continuous_action_space': False,
+    'penalty_for_invalid_actions': False,
 }
 
 OBS_SHAPES = {
@@ -56,6 +57,9 @@ class PokerMultiAgentEnv(MultiAgentEnv):
             raise ValueError("dummy_action_multiplier must be a positive non-zero int")
         self._dummy_action_multiplier = env_config['dummy_action_multiplier']
         self._continuous_action_space = env_config['continuous_action_space']
+
+        self._apply_penalty_for_invalid_actions = env_config["penalty_for_invalid_actions"]
+        self._invalid_action_penalties = [False, False]
 
         if self.game_version in [KUHN_POKER, LEDUC_POKER]:
             open_spiel_env_config = {
@@ -175,6 +179,8 @@ class PokerMultiAgentEnv(MultiAgentEnv):
         # If action is illegal, do a random legal action instead
         if player_action not in legal_actions:
             player_action = random.choice(legal_actions)
+            if self._apply_penalty_for_invalid_actions:
+                self._invalid_action_penalties[curr_player_id] = True
 
         self.curr_time_step = self.openspiel_env.step([player_action])
 
@@ -218,6 +224,12 @@ class PokerMultiAgentEnv(MultiAgentEnv):
             rewards = {self.player_map(new_curr_player_id): self.curr_time_step.rewards[new_curr_player_id]}
             assert self.curr_time_step.rewards[1 - new_curr_player_id] == 0.0
             infos = {}
+
+        if self._apply_penalty_for_invalid_actions:
+            for player_id, penalty in enumerate(self._invalid_action_penalties):
+                if penalty and self.player_map(player_id) in rewards:
+                    rewards[self.player_map(player_id)] -= 4.0
+                    self._invalid_action_penalties[player_id] = False
 
         return obs, rewards, dones, infos
 
