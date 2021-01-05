@@ -94,8 +94,11 @@ class P2SROManager(object):
 
         self._modification_lock = RLock()
 
-    def n_players(self):
+    def n_players(self) -> int:
         return self._n_players
+
+    def get_log_dir(self) -> str:
+        return self.log_dir
 
     def claim_new_active_policy_for_player(self, player, new_policy_metadata_dict) -> PayoffTableStrategySpec:
         with self._modification_lock:

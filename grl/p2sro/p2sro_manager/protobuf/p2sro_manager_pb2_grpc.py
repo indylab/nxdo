@@ -20,6 +20,11 @@ class P2SROManagerStub(object):
                 request_serializer=p2sro__manager__pb2.NumPlayers.SerializeToString,
                 response_deserializer=p2sro__manager__pb2.Confirmation.FromString,
                 )
+        self.GetLogDir = channel.unary_unary(
+                '/P2SROManager/GetLogDir',
+                request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+                response_deserializer=p2sro__manager__pb2.String.FromString,
+                )
         self.ClaimNewActivePolicyForPlayer = channel.unary_unary(
                 '/P2SROManager/ClaimNewActivePolicyForPlayer',
                 request_serializer=p2sro__manager__pb2.NewActivePolicyRequest.SerializeToString,
@@ -66,6 +71,12 @@ class P2SROManagerServicer(object):
     """Missing associated documentation comment in .proto file."""
 
     def CheckNumPlayers(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetLogDir(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -126,6 +137,11 @@ def add_P2SROManagerServicer_to_server(servicer, server):
                     servicer.CheckNumPlayers,
                     request_deserializer=p2sro__manager__pb2.NumPlayers.FromString,
                     response_serializer=p2sro__manager__pb2.Confirmation.SerializeToString,
+            ),
+            'GetLogDir': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetLogDir,
+                    request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+                    response_serializer=p2sro__manager__pb2.String.SerializeToString,
             ),
             'ClaimNewActivePolicyForPlayer': grpc.unary_unary_rpc_method_handler(
                     servicer.ClaimNewActivePolicyForPlayer,
@@ -191,6 +207,23 @@ class P2SROManager(object):
         return grpc.experimental.unary_unary(request, target, '/P2SROManager/CheckNumPlayers',
             p2sro__manager__pb2.NumPlayers.SerializeToString,
             p2sro__manager__pb2.Confirmation.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def GetLogDir(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/P2SROManager/GetLogDir',
+            google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            p2sro__manager__pb2.String.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 

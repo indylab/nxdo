@@ -6,6 +6,10 @@ message NumPlayers {
     int64 num_players = 1;
 }
 
+message String {
+    string string = 1;
+}
+
 message PlayerAndPolicyNum {
     int64 player = 1;
     int64 policy_num = 2;
@@ -53,6 +57,7 @@ message Confirmation {
 
 service P2SROManager {
     rpc CheckNumPlayers (NumPlayers) returns (Confirmation) {}
+    rpc GetLogDir (google.protobuf.Empty) returns (String) {}
     rpc ClaimNewActivePolicyForPlayer (NewActivePolicyRequest) returns (PolicySpecJson) {}
     rpc SubmitNewActivePolicyMetadata (PolicyMetadataRequest) returns (PolicySpecJson) {}
     rpc CanActivePolicyBeSetAsFixedNow (PlayerAndPolicyNum) returns (Confirmation) {}

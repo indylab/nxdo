@@ -9,7 +9,7 @@ from grl.p2sro.payoff_table import PayoffTable, PayoffTableStrategySpec
 from grl.p2sro.p2sro_manager.protobuf.p2sro_manager_pb2_grpc import P2SROManagerServicer, add_P2SROManagerServicer_to_server, \
     P2SROManagerStub
 from grl.p2sro.p2sro_manager.protobuf.p2sro_manager_pb2 import NewActivePolicyRequest, PolicyMetadataRequest, P2SROStatusResponse, \
-    Confirmation, PolicySpecJson, NumPlayers, PayoffResult, EvalRequest, PlayerAndPolicyNum, PolicyNumList
+    Confirmation, PolicySpecJson, NumPlayers, PayoffResult, EvalRequest, PlayerAndPolicyNum, PolicyNumList, String
 
 from grl.p2sro.p2sro_manager.p2sro_manager import P2SROManager, P2SROManagerLogger
 
@@ -24,6 +24,9 @@ class _P2SROMangerServerServicerImpl(P2SROManagerServicer):
     def CheckNumPlayers(self, request: NumPlayers, context):
         is_same_num_players = self._manager.n_players() == request.num_players
         return Confirmation(result=is_same_num_players)
+
+    def GetLogDir(self, request, context):
+        return String(string=self._manager.get_log_dir())
 
     def ClaimNewActivePolicyForPlayer(self, request: NewActivePolicyRequest, context):
         policy_spec = self._manager.claim_new_active_policy_for_player(
@@ -151,8 +154,11 @@ class RemoteP2SROManagerClient(P2SROManager):
             raise ValueError("Remote P2SROManger server has a different number of players than this one.")
         self._n_players = n_players
 
-    def n_players(self):
+    def n_players(self) -> int:
         return self._n_players
+
+    def get_log_dir(self) -> str:
+        return self._stub.GetLogDir(Empty()).string
 
     def claim_new_active_policy_for_player(self, player, new_policy_metadata_dict) -> PayoffTableStrategySpec:
         try:

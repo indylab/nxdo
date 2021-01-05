@@ -20,7 +20,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x13p2sro_manager.proto\x1a\x1bgoogle/protobuf/empty.proto\"!\n\nNumPlayers\x12\x13\n\x0bnum_players\x18\x01 \x01(\x03\"8\n\x12PlayerAndPolicyNum\x12\x0e\n\x06player\x18\x01 \x01(\x03\x12\x12\n\npolicy_num\x18\x02 \x01(\x03\"?\n\x16NewActivePolicyRequest\x12\x0e\n\x06player\x18\x01 \x01(\x03\x12\x15\n\rmetadata_json\x18\x02 \x01(\t\"*\n\x0ePolicySpecJson\x12\x18\n\x10policy_spec_json\x18\x01 \x01(\t\"R\n\x15PolicyMetadataRequest\x12\x0e\n\x06player\x18\x01 \x01(\x03\x12\x12\n\npolicy_num\x18\x02 \x01(\x03\x12\x15\n\rmetadata_json\x18\x03 \x01(\t\"!\n\rPolicyNumList\x12\x10\n\x08policies\x18\x01 \x03(\x03\"\x81\x01\n\x13P2SROStatusResponse\x12\x19\n\x11payoff_table_json\x18\x01 \x01(\t\x12\'\n\x0f\x61\x63tive_policies\x18\x02 \x03(\x0b\x32\x0e.PolicyNumList\x12&\n\x0e\x66ixed_policies\x18\x03 \x03(\x0b\x32\x0e.PolicyNumList\"\x97\x01\n\x0cPayoffResult\x12)\n!json_policy_specs_for_each_player\x18\x01 \x03(\t\x12\x1f\n\x17payoffs_for_each_player\x18\x02 \x03(\x02\x12\x14\n\x0cgames_played\x18\x03 \x01(\x03\x12%\n\x1doverride_all_previous_results\x18\x04 \x01(\x08\"8\n\x0b\x45valRequest\x12)\n!json_policy_specs_for_each_player\x18\x01 \x03(\t\"\x1e\n\x0c\x43onfirmation\x12\x0e\n\x06result\x18\x01 \x01(\x08\x32\xd8\x04\n\x0cP2SROManager\x12/\n\x0f\x43heckNumPlayers\x12\x0b.NumPlayers\x1a\r.Confirmation\"\x00\x12K\n\x1d\x43laimNewActivePolicyForPlayer\x12\x17.NewActivePolicyRequest\x1a\x0f.PolicySpecJson\"\x00\x12J\n\x1dSubmitNewActivePolicyMetadata\x12\x16.PolicyMetadataRequest\x1a\x0f.PolicySpecJson\"\x00\x12\x46\n\x1e\x43\x61nActivePolicyBeSetAsFixedNow\x12\x13.PlayerAndPolicyNum\x1a\r.Confirmation\"\x00\x12\x35\n\rIsPolicyFixed\x12\x13.PlayerAndPolicyNum\x1a\r.Confirmation\"\x00\x12\x43\n\x16SetActivePolicyAsFixed\x12\x16.PolicyMetadataRequest\x1a\x0f.PolicySpecJson\"\x00\x12\x45\n\x13GetCopyOfLatestData\x12\x16.google.protobuf.Empty\x1a\x14.P2SROStatusResponse\"\x00\x12=\n\x1bSubmitEmpiricalPayoffResult\x12\r.PayoffResult\x1a\r.Confirmation\"\x00\x12\x34\n\x13RequestExternalEval\x12\x0c.EvalRequest\x1a\r.Confirmation\"\x00\x62\x06proto3'
+  serialized_pb=b'\n\x13p2sro_manager.proto\x1a\x1bgoogle/protobuf/empty.proto\"!\n\nNumPlayers\x12\x13\n\x0bnum_players\x18\x01 \x01(\x03\"\x18\n\x06String\x12\x0e\n\x06string\x18\x01 \x01(\t\"8\n\x12PlayerAndPolicyNum\x12\x0e\n\x06player\x18\x01 \x01(\x03\x12\x12\n\npolicy_num\x18\x02 \x01(\x03\"?\n\x16NewActivePolicyRequest\x12\x0e\n\x06player\x18\x01 \x01(\x03\x12\x15\n\rmetadata_json\x18\x02 \x01(\t\"*\n\x0ePolicySpecJson\x12\x18\n\x10policy_spec_json\x18\x01 \x01(\t\"R\n\x15PolicyMetadataRequest\x12\x0e\n\x06player\x18\x01 \x01(\x03\x12\x12\n\npolicy_num\x18\x02 \x01(\x03\x12\x15\n\rmetadata_json\x18\x03 \x01(\t\"!\n\rPolicyNumList\x12\x10\n\x08policies\x18\x01 \x03(\x03\"\x81\x01\n\x13P2SROStatusResponse\x12\x19\n\x11payoff_table_json\x18\x01 \x01(\t\x12\'\n\x0f\x61\x63tive_policies\x18\x02 \x03(\x0b\x32\x0e.PolicyNumList\x12&\n\x0e\x66ixed_policies\x18\x03 \x03(\x0b\x32\x0e.PolicyNumList\"\x97\x01\n\x0cPayoffResult\x12)\n!json_policy_specs_for_each_player\x18\x01 \x03(\t\x12\x1f\n\x17payoffs_for_each_player\x18\x02 \x03(\x02\x12\x14\n\x0cgames_played\x18\x03 \x01(\x03\x12%\n\x1doverride_all_previous_results\x18\x04 \x01(\x08\"8\n\x0b\x45valRequest\x12)\n!json_policy_specs_for_each_player\x18\x01 \x03(\t\"\x1e\n\x0c\x43onfirmation\x12\x0e\n\x06result\x18\x01 \x01(\x08\x32\x88\x05\n\x0cP2SROManager\x12/\n\x0f\x43heckNumPlayers\x12\x0b.NumPlayers\x1a\r.Confirmation\"\x00\x12.\n\tGetLogDir\x12\x16.google.protobuf.Empty\x1a\x07.String\"\x00\x12K\n\x1d\x43laimNewActivePolicyForPlayer\x12\x17.NewActivePolicyRequest\x1a\x0f.PolicySpecJson\"\x00\x12J\n\x1dSubmitNewActivePolicyMetadata\x12\x16.PolicyMetadataRequest\x1a\x0f.PolicySpecJson\"\x00\x12\x46\n\x1e\x43\x61nActivePolicyBeSetAsFixedNow\x12\x13.PlayerAndPolicyNum\x1a\r.Confirmation\"\x00\x12\x35\n\rIsPolicyFixed\x12\x13.PlayerAndPolicyNum\x1a\r.Confirmation\"\x00\x12\x43\n\x16SetActivePolicyAsFixed\x12\x16.PolicyMetadataRequest\x1a\x0f.PolicySpecJson\"\x00\x12\x45\n\x13GetCopyOfLatestData\x12\x16.google.protobuf.Empty\x1a\x14.P2SROStatusResponse\"\x00\x12=\n\x1bSubmitEmpiricalPayoffResult\x12\r.PayoffResult\x1a\r.Confirmation\"\x00\x12\x34\n\x13RequestExternalEval\x12\x0c.EvalRequest\x1a\r.Confirmation\"\x00\x62\x06proto3'
   ,
   dependencies=[google_dot_protobuf_dot_empty__pb2.DESCRIPTOR,])
 
@@ -59,6 +59,38 @@ _NUMPLAYERS = _descriptor.Descriptor(
 )
 
 
+_STRING = _descriptor.Descriptor(
+  name='String',
+  full_name='String',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='string', full_name='String.string', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=87,
+  serialized_end=111,
+)
+
+
 _PLAYERANDPOLICYNUM = _descriptor.Descriptor(
   name='PlayerAndPolicyNum',
   full_name='PlayerAndPolicyNum',
@@ -93,8 +125,8 @@ _PLAYERANDPOLICYNUM = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=87,
-  serialized_end=143,
+  serialized_start=113,
+  serialized_end=169,
 )
 
 
@@ -132,8 +164,8 @@ _NEWACTIVEPOLICYREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=145,
-  serialized_end=208,
+  serialized_start=171,
+  serialized_end=234,
 )
 
 
@@ -164,8 +196,8 @@ _POLICYSPECJSON = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=210,
-  serialized_end=252,
+  serialized_start=236,
+  serialized_end=278,
 )
 
 
@@ -210,8 +242,8 @@ _POLICYMETADATAREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=254,
-  serialized_end=336,
+  serialized_start=280,
+  serialized_end=362,
 )
 
 
@@ -242,8 +274,8 @@ _POLICYNUMLIST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=338,
-  serialized_end=371,
+  serialized_start=364,
+  serialized_end=397,
 )
 
 
@@ -288,8 +320,8 @@ _P2SROSTATUSRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=374,
-  serialized_end=503,
+  serialized_start=400,
+  serialized_end=529,
 )
 
 
@@ -341,8 +373,8 @@ _PAYOFFRESULT = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=506,
-  serialized_end=657,
+  serialized_start=532,
+  serialized_end=683,
 )
 
 
@@ -373,8 +405,8 @@ _EVALREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=659,
-  serialized_end=715,
+  serialized_start=685,
+  serialized_end=741,
 )
 
 
@@ -405,13 +437,14 @@ _CONFIRMATION = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=717,
-  serialized_end=747,
+  serialized_start=743,
+  serialized_end=773,
 )
 
 _P2SROSTATUSRESPONSE.fields_by_name['active_policies'].message_type = _POLICYNUMLIST
 _P2SROSTATUSRESPONSE.fields_by_name['fixed_policies'].message_type = _POLICYNUMLIST
 DESCRIPTOR.message_types_by_name['NumPlayers'] = _NUMPLAYERS
+DESCRIPTOR.message_types_by_name['String'] = _STRING
 DESCRIPTOR.message_types_by_name['PlayerAndPolicyNum'] = _PLAYERANDPOLICYNUM
 DESCRIPTOR.message_types_by_name['NewActivePolicyRequest'] = _NEWACTIVEPOLICYREQUEST
 DESCRIPTOR.message_types_by_name['PolicySpecJson'] = _POLICYSPECJSON
@@ -429,6 +462,13 @@ NumPlayers = _reflection.GeneratedProtocolMessageType('NumPlayers', (_message.Me
   # @@protoc_insertion_point(class_scope:NumPlayers)
   })
 _sym_db.RegisterMessage(NumPlayers)
+
+String = _reflection.GeneratedProtocolMessageType('String', (_message.Message,), {
+  'DESCRIPTOR' : _STRING,
+  '__module__' : 'p2sro_manager_pb2'
+  # @@protoc_insertion_point(class_scope:String)
+  })
+_sym_db.RegisterMessage(String)
 
 PlayerAndPolicyNum = _reflection.GeneratedProtocolMessageType('PlayerAndPolicyNum', (_message.Message,), {
   'DESCRIPTOR' : _PLAYERANDPOLICYNUM,
@@ -502,8 +542,8 @@ _P2SROMANAGER = _descriptor.ServiceDescriptor(
   index=0,
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_start=750,
-  serialized_end=1350,
+  serialized_start=776,
+  serialized_end=1424,
   methods=[
   _descriptor.MethodDescriptor(
     name='CheckNumPlayers',
@@ -516,9 +556,19 @@ _P2SROMANAGER = _descriptor.ServiceDescriptor(
     create_key=_descriptor._internal_create_key,
   ),
   _descriptor.MethodDescriptor(
+    name='GetLogDir',
+    full_name='P2SROManager.GetLogDir',
+    index=1,
+    containing_service=None,
+    input_type=google_dot_protobuf_dot_empty__pb2._EMPTY,
+    output_type=_STRING,
+    serialized_options=None,
+    create_key=_descriptor._internal_create_key,
+  ),
+  _descriptor.MethodDescriptor(
     name='ClaimNewActivePolicyForPlayer',
     full_name='P2SROManager.ClaimNewActivePolicyForPlayer',
-    index=1,
+    index=2,
     containing_service=None,
     input_type=_NEWACTIVEPOLICYREQUEST,
     output_type=_POLICYSPECJSON,
@@ -528,7 +578,7 @@ _P2SROMANAGER = _descriptor.ServiceDescriptor(
   _descriptor.MethodDescriptor(
     name='SubmitNewActivePolicyMetadata',
     full_name='P2SROManager.SubmitNewActivePolicyMetadata',
-    index=2,
+    index=3,
     containing_service=None,
     input_type=_POLICYMETADATAREQUEST,
     output_type=_POLICYSPECJSON,
@@ -538,7 +588,7 @@ _P2SROMANAGER = _descriptor.ServiceDescriptor(
   _descriptor.MethodDescriptor(
     name='CanActivePolicyBeSetAsFixedNow',
     full_name='P2SROManager.CanActivePolicyBeSetAsFixedNow',
-    index=3,
+    index=4,
     containing_service=None,
     input_type=_PLAYERANDPOLICYNUM,
     output_type=_CONFIRMATION,
@@ -548,7 +598,7 @@ _P2SROMANAGER = _descriptor.ServiceDescriptor(
   _descriptor.MethodDescriptor(
     name='IsPolicyFixed',
     full_name='P2SROManager.IsPolicyFixed',
-    index=4,
+    index=5,
     containing_service=None,
     input_type=_PLAYERANDPOLICYNUM,
     output_type=_CONFIRMATION,
@@ -558,7 +608,7 @@ _P2SROMANAGER = _descriptor.ServiceDescriptor(
   _descriptor.MethodDescriptor(
     name='SetActivePolicyAsFixed',
     full_name='P2SROManager.SetActivePolicyAsFixed',
-    index=5,
+    index=6,
     containing_service=None,
     input_type=_POLICYMETADATAREQUEST,
     output_type=_POLICYSPECJSON,
@@ -568,7 +618,7 @@ _P2SROMANAGER = _descriptor.ServiceDescriptor(
   _descriptor.MethodDescriptor(
     name='GetCopyOfLatestData',
     full_name='P2SROManager.GetCopyOfLatestData',
-    index=6,
+    index=7,
     containing_service=None,
     input_type=google_dot_protobuf_dot_empty__pb2._EMPTY,
     output_type=_P2SROSTATUSRESPONSE,
@@ -578,7 +628,7 @@ _P2SROMANAGER = _descriptor.ServiceDescriptor(
   _descriptor.MethodDescriptor(
     name='SubmitEmpiricalPayoffResult',
     full_name='P2SROManager.SubmitEmpiricalPayoffResult',
-    index=7,
+    index=8,
     containing_service=None,
     input_type=_PAYOFFRESULT,
     output_type=_CONFIRMATION,
@@ -588,7 +638,7 @@ _P2SROMANAGER = _descriptor.ServiceDescriptor(
   _descriptor.MethodDescriptor(
     name='RequestExternalEval',
     full_name='P2SROManager.RequestExternalEval',
-    index=8,
+    index=9,
     containing_service=None,
     input_type=_EVALREQUEST,
     output_type=_CONFIRMATION,
