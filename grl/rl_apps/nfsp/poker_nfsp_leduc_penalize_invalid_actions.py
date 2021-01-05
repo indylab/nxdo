@@ -95,6 +95,7 @@ def train_poker_off_policy_rl_nfsp(results_dir: str,
     env_config = {
         'version': "leduc_poker",
         'fixed_players': True,
+        'penalty_for_invalid_actions': True,
     }
     tmp_env = PokerMultiAgentEnv(env_config=env_config)
 
