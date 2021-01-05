@@ -238,7 +238,7 @@ def openspiel_policy_from_nonlstm_rllib_policy(openspiel_game: OpenSpielGame,
         #     axis=0)
         obs = np.asarray(info_state_vector, dtype=np.float32)
 
-        _, _, action_info = rllib_policy.compute_single_action(obs=obs, state=[])
+        _, _, action_info = rllib_policy.compute_single_action(obs=obs, state=[], explore=False)
 
         action_probs = None
         for key in ['policy_targets', 'action_probs']:
