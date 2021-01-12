@@ -16,7 +16,7 @@ if __name__ == '__main__':
         do_external_payoff_evals_for_new_fixed_policies=True,
         games_per_external_payoff_eval=20000,
         payoff_table_exponential_average_coeff=None,
-        log_dir=os.path.join(os.path.dirname(grl.__file__), "data", "simple_push_psro", f"manager_{datetime_str()}")
+        log_dir=os.path.join(os.path.dirname(grl.__file__), "data", "kuhn_psro", f"manager_{datetime_str()}")
     )
     print(f"Launched P2SRO Manager with server.")
     manager.wait_for_server_termination()

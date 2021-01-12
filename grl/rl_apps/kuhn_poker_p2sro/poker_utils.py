@@ -249,6 +249,14 @@ def openspiel_policy_from_nonlstm_rllib_policy(openspiel_game: OpenSpielGame,
             action_logits = action_info['behaviour_logits']
             action_probs = softmax(action_logits)
 
+        if len(action_probs) > len(valid_actions_mask) and len(action_probs) % len(valid_actions_mask) == 0:
+            # we may be using a dummy action variant of poker
+            dummy_action_probs = action_probs.copy()
+            action_probs = np.zeros_like(valid_actions_mask)
+            for i, action_prob in enumerate(dummy_action_probs):
+                action_probs[i % len(valid_actions_mask)] += action_prob
+            assert np.isclose(sum(action_probs), 1.0)
+
         # Since the rl env will execute a random legal action if an illegal action is chosen, redistribute probability
         # of choosing an illegal action evenly across all legal actions.
         num_legal_actions = sum(valid_actions_mask)
