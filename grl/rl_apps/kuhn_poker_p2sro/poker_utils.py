@@ -116,7 +116,7 @@ def _recursively_update_average_policies(state, avg_reach_probs, br_reach_probs,
     else:
         player = state.current_player()
 
-        print(f"avg policy: {avg_policies[player]}, state: {state}")
+        # print(f"avg policy: {avg_policies[player]}, state: {state}")
 
         avg_policy = _policy_dict_at_state(avg_policies[player], state)
         br_policy = _policy_dict_at_state(best_responses[player], state)
@@ -230,13 +230,15 @@ def openspiel_policy_from_nonlstm_rllib_policy(openspiel_game: OpenSpielGame,
 
         info_state_vector = state.information_state_as_normalized_vector()
 
-        # Observation includes both the info_state and legal actions, but agent isn't forced to take legal actions.
-        # Taking an illegal action will result in a random legal action being played.
-        # Allows easy compatibility with standard RL implementations for small action-space games like this one.
-        # obs = np.concatenate(
-        #     (np.asarray(info_state_vector, dtype=np.float32), np.asarray(valid_actions_mask, dtype=np.float32)),
-        #     axis=0)
-        obs = np.asarray(info_state_vector, dtype=np.float32)
+        if openspiel_game.get_type().short_name == "leduc_poker":
+            # Observation includes both the info_state and legal actions, but agent isn't forced to take legal actions.
+            # Taking an illegal action will result in a random legal action being played.
+            # Allows easy compatibility with standard RL implementations for small action-space games like this one.
+            obs = np.concatenate(
+                (np.asarray(info_state_vector, dtype=np.float32), np.asarray(valid_actions_mask, dtype=np.float32)),
+                axis=0)
+        else:
+            obs = np.asarray(info_state_vector, dtype=np.float32)
 
         _, _, action_info = rllib_policy.compute_single_action(obs=obs, state=[], explore=False)
 
@@ -259,11 +261,11 @@ def openspiel_policy_from_nonlstm_rllib_policy(openspiel_game: OpenSpielGame,
 
         # Since the rl env will execute a random legal action if an illegal action is chosen, redistribute probability
         # of choosing an illegal action evenly across all legal actions.
-        num_legal_actions = sum(valid_actions_mask)
-        if num_legal_actions > 0:
-            total_legal_action_probability = sum(action_probs * valid_actions_mask)
-            total_illegal_action_probability = 1.0 - total_legal_action_probability
-            action_probs = (action_probs + (total_illegal_action_probability / num_legal_actions)) * valid_actions_mask
+        # num_legal_actions = sum(valid_actions_mask)
+        # if num_legal_actions > 0:
+        #     total_legal_action_probability = sum(action_probs * valid_actions_mask)
+        #     total_illegal_action_probability = 1.0 - total_legal_action_probability
+        #     action_probs = (action_probs + (total_illegal_action_probability / num_legal_actions)) * valid_actions_mask
 
         assert np.isclose(sum(action_probs), 1.0)
 
@@ -273,7 +275,7 @@ def openspiel_policy_from_nonlstm_rllib_policy(openspiel_game: OpenSpielGame,
             if valid_actions_mask[idx] == 1.0:
                 legal_action_probs.append(action_probs[idx])
                 valid_action_prob_sum += action_probs[idx]
-        assert np.isclose(valid_action_prob_sum, 1.0)
+        assert np.isclose(valid_action_prob_sum, 1.0), (action_probs, valid_actions_mask)
 
         return {action_name: action_prob for action_name, action_prob in zip(legal_actions_list, legal_action_probs)}
 
@@ -384,13 +386,11 @@ def psro_measure_exploitability_nonlstm(br_checkpoint_path_tuple_list: List[Tupl
 
 
 
-def get_stats_for_single_payoff_table(payoff_table:PayoffTable, highest_policy_num: int, poker_game_version, policy_class, policy_config):
-    poker_env_config = {
-        'version': poker_game_version,
-    }
+def get_stats_for_single_payoff_table(payoff_table:PayoffTable, highest_policy_num: int, poker_env_config, policy_class, policy_config):
 
     ray.init(ignore_reinit_error=True, local_mode=True)
 
+    poker_game_version = poker_env_config["version"]
     temp_env = PokerMultiAgentEnv(env_config=poker_env_config)
 
     # def fetch_logits(policy):

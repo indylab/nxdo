@@ -13,7 +13,7 @@ from ray.rllib.policy.policy import Policy
 from ray.rllib.agents.sac import SACTorchPolicy, DEFAULT_CONFIG as DEFAULT_SAC_CONFIG
 from grl.p2sro.eval_dispatcher.remote import RemoteEvalDispatcherClient
 from grl.rl_apps.kuhn_poker_p2sro.poker_multi_agent_env import PokerMultiAgentEnv
-from grl.rl_apps.kuhn_poker_p2sro.config import kuhn_sac_params, kuhn_dqn_params
+from grl.rl_apps.kuhn_poker_p2sro.config import kuhn_sac_params, kuhn_dqn_params, leduc_dqn_params
 from grl.p2sro.payoff_table import PayoffTableStrategySpec
 
 
@@ -72,12 +72,22 @@ def run_poker_evaluation_loop(commandline_args,
 
     eval_dispatcher = RemoteEvalDispatcherClient(port=eval_dispatcher_port, remote_server_host=eval_dispatcher_host)
 
-    env = PokerMultiAgentEnv(env_config={'version': commandline_args.env, "fixed_players": True})
+    env = PokerMultiAgentEnv(env_config={'version': commandline_args.env,
+                                         "fixed_players": True,
+                                         "append_valid_actions_mask_to_obs": commandline_args.env == "leduc_poker"})
     num_players = 2
+
+    if commandline_args.env == "kuhn_poker":
+        hyperparams = kuhn_dqn_params
+    elif commandline_args.env == "leduc_poker":
+        hyperparams = leduc_dqn_params
+    else:
+        raise NotImplementedError(f"unknown params for env: {commandline_args.env}")
+
 
     policies = [policy_class(env.observation_space,
                              env.action_space,
-                             merge_dicts(SIMPLE_Q_DEFAULT_CONFIG, kuhn_dqn_params(action_space=env.action_space)))
+                             merge_dicts(SIMPLE_Q_DEFAULT_CONFIG, hyperparams(action_space=env.action_space)))
                 for _ in range(num_players)]
 
     while True:

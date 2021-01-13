@@ -26,6 +26,7 @@ DEFAULT_CONFIG = {
     'dummy_action_multiplier': 1,
     'continuous_action_space': False,
     'penalty_for_invalid_actions': False,
+    'append_valid_actions_mask_to_obs': False,
 }
 
 OBS_SHAPES = {
@@ -61,6 +62,8 @@ class PokerMultiAgentEnv(MultiAgentEnv):
         self._apply_penalty_for_invalid_actions = env_config["penalty_for_invalid_actions"]
         self._invalid_action_penalties = [False, False]
 
+        self._append_valid_actions_mask_to_obs = env_config["append_valid_actions_mask_to_obs"]
+
         if self.game_version in [KUHN_POKER, LEDUC_POKER]:
             open_spiel_env_config = {
                 "players": 2
@@ -80,8 +83,11 @@ class PokerMultiAgentEnv(MultiAgentEnv):
         else:
             self.action_space = Discrete(self.num_discrete_actions)
 
-        # observation_length = OBS_SHAPES[self.game_version][0] + VALID_ACTIONS_SHAPES[self.game_version][0]
-        observation_length = OBS_SHAPES[self.game_version][0]
+        if self._append_valid_actions_mask_to_obs:
+            observation_length = OBS_SHAPES[self.game_version][0] + VALID_ACTIONS_SHAPES[self.game_version][0]
+        else:
+            observation_length = OBS_SHAPES[self.game_version][0]
+
         self.observation_space = Box(low=0.0, high=1.0, shape=(observation_length,))
 
         self.curr_time_step: TimeStep = None
@@ -104,14 +110,15 @@ class PokerMultiAgentEnv(MultiAgentEnv):
 
             info_state = self.curr_time_step.observations["info_state"][player_id]
 
-            # Observation includes both the info_state and legal actions, but agent isn't forced to take legal actions.
-            # Taking an illegal action will result in a random legal action being played.
-            # Allows easy compatibility with standard RL implementations for small action-space games like this one.
-            # obs[self.player_map(player_id)] = np.concatenate(
-            #     (np.asarray(info_state, dtype=np.float32), np.asarray(legal_actions_mask, dtype=np.float32)),
-            #     axis=0)
-
-            obs[self.player_map(player_id)] = np.asarray(info_state, dtype=np.float32)
+            if self._append_valid_actions_mask_to_obs:
+                # Observation includes both the info_state and legal actions, but agent isn't forced to take legal actions.
+                # Taking an illegal action will result in a random legal action being played.
+                # Allows easy compatibility with standard RL implementations for small action-space games like this one.
+                obs[self.player_map(player_id)] = np.concatenate(
+                    (np.asarray(info_state, dtype=np.float32), np.asarray(legal_actions_mask, dtype=np.float32)),
+                    axis=0)
+            else:
+                obs[self.player_map(player_id)] = np.asarray(info_state, dtype=np.float32)
 
         return obs
 

@@ -5,6 +5,7 @@ from gym.spaces import Space, Discrete, Box
 from ray.rllib.utils import merge_dicts
 from ray.rllib.models import MODEL_DEFAULTS
 from ray.rllib.policy.sample_batch import SampleBatch, MultiAgentBatch
+from grl.rllib_tools.leduc_dqn.valid_actions_fcnet import LeducDQNFullyConnectedNetwork
 
 
 # def debug_before_learn_on_batch(x: MultiAgentBatch, *args, **kwargs):
@@ -245,6 +246,7 @@ def leduc_dqn_params(action_space: Space) -> Dict:
         "model": merge_dicts(MODEL_DEFAULTS, {
             "fcnet_activation": "relu",
             "fcnet_hiddens": [128],
+            "custom_model": LeducDQNFullyConnectedNetwork,
         }),
     }
 
