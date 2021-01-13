@@ -15,11 +15,13 @@ from gym.spaces import Space, Discrete
 import deepdish
 
 import ray
+from ray.rllib.utils import merge_dicts, try_import_torch
+torch, _ = try_import_torch()
+
 from ray.rllib import SampleBatch, Policy
 from ray.rllib.agents import Trainer
 from ray.rllib.agents.sac import SACTrainer, SACTorchPolicy
 from ray.rllib.agents.dqn import DQNTrainer, DQNTorchPolicy, SimpleQTorchPolicy, SimpleQTFPolicy
-from ray.rllib.utils import merge_dicts, try_import_torch
 from ray.rllib.utils.torch_ops import convert_to_non_torch_type, \
     convert_to_torch_tensor
 from ray.rllib.utils.typing import ModelGradients, ModelWeights, \
@@ -52,7 +54,6 @@ from grl.xfdo.action_space_conversion import RestrictedToBaseGameActionSpaceConv
 
 from grl.rl_apps.kuhn_poker_p2sro.poker_multi_agent_env import PokerMultiAgentEnv
 
-torch, _ = try_import_torch()
 
 logger = logging.getLogger(__name__)
 

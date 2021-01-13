@@ -15,11 +15,13 @@ from gym.spaces import Space
 import deepdish
 
 import ray
+from ray.rllib.utils import merge_dicts, try_import_torch
+torch, _ = try_import_torch()
+
 from ray.rllib import SampleBatch, Policy
 from ray.rllib.agents import Trainer
 from ray.rllib.agents.sac import SACTrainer, SACTorchPolicy
 from ray.rllib.agents.dqn import DQNTrainer, DQNTorchPolicy, SimpleQTorchPolicy, SimpleQTFPolicy
-from ray.rllib.utils import merge_dicts, try_import_torch
 from ray.rllib.utils.torch_ops import convert_to_non_torch_type, \
     convert_to_torch_tensor
 from ray.rllib.utils.typing import ModelGradients, ModelWeights, \
@@ -51,7 +53,6 @@ from grl.rl_apps.nfsp.openspiel_utils import snfsp_measure_exploitability_nonlst
 
 from grl.rllib_tools.space_saving_logger import SpaceSavingLogger
 
-torch, _ = try_import_torch()
 
 logger = logging.getLogger(__name__)
 
