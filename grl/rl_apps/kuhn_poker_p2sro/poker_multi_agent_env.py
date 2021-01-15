@@ -185,9 +185,10 @@ class PokerMultiAgentEnv(MultiAgentEnv):
 
         # If action is illegal, do a random legal action instead
         if player_action not in legal_actions:
-            player_action = random.choice(legal_actions)
-            if self._apply_penalty_for_invalid_actions:
-                self._invalid_action_penalties[curr_player_id] = True
+            raise ValueError("illegal actions are now not allowed")
+            # player_action = random.choice(legal_actions)
+            # if self._apply_penalty_for_invalid_actions:
+            #     self._invalid_action_penalties[curr_player_id] = True
 
         self.curr_time_step = self.openspiel_env.step([player_action])
 

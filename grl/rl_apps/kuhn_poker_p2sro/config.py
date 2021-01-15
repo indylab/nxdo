@@ -4,6 +4,7 @@ from typing import Dict
 from ray.rllib.utils import merge_dicts
 from ray.rllib.models import MODEL_DEFAULTS
 from grl.rllib_tools.leduc_dqn.valid_actions_fcnet import LeducDQNFullyConnectedNetwork
+from grl.rllib_tools.leduc_dqn.leduc_epsilon_greedy import LeducEpsilonGreedy
 
 def kuhn_sac_params(action_space: Discrete):
     return {
@@ -186,12 +187,12 @@ def leduc_dqn_params(action_space: Space) -> Dict:
         # === Exploration Settings ===
         "exploration_config": {
             # The Exploration class to use.
-            "type": "EpsilonGreedy",
+            "type": LeducEpsilonGreedy,
             # Config for the Exploration class' constructor:
             "initial_epsilon": 0.06,
             "final_epsilon": 0.001,
-            # "epsilon_timesteps": int(20e6) * 10,  # Timesteps over which to anneal epsilon.
-            "epsilon_timesteps": int(200000)
+            "epsilon_timesteps": int(20e6) * 10,  # Timesteps over which to anneal epsilon.
+            # "epsilon_timesteps": int(200000)
             # For soft_q, use:
             # "exploration_config" = {
             #   "type": "SoftQ"
@@ -205,8 +206,8 @@ def leduc_dqn_params(action_space: Space) -> Dict:
         "explore": True,
 
         # Update the target network every `target_network_update_freq` steps.
-        # "target_network_update_freq": 19200 * 10,
-        "target_network_update_freq": 10000,
+        "target_network_update_freq": 19200 * 10,
+        # "target_network_update_freq": 10000,
 
         # "target_network_update_freq": 1,
 

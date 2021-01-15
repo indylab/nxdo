@@ -6,6 +6,7 @@ from ray.rllib.utils import merge_dicts
 from ray.rllib.models import MODEL_DEFAULTS
 from ray.rllib.policy.sample_batch import SampleBatch, MultiAgentBatch
 from grl.rllib_tools.leduc_dqn.valid_actions_fcnet import LeducDQNFullyConnectedNetwork
+from grl.rllib_tools.leduc_dqn.leduc_epsilon_greedy import LeducEpsilonGreedy
 
 
 # def debug_before_learn_on_batch(x: MultiAgentBatch, *args, **kwargs):
@@ -161,7 +162,7 @@ def leduc_dqn_params(action_space: Space) -> Dict:
         # === Exploration Settings ===
         "exploration_config": {
             # The Exploration class to use.
-            "type": "EpsilonGreedy",
+            "type": LeducEpsilonGreedy,
             # Config for the Exploration class' constructor:
             "initial_epsilon": 0.06,
             "final_epsilon": 0.001,

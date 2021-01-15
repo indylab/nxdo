@@ -1,4 +1,5 @@
 from grl.p2sro.payoff_table import PayoffTable, PayoffTableStrategySpec
+from grl.rllib_tools.leduc_dqn.valid_actions_fcnet import LeducDQNFullyConnectedNetwork
 from ray.rllib.agents.sac import SACTorchPolicy
 from ray.rllib.agents.trainer import with_common_config, MODEL_DEFAULTS
 from ray.rllib.policy import Policy
@@ -166,7 +167,7 @@ def _recursively_update_average_policies(state, avg_reach_probs, br_reach_probs,
 
                     avg_policy_tables[player][infostate_key][action] = pr
                     pr_sum += pr
-                print(f"pr_sum: {pr_sum}")
+                # print(f"pr_sum: {pr_sum}")
                 assert (1.0 - delta_tolerance <= pr_sum <= 1.0 + delta_tolerance)
             else:
                 for action in legal_actions:
@@ -192,8 +193,8 @@ def tabular_policies_from_weighted_policies(game: OpenSpielGame,
     total_weights_added = np.zeros(num_players)
     for index, (best_responses, weights_for_each_br) in enumerate(zip(policy_iterable, weights)):
         weights_for_each_br = np.asarray(weights_for_each_br, dtype=np.float64)
-        print(f"best responses: {best_responses}")
-        print(f"total_weights_added: {total_weights_added}, weights_for_each_br: {weights_for_each_br}")
+        # print(f"best responses: {best_responses}")
+        # print(f"total_weights_added: {total_weights_added}, weights_for_each_br: {weights_for_each_br}")
         total_weights_added += weights_for_each_br
         if index == 0:
             for i in range(num_players):
@@ -215,7 +216,7 @@ def tabular_policies_from_weighted_policies(game: OpenSpielGame,
     for i in range(num_players):
         avg_policies[i] = PolicyFromCallable(game=game, callable_policy=avg_policies[i])
 
-    print(f"avg_policies: {avg_policies}")
+    # print(f"avg_policies: {avg_policies}")
     return avg_policies
 
 def openspiel_policy_from_nonlstm_rllib_policy(openspiel_game: OpenSpielGame,
@@ -238,6 +239,7 @@ def openspiel_policy_from_nonlstm_rllib_policy(openspiel_game: OpenSpielGame,
                 (np.asarray(info_state_vector, dtype=np.float32), np.asarray(valid_actions_mask, dtype=np.float32)),
                 axis=0)
         else:
+            assert False, "ok to remove if this isnt leduc"
             obs = np.asarray(info_state_vector, dtype=np.float32)
 
         _, _, action_info = rllib_policy.compute_single_action(obs=obs, state=[], explore=False)
@@ -275,7 +277,7 @@ def openspiel_policy_from_nonlstm_rllib_policy(openspiel_game: OpenSpielGame,
             if valid_actions_mask[idx] == 1.0:
                 legal_action_probs.append(action_probs[idx])
                 valid_action_prob_sum += action_probs[idx]
-        assert np.isclose(valid_action_prob_sum, 1.0), (action_probs, valid_actions_mask)
+        assert np.isclose(valid_action_prob_sum, 1.0), (action_probs, valid_actions_mask, action_info.get('behaviour_logits'))
 
         return {action_name: action_prob for action_name, action_prob in zip(legal_actions_list, legal_action_probs)}
 
@@ -372,7 +374,7 @@ def psro_measure_exploitability_nonlstm(br_checkpoint_path_tuple_list: List[Tupl
                 openspiel_policies.append(single_openspiel_policy)
             yield openspiel_policies
 
-    print(f"weights: {metanash_weights}")
+    # print(f"weights: {metanash_weights}")
 
     avg_policies = tabular_policies_from_weighted_policies(game=openspiel_game,
                                                            policy_iterable=policy_iterable(),
@@ -388,7 +390,7 @@ def psro_measure_exploitability_nonlstm(br_checkpoint_path_tuple_list: List[Tupl
 
 def get_stats_for_single_payoff_table(payoff_table:PayoffTable, highest_policy_num: int, poker_env_config, policy_class, policy_config):
 
-    ray.init(ignore_reinit_error=True, local_mode=True)
+    ray.init(ignore_reinit_error=True, local_mode=True, num_cpus=1)
 
     poker_game_version = poker_env_config["version"]
     temp_env = PokerMultiAgentEnv(env_config=poker_env_config)
@@ -424,6 +426,9 @@ def get_stats_for_single_payoff_table(payoff_table:PayoffTable, highest_policy_n
         # )
     # ) for _ in range(2)]
 
+    if poker_game_version == "leduc_poker":
+        assert isinstance(policies[0].model, LeducDQNFullyConnectedNetwork)
+
     def set_policy_weights(policy: Policy, checkpoint_path: str):
         checkpoint_data = deepdish.io.load(path=checkpoint_path)
         weights = checkpoint_data["weights"]
@@ -454,7 +459,7 @@ def get_stats_for_single_payoff_table(payoff_table:PayoffTable, highest_policy_n
                                        as_policy_num=n_policies,
                                        fictitious_play_iters=2000,
                                        mix_with_uniform_dist_coeff=0.0)[1].sample_policy_spec().get_pure_strat_indexes()
-        print(f"pure strat index: {pure_strat_index}")
+        # print(f"pure strat index: {pure_strat_index}")
 
 
         policy_specs_0 = payoff_table.get_ordered_spec_list_for_player(player=0)[:n_policies]
@@ -468,10 +473,10 @@ def get_stats_for_single_payoff_table(payoff_table:PayoffTable, highest_policy_n
         br_checkpoint_paths = []
         metanash_weights = []
 
-        print(policy_specs_0)
-        print(metanash_probs_0)
-        print(policy_specs_1)
-        print(metanash_probs_1)
+        # print(policy_specs_0)
+        # print(metanash_probs_0)
+        # print(policy_specs_1)
+        # print(metanash_probs_1)
 
         for spec_0, prob_0, spec_1, prob_1 in zip(policy_specs_0, metanash_probs_0, policy_specs_1, metanash_probs_1):
             br_checkpoint_paths.append((spec_0.metadata["checkpoint_path"], spec_1.metadata["checkpoint_path"]))

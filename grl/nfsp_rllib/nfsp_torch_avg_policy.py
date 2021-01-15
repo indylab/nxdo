@@ -141,6 +141,7 @@ def behaviour_logits_fetches(
     """
     return {
         "action_probs": policy.action_probs,
+        "behaviour_logits": policy.logits,
     }
 
 # actions, logp, state_out = self.action_sampler_fn(
@@ -158,6 +159,7 @@ def action_sampler(policy, model, input_dict, state, explore, timestep):
     logits = compute_policy_logits(policy, model, obs, is_training)
     logits = logits[0] if isinstance(logits, tuple) else logits
     action_probs_batch = F.softmax(logits, dim=1)
+    policy.logits = logits
     policy.action_probs = action_probs_batch
     # print(f"probs: {action_probs_batch}")
 

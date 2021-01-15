@@ -231,7 +231,7 @@ def train_poker_best_response(player, print_train_results=True):
         else:
             raise ValueError(f"Unknown agent id: {agent_id}")
 
-    env_config = {'version': "leduc_poker", "append_valid_actions_mask_to_obs": True, "fixed_players": True}
+    env_config = {'version': "leduc_poker", "append_valid_actions_mask_to_obs": True, "fixed_players": True, "dummy_action_multiplier": 20}
     tmp_env = PokerMultiAgentEnv(env_config=env_config)
 
     trainer_config = {

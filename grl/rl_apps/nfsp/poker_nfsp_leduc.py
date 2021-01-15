@@ -11,11 +11,13 @@ import copy
 import deepdish
 
 import ray
+from ray.rllib.utils import merge_dicts, try_import_torch
+torch, _ = try_import_torch()
+
 from ray.rllib import SampleBatch, Policy
 from ray.rllib.agents import Trainer
 from ray.rllib.agents.sac import SACTrainer, SACTorchPolicy
 from ray.rllib.agents.dqn import DQNTrainer, DQNTorchPolicy, SimpleQTorchPolicy, SimpleQTFPolicy
-from ray.rllib.utils import merge_dicts, try_import_torch
 from ray.rllib.utils.torch_ops import convert_to_non_torch_type, \
     convert_to_torch_tensor
 from ray.rllib.utils.typing import ModelGradients, ModelWeights, \
@@ -38,16 +40,15 @@ from grl.rl_apps.nfsp.config import leduc_dqn_params
 from grl.rl_apps.kuhn_poker_p2sro.poker_utils import measure_exploitability_nonlstm, openspiel_policy_from_nonlstm_rllib_policy
 from grl.nfsp_rllib.nfsp import NFSPTrainer, NFSPTorchAveragePolicy, get_store_to_avg_policy_buffer_fn
 from grl.rl_apps.nfsp.openspiel_utils import nfsp_measure_exploitability_nonlstm
-
-
+from grl.rllib_tools.leduc_dqn.valid_actions_fcnet import LeducDQNFullyConnectedNetwork
+from grl.rllib_tools.space_saving_logger import SpaceSavingLogger
 
 logger = logging.getLogger(__name__)
 
-torch, _ = try_import_torch()
 
 
 def get_trainer_logger_creator(base_dir: str, env_class):
-    logdir_prefix = f"{env_class.__name__}_{datetime_str()}"
+    logdir_prefix = f"{env_class.__name__}_sparse_{datetime_str()}"
 
     def trainer_logger_creator(config):
         """Creates a Unified logger with a default logdir prefix
@@ -57,7 +58,11 @@ def get_trainer_logger_creator(base_dir: str, env_class):
             os.makedirs(base_dir)
         logdir = tempfile.mkdtemp(
             prefix=logdir_prefix, dir=base_dir)
-        return UnifiedLogger(config, logdir)
+
+        def _should_log(result: dict) -> bool:
+            return "z_avg_policy_exploitability" in result
+
+        return SpaceSavingLogger(config=config, logdir=logdir, should_log_result_fn=_should_log)
 
     return trainer_logger_creator
 
@@ -94,6 +99,7 @@ def train_poker_off_policy_rl_nfsp(results_dir: str,
 
     env_config = {
         'version': "leduc_poker",
+        "append_valid_actions_mask_to_obs": True,
         'fixed_players': True,
     }
     tmp_env = PokerMultiAgentEnv(env_config=env_config)
@@ -114,12 +120,14 @@ def train_poker_off_policy_rl_nfsp(results_dir: str,
                     "model": {
                         "fcnet_activation": "relu",
                         "fcnet_hiddens": [128],
+                        "custom_model": LeducDQNFullyConnectedNetwork,
                     }
                 }),
                 "average_policy_1": (NFSPTorchAveragePolicy, tmp_env.observation_space, tmp_env.action_space, {
                     "model": {
                         "fcnet_activation": "relu",
                         "fcnet_hiddens": [128],
+                        "custom_model": LeducDQNFullyConnectedNetwork,
                     }
                 }),
             },
@@ -150,6 +158,8 @@ def train_poker_off_policy_rl_nfsp(results_dir: str,
 
                     if "action_probs" in postprocessed_batch:
                         del postprocessed_batch.data["action_probs"]
+                    if "behaviour_logits" in postprocessed_batch:
+                        del postprocessed_batch.data["behaviour_logits"]
 
                     br_policy: Policy = policies[br_policy_id]
 
@@ -200,7 +210,7 @@ def train_poker_off_policy_rl_nfsp(results_dir: str,
             # if trainer.latest_avg_trainer_result is not None:
             #     result["avg_trainer_info"] = trainer.latest_avg_trainer_result.get("info", {})
             training_iteration = result["training_iteration"]
-            if training_iteration == 1 or training_iteration % 300 == 0:
+            if training_iteration == 1 or training_iteration % 2000 == 0:
                 local_avg_policy_0 = trainer.workers.local_worker().policy_map["average_policy_0"]
                 local_avg_policy_1 = trainer.workers.local_worker().policy_map["average_policy_1"]
                 exploitability = nfsp_measure_exploitability_nonlstm(
@@ -242,6 +252,7 @@ def train_poker_off_policy_rl_nfsp(results_dir: str,
                     "model": {
                         "fcnet_activation": "relu",
                         "fcnet_hiddens": [128],
+                        "custom_model": LeducDQNFullyConnectedNetwork,
                     },
                     "explore": False,
                 }),
@@ -251,6 +262,7 @@ def train_poker_off_policy_rl_nfsp(results_dir: str,
                     "model": {
                         "fcnet_activation": "relu",
                         "fcnet_hiddens": [128],
+                        "custom_model": LeducDQNFullyConnectedNetwork,
                     },
                     "explore": False,
                 }),
@@ -264,6 +276,11 @@ def train_poker_off_policy_rl_nfsp(results_dir: str,
     br_trainer = br_trainer_class(config=br_trainer_config, logger_creator=get_trainer_logger_creator(base_dir=results_dir,
                                                                                           env_class=PokerMultiAgentEnv))
 
+
+    assert isinstance(br_trainer.workers.local_worker().policy_map["average_policy_1"].model, LeducDQNFullyConnectedNetwork)
+    assert isinstance(br_trainer.workers.local_worker().policy_map["average_policy_0"].model, LeducDQNFullyConnectedNetwork)
+    assert isinstance(avg_trainer.workers.local_worker().policy_map["average_policy_0"].model, LeducDQNFullyConnectedNetwork)
+    assert isinstance(avg_trainer.workers.local_worker().policy_map["average_policy_0"].model, LeducDQNFullyConnectedNetwork)
 
     br_trainer.latest_avg_trainer_result = None
     train_iter_count = 0
