@@ -1,6 +1,7 @@
 import os
 import time
 import logging
+import tempfile
 
 from typing import Dict, List
 from tables.exceptions import HDF5ExtError
@@ -29,13 +30,34 @@ from grl.utils import pretty_dict_str, datetime_str, ensure_dir
 from grl.p2sro.p2sro_manager import RemoteP2SROManagerClient, P2SROManagerWithServer
 from grl.p2sro.p2sro_manager.utils import get_latest_metanash_strategies, PolicySpecDistribution
 from grl.rl_apps.kuhn_poker_p2sro.config import leduc_dqn_params
+from grl.rllib_tools.space_saving_logger import SpaceSavingLogger
 
 
 logger = logging.getLogger(__name__)
 
 
-BR_CHECKPOINT_SAVE_DIR = "/tmp/p2sro_policies"
 
+def get_trainer_logger_creator(base_dir: str, env_class):
+    logdir_prefix = f"{env_class.__name__}_sparse_{datetime_str()}"
+
+    def trainer_logger_creator(config):
+        """Creates a Unified logger with a default logdir prefix
+        containing the agent name and the env id
+        """
+        if not os.path.exists(base_dir):
+            os.makedirs(base_dir)
+        logdir = tempfile.mkdtemp(
+            prefix=logdir_prefix, dir=base_dir)
+
+        def _should_log(result: dict) -> bool:
+            return result["training_iteration"] % 100 == 0
+
+        return SpaceSavingLogger(config=config, logdir=logdir, should_log_result_fn=_should_log)
+
+    return trainer_logger_creator
+
+def checkpoint_dir(trainer):
+    return os.path.join(trainer.logdir, "br_checkpoints")
 
 def save_best_response_checkpoint(trainer: SACTrainer,
                                   player: int,
@@ -151,7 +173,7 @@ def sync_active_policy_br_and_metanash_with_p2sro_manager(trainer: SACTrainer,
     p2sro_manager.submit_new_active_policy_metadata(
         player=player, policy_num=active_policy_num,
         metadata_dict=create_metadata_with_new_checkpoint_for_current_best_response(
-            trainer=trainer, player=player, save_dir=BR_CHECKPOINT_SAVE_DIR, timesteps_training_br=timesteps_training_br,
+            trainer=trainer, player=player, save_dir=checkpoint_dir(trainer), timesteps_training_br=timesteps_training_br,
             episodes_training_br=episodes_training_br,
             active_policy_num=active_policy_num
         ))
@@ -186,7 +208,7 @@ class P2SROPreAndPostEpisodeCallbacks(DefaultCallbacks):
     #                    env_index: int, **kwargs):
     #
     #     if not hasattr(worker, "p2sro_manager"):
-    #         worker.p2sro_manager = RemoteP2SROManagerClient(n_players=2, port=4535, remote_server_host="127.0.0.1")
+    #         worker.p2sro_manager = RemoteP2SROManagerClient(n_players=2, port=os.getenv("P2SRO_PORT", 4535), remote_server_host="127.0.0.1")
     #
     #     br_policy_spec: PayoffTableStrategySpec = worker.policy_map["best_response"].p2sro_policy_spec
     #     if br_policy_spec.pure_strat_index_for_player(player=worker.br_player) == 0:
@@ -214,7 +236,7 @@ class P2SROPreAndPostEpisodeCallbacks(DefaultCallbacks):
     #         override_all_previous_results=False)
 
 
-def train_poker_best_response(player, print_train_results=True):
+def train_poker_best_response(player, results_dir, print_train_results=True):
     
     other_player = 1 - player
     
@@ -240,8 +262,8 @@ def train_poker_best_response(player, print_train_results=True):
         "env_config": env_config,
         "gamma": 1.0,
         "num_gpus": 0,
-        "num_workers": 0,
-        "num_envs_per_worker": 1,
+        "num_workers": 4,
+        "num_envs_per_worker": 8,
         "multiagent": {
             "policies_to_train": [f"best_response"],
             "policies": {
@@ -252,13 +274,14 @@ def train_poker_best_response(player, print_train_results=True):
         },
     }
     trainer_config = merge_dicts(trainer_config, leduc_dqn_params(action_space=tmp_env.action_space))
+    trainer_config["rollout_fragment_length"] = trainer_config["rollout_fragment_length"] // max(1, trainer_config["num_workers"] * trainer_config["num_envs_per_worker"] )
 
     ray.init(ignore_reinit_error=True, local_mode=False)
-    trainer = DQNTrainer(config=trainer_config)
-    p2sro_manager = RemoteP2SROManagerClient(n_players=2, port=4535, remote_server_host="127.0.0.1")
+    trainer = DQNTrainer(config=trainer_config, logger_creator=get_trainer_logger_creator(base_dir=results_dir, env_class=PokerMultiAgentEnv))
+    p2sro_manager = RemoteP2SROManagerClient(n_players=2, port=os.getenv("P2SRO_PORT", 4535), remote_server_host="127.0.0.1")
     active_policy_spec: PayoffTableStrategySpec = p2sro_manager.claim_new_active_policy_for_player(
         player=player, new_policy_metadata_dict=create_metadata_with_new_checkpoint_for_current_best_response(
-            trainer=trainer, player=player, save_dir=BR_CHECKPOINT_SAVE_DIR, timesteps_training_br=0, episodes_training_br=0,
+            trainer=trainer, player=player, save_dir=checkpoint_dir(trainer), timesteps_training_br=0, episodes_training_br=0,
             active_policy_num=None
         ))
 
@@ -354,7 +377,7 @@ def train_poker_best_response(player, print_train_results=True):
     p2sro_manager.set_active_policy_as_fixed(
         player=player, policy_num=active_policy_num,
         final_metadata_dict=create_metadata_with_new_checkpoint_for_current_best_response(
-            trainer=trainer, player=player, save_dir=BR_CHECKPOINT_SAVE_DIR, timesteps_training_br=total_timesteps_training_br,
+            trainer=trainer, player=player, save_dir=checkpoint_dir(trainer=trainer), timesteps_training_br=total_timesteps_training_br,
             episodes_training_br=total_episodes_training_br,
             active_policy_num=active_policy_num
         ))
@@ -389,9 +412,13 @@ if __name__ == "__main__":
     #
     # exploitability_path = os.path.join(results_dir, "exploitability.csv")
 
+    manager_log_dir = RemoteP2SROManagerClient(n_players=2, port=os.getenv("P2SRO_PORT", 4535), remote_server_host="127.0.0.1").get_log_dir()
+    results_dir = os.path.join(manager_log_dir, f"learners_player_{args.player}/")
+    print(f"results dir is {results_dir}")
+
     while True:
         # Train a br for each player, then repeat.
-        train_poker_best_response(player=args.player, print_train_results=True)
+        train_poker_best_response(player=args.player, print_train_results=True, results_dir=results_dir)
         # with open(file=exploitability_path, "a+") as csv_file:
         #     writer = csv.writer(csv_file)
         #     writer.writerow()

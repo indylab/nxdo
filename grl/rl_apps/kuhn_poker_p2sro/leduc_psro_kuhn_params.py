@@ -29,7 +29,7 @@ from grl.rl_apps.kuhn_poker_p2sro.poker_multi_agent_env import PokerMultiAgentEn
 from grl.utils import pretty_dict_str, datetime_str, ensure_dir
 from grl.p2sro.p2sro_manager import RemoteP2SROManagerClient, P2SROManagerWithServer
 from grl.p2sro.p2sro_manager.utils import get_latest_metanash_strategies, PolicySpecDistribution
-from grl.rl_apps.kuhn_poker_p2sro.config import leduc_dqn_params
+from grl.rl_apps.kuhn_poker_p2sro.config import fast_leduc_dqn_params
 from grl.rllib_tools.space_saving_logger import SpaceSavingLogger
 
 
@@ -253,7 +253,7 @@ def train_poker_best_response(player, results_dir, print_train_results=True):
         else:
             raise ValueError(f"Unknown agent id: {agent_id}")
 
-    env_config = {'version': "leduc_poker", "append_valid_actions_mask_to_obs": True, "fixed_players": True, "dummy_action_multiplier": 20}
+    env_config = {'version': "leduc_poker", "append_valid_actions_mask_to_obs": True, "fixed_players": True}
     tmp_env = PokerMultiAgentEnv(env_config=env_config)
 
     trainer_config = {
@@ -273,7 +273,7 @@ def train_poker_best_response(player, results_dir, print_train_results=True):
             "policy_mapping_fn": select_policy,
         },
     }
-    trainer_config = merge_dicts(trainer_config, leduc_dqn_params(action_space=tmp_env.action_space))
+    trainer_config = merge_dicts(trainer_config, fast_leduc_dqn_params(action_space=tmp_env.action_space))
     trainer_config["rollout_fragment_length"] = trainer_config["rollout_fragment_length"] // max(1, trainer_config["num_workers"] * trainer_config["num_envs_per_worker"] )
 
     ray.init(ignore_reinit_error=True, local_mode=False)
@@ -308,9 +308,9 @@ def train_poker_best_response(player, results_dir, print_train_results=True):
 
     sync_with_manager_every_n_train_iters = 10000  # not using p2sro sync
 
-    dont_do_saturation_checks_before_n_train_iters = 3000
+    dont_do_saturation_checks_before_n_train_iters = 300
     iters_since_saturation_checks_began = None
-    check_for_saturation_every_n_train_iters = 1000
+    check_for_saturation_every_n_train_iters = 100
     minimum_reward_improvement_otherwise_saturated = 0.01
     last_saturation_check_reward = None
 

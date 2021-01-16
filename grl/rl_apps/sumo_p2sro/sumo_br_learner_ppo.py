@@ -213,7 +213,7 @@ class P2SROPreAndPostEpisodeCallbacks(DefaultCallbacks):
                 f"total_reward: {total_reward}, total_main_reward: {total_main_reward}, total_shaping_reward: {total_shaping_reward}"
 
     #     if not hasattr(worker, "p2sro_manager"):
-    #         worker.p2sro_manager = RemoteP2SROManagerClient(n_players=2, port=4535, remote_server_host="127.0.0.1")
+    #         worker.p2sro_manager = RemoteP2SROManagerClient(n_players=2, port=os.getenv("P2SRO_PORT", 4535), remote_server_host="127.0.0.1")
     #
     #     br_policy_spec: PayoffTableStrategySpec = worker.policy_map["best_response"].p2sro_policy_spec
     #     if br_policy_spec.pure_strat_index_for_player(player=0) == 0:
@@ -287,7 +287,7 @@ def train_poker_sac_best_response(results_dir, print_train_results=True):
     trainer = PPOTrainer(config=trainer_config, logger_creator=get_trainer_logger_creator(base_dir=results_dir,
                                                                                           env_class=SumoMultiAgentEnv))
 
-    p2sro_manager = RemoteP2SROManagerClient(n_players=2, port=4535, remote_server_host="127.0.0.1")
+    p2sro_manager = RemoteP2SROManagerClient(n_players=2, port=os.getenv("P2SRO_PORT", 4535), remote_server_host="127.0.0.1")
     active_policy_spec: PayoffTableStrategySpec = p2sro_manager.claim_new_active_policy_for_player(
         player=0, new_policy_metadata_dict=create_metadata_with_new_checkpoint_for_current_best_response(
             trainer=trainer, save_dir=checkpoint_dir(trainer=trainer), timesteps_training_br=0, episodes_training_br=0,

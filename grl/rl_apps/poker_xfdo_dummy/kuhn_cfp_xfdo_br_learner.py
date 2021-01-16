@@ -116,6 +116,7 @@ def create_metadata_with_new_checkpoint_for_current_best_response(trainer: SACTr
                                                               timesteps_training_br: int,
                                                               episodes_training_br: int,
                                                               active_policy_num: int = None,
+                                                              current_br_reward: float = None,
                                                               ):
     return {
         "checkpoint_path": save_best_response_checkpoint(trainer=trainer,
@@ -125,7 +126,8 @@ def create_metadata_with_new_checkpoint_for_current_best_response(trainer: SACTr
                                                          timesteps_training_br=timesteps_training_br,
                                                          episodes_training_br=episodes_training_br),
         "timesteps_training_br": timesteps_training_br,
-        "episodes_training_br": episodes_training_br
+        "episodes_training_br": episodes_training_br,
+        "current_br_reward": current_br_reward,
     }
 
 
@@ -320,7 +322,8 @@ def train_poker_best_response(br_player: int, print_train_results: bool = True):
         metadata_dict=create_metadata_with_new_checkpoint_for_current_best_response(
             trainer=trainer, player=br_player, save_dir=BR_CHECKPOINT_SAVE_DIR, timesteps_training_br=total_timesteps_training_br,
             episodes_training_br=total_episodes_training_br,
-            active_policy_num=active_policy_num
+            active_policy_num=active_policy_num,
+            current_br_reward=br_reward_this_iter
         ))
 
     # wait for both player policies to be fixed and then track exploitability.

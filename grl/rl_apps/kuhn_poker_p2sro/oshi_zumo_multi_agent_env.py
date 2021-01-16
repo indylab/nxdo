@@ -13,41 +13,18 @@ def with_base_config(base_config, extra_config):
     config.update(extra_config)
     return config
 
-# game versions
-KUHN_POKER = 'kuhn_poker'
-LEDUC_POKER = 'leduc_poker'
-PHANTOM_TICTACTOE = 'phantom_ttt'
-MATRIX_RPS = 'matrix_rps'
+
 OSHI_ZUMO = "oshi_zumo"
 
 DEFAULT_CONFIG = {
-    'version': KUHN_POKER,
+    'version': OSHI_ZUMO,
     'fixed_players': True,
     'dummy_action_multiplier': 1,
     'continuous_action_space': False,
-    'penalty_for_invalid_actions': False,
     'append_valid_actions_mask_to_obs': False,
 }
 
-OBS_SHAPES = {
-    KUHN_POKER: (11,),
-    LEDUC_POKER: (30,),
-    PHANTOM_TICTACTOE: (214,),
-}
-
-VALID_ACTIONS_SHAPES = {
-    KUHN_POKER: (2,),
-    LEDUC_POKER: (3,),
-    PHANTOM_TICTACTOE: (9,),
-}
-
-POKER_ENV = 'poker_env'
-
-PARTIAL_OBSERVATION = 'partial_observation'
-VALID_ACTIONS_MASK = 'valid_actions_mask'
-
-
-class PokerMultiAgentEnv(MultiAgentEnv):
+class OshiZumoMultiAgentEnv(MultiAgentEnv):
 
     def __init__(self, env_config=None):
         env_config = with_base_config(base_config=DEFAULT_CONFIG, extra_config=env_config if env_config else {})
@@ -58,21 +35,9 @@ class PokerMultiAgentEnv(MultiAgentEnv):
             raise ValueError("dummy_action_multiplier must be a positive non-zero int")
         self._dummy_action_multiplier = env_config['dummy_action_multiplier']
         self._continuous_action_space = env_config['continuous_action_space']
-
-        self._apply_penalty_for_invalid_actions = env_config["penalty_for_invalid_actions"]
-        self._invalid_action_penalties = [False, False]
-
         self._append_valid_actions_mask_to_obs = env_config["append_valid_actions_mask_to_obs"]
 
-        if self.game_version in [KUHN_POKER, LEDUC_POKER]:
-            open_spiel_env_config = {
-                "players": 2
-            }
-        else:
-            open_spiel_env_config = {}
-
-        self.openspiel_env = Environment(game_name=self.game_version, discount=1.0,
-                                         **open_spiel_env_config)
+        self.openspiel_env = Environment(game_name=self.game_version, discount=1.0)
 
         self.base_num_discrete_actions = self.openspiel_env.action_spec()["num_actions"]
         self.num_discrete_actions = int(self.base_num_discrete_actions * self._dummy_action_multiplier)
@@ -84,11 +49,11 @@ class PokerMultiAgentEnv(MultiAgentEnv):
             self.action_space = Discrete(self.num_discrete_actions)
 
         if self._append_valid_actions_mask_to_obs:
-            observation_length = OBS_SHAPES[self.game_version][0] + VALID_ACTIONS_SHAPES[self.game_version][0]
+            self.observation_length = self.openspiel_env.observation_spec()["info_state"][0] + self.num_discrete_actions
         else:
-            observation_length = OBS_SHAPES[self.game_version][0]
+            self.observation_length = self.openspiel_env.observation_spec()["info_state"][0]
 
-        self.observation_space = Box(low=0.0, high=1.0, shape=(observation_length,))
+        self.observation_space = Box(low=0.0, high=1.0, shape=(self.observation_length,))
 
         self.curr_time_step: TimeStep = None
         self.player_map = None
