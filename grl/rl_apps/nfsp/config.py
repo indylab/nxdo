@@ -5,15 +5,19 @@ from gym.spaces import Space, Discrete, Box
 from ray.rllib.utils import merge_dicts
 from ray.rllib.models import MODEL_DEFAULTS
 from ray.rllib.policy.sample_batch import SampleBatch, MultiAgentBatch
-from grl.rllib_tools.leduc_dqn.valid_actions_fcnet import LeducDQNFullyConnectedNetwork
-from grl.rllib_tools.leduc_dqn.leduc_epsilon_greedy import LeducEpsilonGreedy
+from grl.rllib_tools.openspiel_dqn.valid_actions_fcnet import get_valid_action_fcn_class
+from grl.rllib_tools.openspiel_dqn.valid_actions_epsilon_greedy import ValidActionsEpsilonGreedy
+from grl.rl_apps.kuhn_poker_p2sro.poker_multi_agent_env import OBS_SHAPES, LEDUC_POKER
 
 
 # def debug_before_learn_on_batch(x: MultiAgentBatch, *args, **kwargs):
 #     print(f"DQN trainer learn on batch {[s.count for s in x.policy_batches.values()]}")
 #     return x
 
-def kuhn_dqn_params(action_space: Space) -> Dict:
+_LEDUC_OBS_LEN = OBS_SHAPES[LEDUC_POKER][0]
+
+
+def nfsp_kuhn_dqn_params(action_space: Space) -> Dict:
     return {
         "framework": "torch",
         # Smooth metrics over this many episodes.
@@ -133,7 +137,9 @@ def kuhn_dqn_params(action_space: Space) -> Dict:
     }
 
 
-def leduc_dqn_params(action_space: Space) -> Dict:
+def nfsp_leduc_dqn_params(action_space: Space) -> Dict:
+    assert isinstance(action_space, Discrete)
+    action_space: Discrete = action_space
     return {
         "framework": "torch",
         # Smooth metrics over this many episodes.
@@ -162,7 +168,7 @@ def leduc_dqn_params(action_space: Space) -> Dict:
         # === Exploration Settings ===
         "exploration_config": {
             # The Exploration class to use.
-            "type": LeducEpsilonGreedy,
+            "type": ValidActionsEpsilonGreedy,
             # Config for the Exploration class' constructor:
             "initial_epsilon": 0.06,
             "final_epsilon": 0.001,
@@ -247,12 +253,15 @@ def leduc_dqn_params(action_space: Space) -> Dict:
         "model": merge_dicts(MODEL_DEFAULTS, {
             "fcnet_activation": "relu",
             "fcnet_hiddens": [128],
-            "custom_model": LeducDQNFullyConnectedNetwork,
+            "custom_model": get_valid_action_fcn_class(obs_len=_LEDUC_OBS_LEN, action_space_n=action_space.n),
         }),
     }
 
 
-def kuhn_sac_params(action_space: Space) -> Dict:
+def nfsp_kuhn_sac_params(action_space: Space) -> Dict:
+
+    raise NotImplementedError("need to set up SAC valid actions")
+
     if isinstance(action_space, Discrete):
         default_target_entropy = np.array(-np.log(1.0 / action_space.n), dtype=np.float32)
     else:

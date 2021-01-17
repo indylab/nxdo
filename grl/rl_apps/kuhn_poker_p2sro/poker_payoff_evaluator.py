@@ -15,7 +15,7 @@ from grl.p2sro.eval_dispatcher.remote import RemoteEvalDispatcherClient
 from grl.rl_apps.kuhn_poker_p2sro.poker_multi_agent_env import PokerMultiAgentEnv
 from grl.rl_apps.kuhn_poker_p2sro.config import kuhn_sac_params, kuhn_dqn_params, leduc_dqn_params
 from grl.p2sro.payoff_table import PayoffTableStrategySpec
-from grl.rllib_tools.leduc_dqn.valid_actions_fcnet import LeducDQNFullyConnectedNetwork
+from grl.rllib_tools.openspiel_dqn.valid_actions_fcnet import LeducDQNFullyConnectedNetwork
 
 def load_weights(policy: Policy, pure_strat_spec: PayoffTableStrategySpec):
     pure_strat_checkpoint_path = pure_strat_spec.metadata["checkpoint_path"]

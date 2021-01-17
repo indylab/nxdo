@@ -40,7 +40,7 @@ from grl.rl_apps.nfsp.config import leduc_dqn_params
 from grl.rl_apps.kuhn_poker_p2sro.poker_utils import measure_exploitability_nonlstm, openspiel_policy_from_nonlstm_rllib_policy
 from grl.nfsp_rllib.nfsp import NFSPTrainer, NFSPTorchAveragePolicy, get_store_to_avg_policy_buffer_fn
 from grl.rl_apps.nfsp.openspiel_utils import nfsp_measure_exploitability_nonlstm
-from grl.rllib_tools.leduc_dqn.valid_actions_fcnet import LeducDQNFullyConnectedNetwork
+from grl.rllib_tools.openspiel_dqn.valid_actions_fcnet import LeducDQNFullyConnectedNetwork
 from grl.rllib_tools.space_saving_logger import SpaceSavingLogger
 
 logger = logging.getLogger(__name__)

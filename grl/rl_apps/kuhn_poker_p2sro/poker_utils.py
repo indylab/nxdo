@@ -1,5 +1,5 @@
 from grl.p2sro.payoff_table import PayoffTable, PayoffTableStrategySpec
-from grl.rllib_tools.leduc_dqn.valid_actions_fcnet import LeducDQNFullyConnectedNetwork
+from grl.rllib_tools.openspiel_dqn.valid_actions_fcnet import LeducDQNFullyConnectedNetwork
 from ray.rllib.agents.sac import SACTorchPolicy
 from ray.rllib.agents.trainer import with_common_config, MODEL_DEFAULTS
 from ray.rllib.policy import Policy

@@ -10,14 +10,14 @@ from ray.rllib.utils.from_config import from_config
 from ray.rllib.utils.schedules import Schedule, PiecewiseSchedule
 from ray.rllib.utils.torch_ops import FLOAT_MIN
 
-from grl.rllib_tools.leduc_dqn.valid_actions_fcnet import ILLEGAL_ACTION_LOGITS_PENALTY
+from grl.rllib_tools.openspiel_dqn.valid_actions_fcnet import ILLEGAL_ACTION_LOGITS_PENALTY
 
 tf1, tf, tfv = try_import_tf()
 torch, _ = try_import_torch()
 
 import torch
 
-class LeducEpsilonGreedy(Exploration):
+class ValidActionsEpsilonGreedy(Exploration):
     """Epsilon-greedy Exploration class that produces exploration actions.
 
     When given a Model's output and a current epsilon value (based on some
@@ -99,7 +99,7 @@ class LeducEpsilonGreedy(Exploration):
             # Get the current epsilon.
             epsilon = self.epsilon_schedule(self.last_timestep)
             batch_size = q_values.size()[0]
-            # Mask out actions, whose Q-values are -inf, so that we don't
+            # Mask out actions, whose Q-values are less than ILLEGAL_ACTION_LOGITS_PENALTY, so that we don't
             # even consider them for exploration.
             random_valid_action_logits = torch.where(
                 q_values <= ILLEGAL_ACTION_LOGITS_PENALTY,
