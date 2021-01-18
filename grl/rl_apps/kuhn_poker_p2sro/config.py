@@ -1,10 +1,9 @@
-import numpy as np
 from gym.spaces import Discrete, Space
 from typing import Dict
 from ray.rllib.utils import merge_dicts
 from ray.rllib.models import MODEL_DEFAULTS
-from grl.rllib_tools.openspiel_dqn.valid_actions_fcnet import get_valid_action_fcn_class
-from grl.rllib_tools.openspiel_dqn.valid_actions_epsilon_greedy import ValidActionsEpsilonGreedy
+from grl.rllib_tools.valid_actions_fcnet import get_valid_action_fcn_class
+from grl.rllib_tools.valid_actions_epsilon_greedy import ValidActionsEpsilonGreedy
 from grl.rl_apps.kuhn_poker_p2sro.poker_multi_agent_env import OBS_SHAPES, LEDUC_POKER
 
 _LEDUC_OBS_LEN = OBS_SHAPES[LEDUC_POKER][0]

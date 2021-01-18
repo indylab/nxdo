@@ -1,10 +1,6 @@
-import numpy as np
 from gym.spaces import Discrete, Space
 from typing import Dict
-from ray.rllib.utils import merge_dicts
-from ray.rllib.models import MODEL_DEFAULTS
-from grl.rllib_tools.openspiel_dqn.valid_actions_fcnet import get_valid_action_fcn_class
-from grl.rllib_tools.openspiel_dqn.valid_actions_epsilon_greedy import ValidActionsEpsilonGreedy
+from grl.rllib_tools.valid_actions_fcnet import get_valid_action_fcn_class
 
 from grl.rl_apps.kuhn_poker_p2sro.poker_multi_agent_env import OBS_SHAPES, LEDUC_POKER
 
@@ -407,13 +403,12 @@ def psro_fast_leduc_dqn_params(action_space: Space) -> Dict:
 
 import numpy as np
 from typing import Dict
-from gym.spaces import Space, Discrete, Box
+from gym.spaces import Space, Discrete
 
 from ray.rllib.utils import merge_dicts
 from ray.rllib.models import MODEL_DEFAULTS
-from ray.rllib.policy.sample_batch import SampleBatch, MultiAgentBatch
-from grl.rllib_tools.openspiel_dqn.valid_actions_fcnet import LeducDQNFullyConnectedNetwork
-from grl.rllib_tools.openspiel_dqn.valid_actions_epsilon_greedy import ValidActionsEpsilonGreedy
+from grl.rllib_tools.valid_actions_fcnet import LeducDQNFullyConnectedNetwork
+from grl.rllib_tools.valid_actions_epsilon_greedy import ValidActionsEpsilonGreedy
 
 
 # def debug_before_learn_on_batch(x: MultiAgentBatch, *args, **kwargs):

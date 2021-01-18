@@ -1,6 +1,6 @@
 
 from grl.rl_apps.kuhn_poker_p2sro.config import psro_kuhn_sac_params, psro_kuhn_dqn_params, psro_leduc_dqn_params, psro_fast_leduc_dqn_params
-from grl.rl_apps.nfsp.config import nfsp_kuhn_sac_params, nfsp_leduc_dqn_params, nfsp_kuhn_dqn_params
+from grl.rl_apps.nfsp.config import nfsp_kuhn_sac_params, nfsp_leduc_dqn_params, nfsp_kuhn_dqn_params, nfsp_oshi_zumo_dqn_params_like_leduc, nfsp_oshi_zumo_dqn_params_like_kuhn
 
 from grl.rl_apps.kuhn_poker_p2sro.poker_multi_agent_env import PokerMultiAgentEnv
 from grl.rl_apps.kuhn_poker_p2sro.oshi_zumo_multi_agent_env import OshiZumoMultiAgentEnv
@@ -9,7 +9,7 @@ from grl.rl_apps.scenarios.stopping_conditions import SingleBRRewardPlateauStopp
 from ray.rllib.agents.sac import SACTrainer, SACTorchPolicy
 from ray.rllib.agents.dqn import DQNTrainer, DQNTorchPolicy, SimpleQTorchPolicy
 from grl.nfsp_rllib.nfsp import NFSPTrainer, NFSPTorchAveragePolicy, get_store_to_avg_policy_buffer_fn
-
+from grl.rllib_tools.modified_policies import SimpleQTorchPolicyWithActionProbsOut, SACTorchPolicyWithBehaviorLogitsOut
 
 scenarios = {
 
@@ -93,6 +93,44 @@ scenarios = {
         "calc_metanash_every_n_iters": 2000,
     },
 
+    "oshi_zumo_nfsp_dqn_leduc_params": {
+        "env_class": OshiZumoMultiAgentEnv,
+        "env_config": {
+            'version': "oshi_zumo",
+            "fixed_players": True,
+            "append_valid_actions_mask_to_obs": True,
+        },
+        "trainer_class": DQNTrainer,
+        "policy_classes": {
+            "average_policy": NFSPTorchAveragePolicy,
+            "best_response": SimpleQTorchPolicy,
+        },
+        "get_trainer_config": nfsp_oshi_zumo_dqn_params_like_leduc,
+        "anticipatory_param": 0.1,
+        "nfsp_get_stopping_condition": lambda: NoStoppingCondition,
+        "calculate_openspiel_metanash": True,
+        "calc_metanash_every_n_iters": 2000,
+    },
+
+    "oshi_zumo_nfsp_dqn_kuhn_params": {
+        "env_class": OshiZumoMultiAgentEnv,
+        "env_config": {
+            'version': "oshi_zumo",
+            "fixed_players": True,
+            "append_valid_actions_mask_to_obs": True,
+        },
+        "trainer_class": DQNTrainer,
+        "policy_classes": {
+            "average_policy": NFSPTorchAveragePolicy,
+            "best_response": SimpleQTorchPolicy,
+        },
+        "get_trainer_config": nfsp_oshi_zumo_dqn_params_like_kuhn,
+        "anticipatory_param": 0.1,
+        "nfsp_get_stopping_condition": lambda: NoStoppingCondition,
+        "calculate_openspiel_metanash": True,
+        "calc_metanash_every_n_iters": 2000,
+    },
+
     # CFP #########################################################
 
     "kuhn_cfp_dqn": {
@@ -103,11 +141,12 @@ scenarios = {
         },
         "trainer_class": DQNTrainer,
         "policy_classes": {
-            "best_response": SimpleQTorchPolicy,
+            "best_response": SimpleQTorchPolicyWithActionProbsOut,
         },
         "get_trainer_config": nfsp_kuhn_dqn_params,
         "anticipatory_param": 0.1,
-        "nfsp_get_stopping_condition": lambda: NoStoppingCondition,
+        "checkpoint_reservoir_size": 5000,
+        "cfp_get_stopping_condition": lambda: NoStoppingCondition,
         "calculate_openspiel_metanash": True,
         "calc_metanash_every_n_iters": 500,
     },
@@ -121,11 +160,12 @@ scenarios = {
         },
         "trainer_class": DQNTrainer,
         "policy_classes": {
-            "best_response": SimpleQTorchPolicy,
+            "best_response": SimpleQTorchPolicyWithActionProbsOut,
         },
         "get_trainer_config": nfsp_kuhn_dqn_params,
         "anticipatory_param": 0.1,
-        "nfsp_get_stopping_condition": lambda: NoStoppingCondition,
+        "checkpoint_reservoir_size": 5000,
+        "cfp_get_stopping_condition": lambda: NoStoppingCondition,
         "calculate_openspiel_metanash": True,
         "calc_metanash_every_n_iters": 500,
     },
@@ -139,11 +179,12 @@ scenarios = {
         },
         "trainer_class": DQNTrainer,
         "policy_classes": {
-            "best_response": SimpleQTorchPolicy,
+            "best_response": SimpleQTorchPolicyWithActionProbsOut,
         },
         "get_trainer_config": nfsp_leduc_dqn_params,
         "anticipatory_param": 0.1,
-        "nfsp_get_stopping_condition": lambda: NoStoppingCondition,
+        "checkpoint_reservoir_size": 5000,
+        "cfp_get_stopping_condition": lambda: NoStoppingCondition,
         "calculate_openspiel_metanash": True,
         "calc_metanash_every_n_iters": 2000,
     },
@@ -158,11 +199,12 @@ scenarios = {
         },
         "trainer_class": DQNTrainer,
         "policy_classes": {
-            "best_response": SimpleQTorchPolicy,
+            "best_response": SimpleQTorchPolicyWithActionProbsOut,
         },
         "get_trainer_config": nfsp_leduc_dqn_params,
         "anticipatory_param": 0.1,
-        "nfsp_get_stopping_condition": lambda: NoStoppingCondition,
+        "checkpoint_reservoir_size": 5000,
+        "cfp_get_stopping_condition": lambda: NoStoppingCondition,
         "calculate_openspiel_metanash": True,
         "calc_metanash_every_n_iters": 2000,
     },
@@ -299,7 +341,7 @@ scenarios = {
         "num_eval_workers": 8,
         "games_per_payoff_eval": 20000,
         "p2sro": False,
-        "get_trainer_config": psro_leduc_dqn_params,
+        "get_trainer_config": nfsp_oshi_zumo_dqn_params_like_leduc,
         "psro_get_stopping_condition": lambda: SingleBRRewardPlateauStoppingCondition(
             br_policy_id="best_response",
             dont_check_plateau_before_n_iters=3000,
@@ -327,7 +369,7 @@ scenarios = {
         "num_eval_workers": 8,
         "games_per_payoff_eval": 20000,
         "p2sro": False,
-        "get_trainer_config": psro_kuhn_dqn_params,
+        "get_trainer_config": nfsp_oshi_zumo_dqn_params_like_kuhn,
         "psro_get_stopping_condition": lambda: SingleBRRewardPlateauStoppingCondition(
             br_policy_id="best_response",
             dont_check_plateau_before_n_iters=300,

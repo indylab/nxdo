@@ -66,9 +66,9 @@ def checkpoint_dir(trainer: Trainer):
     return os.path.join(trainer.logdir, "br_checkpoints")
 
 
-def train_poker_off_policy_rl_nfsp(results_dir: str,
-                                   scenario_name: str,
-                                   print_train_results: bool = True):
+def train_off_policy_rl_nfsp(results_dir: str,
+                             scenario_name: str,
+                             print_train_results: bool = True):
 
     try:
         scenario = scenarios[scenario_name]
@@ -133,7 +133,8 @@ def train_poker_off_policy_rl_nfsp(results_dir: str,
             "policy_mapping_fn": assert_not_called,
         },
 
-    }, logger_creator=get_trainer_logger_creator(base_dir=results_dir, scenario_name=scenario_name))
+    }, logger_creator=get_trainer_logger_creator(base_dir=results_dir,
+                                                 scenario_name=f"{scenario_name}_avg_trainer"))
 
     store_to_avg_policy_buffer = get_store_to_avg_policy_buffer_fn(nfsp_trainer=avg_trainer)
 
@@ -327,7 +328,7 @@ if __name__ == "__main__":
     results_dir = os.path.join(os.path.dirname(grl.__file__), "data")
     print(f"results dir is {results_dir}")
 
-    train_poker_off_policy_rl_nfsp(
+    train_off_policy_rl_nfsp(
         results_dir=results_dir,
         scenario_name=args.scenario,
         print_train_results=True,

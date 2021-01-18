@@ -8,9 +8,8 @@ from ray.rllib.utils.framework import try_import_tf, try_import_torch, \
     get_variable
 from ray.rllib.utils.from_config import from_config
 from ray.rllib.utils.schedules import Schedule, PiecewiseSchedule
-from ray.rllib.utils.torch_ops import FLOAT_MIN
 
-from grl.rllib_tools.openspiel_dqn.valid_actions_fcnet import ILLEGAL_ACTION_LOGITS_PENALTY
+from grl.rllib_tools.valid_actions_fcnet import ILLEGAL_ACTION_LOGITS_PENALTY
 
 tf1, tf, tfv = try_import_tf()
 torch, _ = try_import_torch()

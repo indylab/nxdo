@@ -1,21 +1,19 @@
 import time
-from typing import Type
 import os
 import numpy as np
 import argparse
 import deepdish
 import ray
-from ray.rllib.env.multi_agent_env import MultiAgentEnv
-from ray.rllib.agents.dqn import DQNTrainer, DQNTorchPolicy, SimpleQTorchPolicy, SIMPLE_Q_DEFAULT_CONFIG
+from ray.rllib.agents.dqn import SimpleQTorchPolicy, SIMPLE_Q_DEFAULT_CONFIG
 
 from ray.rllib.utils import merge_dicts
 from ray.rllib.policy.policy import Policy
-from ray.rllib.agents.sac import SACTorchPolicy, DEFAULT_CONFIG as DEFAULT_SAC_CONFIG
+from ray.rllib.agents.sac import SACTorchPolicy
 from grl.p2sro.eval_dispatcher.remote import RemoteEvalDispatcherClient
 from grl.rl_apps.kuhn_poker_p2sro.poker_multi_agent_env import PokerMultiAgentEnv
-from grl.rl_apps.kuhn_poker_p2sro.config import kuhn_sac_params, kuhn_dqn_params, leduc_dqn_params
+from grl.rl_apps.kuhn_poker_p2sro.config import kuhn_dqn_params, leduc_dqn_params
 from grl.p2sro.payoff_table import PayoffTableStrategySpec
-from grl.rllib_tools.openspiel_dqn.valid_actions_fcnet import LeducDQNFullyConnectedNetwork
+from grl.rllib_tools.valid_actions_fcnet import LeducDQNFullyConnectedNetwork
 
 def load_weights(policy: Policy, pure_strat_spec: PayoffTableStrategySpec):
     pure_strat_checkpoint_path = pure_strat_spec.metadata["checkpoint_path"]
