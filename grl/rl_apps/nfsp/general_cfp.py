@@ -35,79 +35,12 @@ from grl.rl_apps.nfsp.openspiel_utils import snfsp_measure_exploitability_nonlst
 from grl.rllib_tools.space_saving_logger import SpaceSavingLogger
 from grl.rl_apps.scenarios.poker import scenarios
 from grl.rl_apps.scenarios.stopping_conditions import StoppingCondition
+from grl.nfsp_rllib.checkpoint_reservoir_buffer import ReservoirBuffer
 
 logger = logging.getLogger(__name__)
 
 
-class ReservoirBuffer(object):
-    """Allows uniform sampling over a stream of data.
 
-    This class supports the storage of arbitrary elements, such as observation
-    tensors, integer actions, etc.
-
-    See https://en.wikipedia.org/wiki/Reservoir_sampling for more details.
-    """
-
-    def __init__(self, reservoir_buffer_capacity: int):
-        self._reservoir_buffer_capacity = reservoir_buffer_capacity
-        self._data = []
-        self._add_calls = 0
-
-    def ask_to_add(self):
-        self._add_calls += 1
-        if len(self._data) < self._reservoir_buffer_capacity:
-            return True, None
-        else:
-            idx = np.random.randint(0, self._add_calls)
-            if idx < self._reservoir_buffer_capacity:
-                return True, idx
-        return False, None
-
-    def add(self, element, idx):
-        """Potentially adds `element` to the reservoir buffer.
-
-        Args:
-          element: data to be added to the reservoir buffer.
-        """
-        if idx is None:
-            assert len(self._data) < self._reservoir_buffer_capacity
-            self._data.append(element)
-        else:
-            assert idx < self._reservoir_buffer_capacity
-            self._data[idx] = element
-
-    def sample(self, num_samples=1):
-        """Returns `num_samples` uniformly sampled from the buffer.
-
-        Args:
-          num_samples: `int`, number of samples to draw.
-
-        Returns:
-          An iterable over `num_samples` random elements of the buffer.
-
-        Raises:
-          ValueError: If there are less than `num_samples` elements in the buffer
-        """
-        if len(self._data) < num_samples:
-            raise ValueError("{} elements could not be sampled from size {}".format(
-                num_samples, len(self._data)))
-        return random.sample(self._data, num_samples)
-
-    def __setitem__(self, index, value):
-        self._data[index] = value
-
-    def __getitem__(self, index):
-        return self._data[index]
-
-    def clear(self):
-        self._data = []
-        self._add_calls = 0
-
-    def __len__(self):
-        return len(self._data)
-
-    def __iter__(self):
-        return iter(self._data)
 
 def save_cfp_best_response_checkpoint(trainer: Trainer,
                                       policy_id_to_save: str,
@@ -236,6 +169,8 @@ def train_cfp(results_dir: str, scenario_name: str, print_train_results: bool = 
 
         def on_train_result(self, *, trainer, result: dict, **kwargs):
             super().on_train_result(trainer=trainer, result=result, **kwargs)
+            result["scenario_name"] = trainer.scenario_name
+
             # print(trainer.latest_avg_trainer_result.keys())
             # log(pretty_dict_str(trainer.latest_avg_trainer_result))
             # if trainer.latest_avg_trainer_result is not None:
@@ -323,6 +258,9 @@ def train_cfp(results_dir: str, scenario_name: str, print_train_results: bool = 
         br_trainer.other_trainer = br_trainers[other_player]
         br_trainer.other_player_latest_train_result = {}
 
+        # scenario_name logged in on_train_result_callback
+        br_trainer.scenario_name = scenario_name
+
     def checkpoint_brs_for_average_policy(checkpoint_count: int, both_train_iter_results=(None, None)):
         for player in range(2):
             br_trainer = br_trainers[player]
@@ -397,24 +335,22 @@ def train_cfp(results_dir: str, scenario_name: str, print_train_results: bool = 
         train_iter_count += 1
         print("printing results..")
 
-        if print_train_results:
-            for br_trainer, train_iter_results in zip(br_trainers, both_train_iter_results):
-                print(f"trainer {br_trainer.player}")
-                # Delete verbose debugging info
-                if "hist_stats" in train_iter_results:
-                    del train_iter_results["hist_stats"]
-                if "td_error" in train_iter_results["info"]["learner"]["best_response"]:
-                    del train_iter_results["info"]["learner"]["best_response"]["td_error"]
-                assert br_trainer.player in [0,1]
-                log(f"Trainer {br_trainer.player} logdir is {br_trainer.logdir}")
-
-
+        for br_trainer, train_iter_results in zip(br_trainers, both_train_iter_results):
+            print(f"trainer {br_trainer.player}")
+            # Delete verbose debugging info
+            if "hist_stats" in train_iter_results:
+                del train_iter_results["hist_stats"]
+            if "td_error" in train_iter_results["info"]["learner"]["best_response"]:
+                del train_iter_results["info"]["learner"]["best_response"]["td_error"]
+            assert br_trainer.player in [0,1]
+            log(f"Trainer {br_trainer.player} logdir is {br_trainer.logdir}")
 
         assert br_trainer_1.other_trainer.player == 0, br_trainer_1.other_trainer.player
         br_trainer_1.other_trainer.other_player_latest_train_result = deepcopy(both_train_iter_results[1])
         assert len(both_train_iter_results[1]) > 0
 
-        log(pretty_dict_str(both_train_iter_results[0]))
+        if print_train_results:
+            log(pretty_dict_str(both_train_iter_results[0]))
 
         if stopping_condition.should_stop_this_iter(latest_trainer_result=both_train_iter_results[0]):
             print("stopping condition met.")

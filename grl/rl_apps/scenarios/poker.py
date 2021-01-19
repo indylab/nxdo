@@ -11,6 +11,8 @@ from ray.rllib.agents.dqn import DQNTrainer, DQNTorchPolicy, SimpleQTorchPolicy
 from grl.nfsp_rllib.nfsp import NFSPTrainer, NFSPTorchAveragePolicy, get_store_to_avg_policy_buffer_fn
 from grl.rllib_tools.modified_policies import SimpleQTorchPolicyWithActionProbsOut, SACTorchPolicyWithBehaviorLogitsOut
 
+from grl.rl_apps.xfdo.solve_restricted_game_fns import SolveRestrictedGameFixedRewardThreshold, SolveRestrictedGameDynamicRewardThreshold
+
 scenarios = {
 
     # NFSP #########################################################
@@ -210,7 +212,10 @@ scenarios = {
     },
 
     # PSRO #########################################################
-    
+
+    # If doing multiple seeds on the same machine,
+    # make a new scenario for each seed with different ports in a for-loop.
+
     "kuhn_psro_dqn": {
         "env_class": PokerMultiAgentEnv,
         "env_config": {
@@ -378,5 +383,51 @@ scenarios = {
             max_train_iters=20000,
         ),
     },
+
+    # XFDO ############################################################################################
+
+    "kuhn_xfdo_dqn_nfsp": {
+        "xfdo_port": 4400,
+        "xfdo_metanash_method": "nfsp",
+        "get_restricted_game_solver": lambda scenario: SolveRestrictedGameFixedRewardThreshold(
+            scenario=scenario, br_reward_threshold=0.03, min_episodes=500000,
+            required_fields=["z_avg_policy_exploitability"]
+        ),
+
+        "env_class": PokerMultiAgentEnv,
+        "env_config": {
+            'version': "kuhn_poker",
+            "fixed_players": True,
+        },
+
+        "trainer_class_br": DQNTrainer,
+        "policy_classes_br": {
+            "metanash": NFSPTorchAveragePolicy,
+            "best_response": SimpleQTorchPolicy,
+        },
+        "get_trainer_config_br": psro_kuhn_dqn_params,
+        "get_stopping_condition_br": lambda: SingleBRRewardPlateauStoppingCondition(
+            br_policy_id="best_response",
+            dont_check_plateau_before_n_iters=300,
+            check_plateau_every_n_iters=100,
+            minimum_reward_improvement_otherwise_plateaued=0.01,
+            max_train_iters=20000,
+        ),
+
+        "trainer_class_nfsp": DQNTrainer,
+        "avg_trainer_class_nfsp": NFSPTrainer,
+        "policy_classes_nfsp": {
+            "average_policy": NFSPTorchAveragePolicy,
+            "delegate_policy": SimpleQTorchPolicy,
+            "best_response": SimpleQTorchPolicy,
+        },
+        "anticipatory_param_nfsp": 0.1,
+        "get_trainer_config_nfsp": nfsp_kuhn_dqn_params,
+        "calculate_openspiel_metanash": True,
+        "calc_metanash_every_n_iters": 300,
+        "metanash_metrics_smoothing_episodes_override": 50000,
+
+    }
+
 
 }

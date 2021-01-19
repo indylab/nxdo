@@ -54,7 +54,8 @@ class SimpleP2SROManagerLogger(P2SROManagerLogger):
         logger.info(f"Player {player} active policy {new_policy_num} claimed")
 
     def on_new_active_policy_metadata(self, player: int, policy_num: int, new_policy_spec: PayoffTableStrategySpec):
-        logger.info(f"Player {player} active policy {policy_num} new metadata: {new_policy_spec.metadata}")
+        pass
+        # logger.info(f"Player {player} active policy {policy_num} new metadata: {new_policy_spec.metadata}")
 
     def on_active_policy_moved_to_fixed(self, player: int, policy_num: int, fixed_policy_spec: PayoffTableStrategySpec):
         logger.info(f"Player {player} policy {policy_num} moved to fixed.")
@@ -90,14 +91,16 @@ class SimpleP2SROManagerLogger(P2SROManagerLogger):
                                 payoffs_for_each_player: Tuple[float], games_played: int,
                                 overrode_all_previous_results: bool):
         pass
-        json_specs = [spec.to_json() for spec in policy_specs_for_each_player]
-        logger.debug(f"Payoff result for {json_specs}, payoffs: {payoffs_for_each_player}, games: {games_played},"
-                    f" overrides existing results: {overrode_all_previous_results}")
+        # json_specs = [spec.to_json() for spec in policy_specs_for_each_player]
+        # logger.debug(f"Payoff result for {json_specs}, payoffs: {payoffs_for_each_player}, games: {games_played},"
+        #             f" overrides existing results: {overrode_all_previous_results}")
+        #
+        #
+        # data = self._manager.get_copy_of_latest_data()
+        # latest_payoff_table, active_policy_nums_per_player, fixed_policy_nums_per_player = data
+        # latest_payoff_table: PayoffTable = latest_payoff_table
 
 
-        data = self._manager.get_copy_of_latest_data()
-        latest_payoff_table, active_policy_nums_per_player, fixed_policy_nums_per_player = data
-        latest_payoff_table: PayoffTable = latest_payoff_table
         # print("Player 0 matrix ---------------------------------------")
         # print(latest_payoff_table.get_payoff_matrix_for_player(0))
         # print("------------------------------------------------------")

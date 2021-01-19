@@ -203,6 +203,10 @@ class P2SROPreAndPostEpisodeCallbacks(DefaultCallbacks):
         elif opponent_policy_distribution is not None:
             metanash_policy.episodes_since_resample += 1
 
+    def on_train_result(self, *, trainer, result: dict, **kwargs):
+        result["scenario_name"] = trainer.scenario_name
+        super().on_train_result(trainer=trainer, result=result, **kwargs)
+
     # def on_episode_end(self, *, worker: RolloutWorker, base_env: BaseEnv,
     #                    policies: Dict[str, Policy], episode: MultiAgentEpisode,
     #                    env_index: int, **kwargs):
@@ -292,6 +296,10 @@ def train_poker_best_response(player, results_dir, scenario_name, print_train_re
     ray.init(ignore_reinit_error=True, local_mode=False)
     trainer = trainer_class(config=trainer_config,
                             logger_creator=get_trainer_logger_creator(base_dir=results_dir, scenario_name=scenario_name))
+
+    # scenario_name logged in on_train_result_callback
+    trainer.scenario_name = scenario_name
+
     p2sro_manager = RemoteP2SROManagerClient(n_players=2, port=os.getenv("P2SRO_PORT", default_psro_port), remote_server_host="127.0.0.1")
     active_policy_spec: PayoffTableStrategySpec = p2sro_manager.claim_new_active_policy_for_player(
         player=player, new_policy_metadata_dict=create_metadata_with_new_checkpoint_for_current_best_response(

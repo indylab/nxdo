@@ -123,7 +123,7 @@ class P2SROManager(object):
             self._manager_logger.on_new_active_policy(player=player, new_policy_num=new_active_policy_num,
                                                       new_policy_spec=new_policy_spec)
 
-            print(f"active policy pure strat indexes are: {new_policy_spec._pure_strategy_indexes}")
+            # print(f"active policy pure strat indexes are: {new_policy_spec._pure_strategy_indexes}")
             return new_policy_spec
 
     def submit_new_active_policy_metadata(self, player, policy_num, metadata_dict) -> PayoffTableStrategySpec:
@@ -184,7 +184,7 @@ class P2SROManager(object):
                                                                                     fixed_policies_only=True,
                                                                                     include_pending_active_policies=True)
 
-                print(f"policy matchups needed: {fixed_policy_spec_matchups}")
+                # print(f"policy matchups needed: {fixed_policy_spec_matchups}")
 
             if len(fixed_policy_spec_matchups) == 0:
                 # Don't do additional evaluations for the policy, and set it as fixed now.
@@ -316,7 +316,7 @@ class P2SROManager(object):
         with self._modification_lock:
             eval_result_should_override_previous_results = False
 
-            print(f"current pending spec matchups: {self._pending_spec_matchups_for_new_fixed_policies}")
+            # print(f"current pending spec matchups: {self._pending_spec_matchups_for_new_fixed_policies}")
 
             # Check if we're waiting on this eval matchup to get the final payoff results for an active policy that
             # we're waiting to move to fixed.
@@ -343,7 +343,7 @@ class P2SROManager(object):
                                                                              fixed_policy_spec=fixed_policy_spec)
             for key in keys_to_remove:
                 del self._pending_spec_matchups_for_new_fixed_policies[key]
-            print(f"new pending spec matchups: {self._pending_spec_matchups_for_new_fixed_policies}")
+            # print(f"new pending spec matchups: {self._pending_spec_matchups_for_new_fixed_policies}")
 
             # Add this payoff result to our payoff table.
             self.submit_empirical_payoff_result(
