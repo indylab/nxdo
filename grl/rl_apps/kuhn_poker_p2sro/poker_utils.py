@@ -1,13 +1,11 @@
-from grl.p2sro.payoff_table import PayoffTable, PayoffTableStrategySpec
-from grl.rllib_tools.leduc_dqn.valid_actions_fcnet import LeducDQNFullyConnectedNetwork
-from ray.rllib.agents.sac import SACTorchPolicy
-from ray.rllib.agents.trainer import with_common_config, MODEL_DEFAULTS
+from grl.p2sro.payoff_table import PayoffTable
+from grl.rllib_tools.valid_actions_fcnet import LeducDQNFullyConnectedNetwork
 from ray.rllib.policy import Policy
 from ray.rllib.models.action_dist import ActionDistribution
 
 import deepdish
 
-from typing import Iterable, Dict, Callable, List, Tuple, Generator
+from typing import Dict, Callable, List, Tuple
 from open_spiel.python import rl_environment
 
 def _calculate_metanash_and_exploitability_of_fixed_policies(payoff_table: PayoffTable, player_policy_nums: dict):
@@ -19,17 +17,17 @@ import numpy as np
 
 import ray
 
-from open_spiel.python.policy import Policy as OpenSpielPolicy, PolicyFromCallable, TabularPolicy, tabular_policy_from_policy
-from open_spiel.python.algorithms.exploitability import nash_conv, exploitability
+from open_spiel.python.policy import Policy as OpenSpielPolicy, PolicyFromCallable, tabular_policy_from_policy
+from open_spiel.python.algorithms.exploitability import exploitability
 from pyspiel import Game as OpenSpielGame
 
 import pyspiel
 from grl.p2sro.p2sro_manager.utils import get_latest_metanash_strategies
 from grl.p2sro.payoff_table import PayoffTableStrategySpec
 from grl.rl_apps.kuhn_poker_p2sro.poker_multi_agent_env import PokerMultiAgentEnv
-from ray.rllib.utils import merge_dicts, try_import_torch
-from ray.rllib.utils.typing import ModelGradients, ModelWeights, \
-    TensorType, TrainerConfigDict, AgentID, PolicyID
+from ray.rllib.utils import try_import_torch
+from ray.rllib.utils.typing import TensorType
+
 torch, _ = try_import_torch()
 
 def softmax(x):

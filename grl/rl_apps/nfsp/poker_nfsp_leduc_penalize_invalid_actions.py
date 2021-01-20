@@ -319,7 +319,7 @@ if __name__ == "__main__":
                                        get_br_config=leduc_dqn_params,
                                        results_dir=results_dir)
     # elif args.algo.lower() == 'sac':
-    #     train_poker_off_policy_rl_nfsp(print_train_results=True,
+    #     train_off_policy_rl_nfsp(print_train_results=True,
     #                                    br_trainer_class=SACTrainer,
     #                                    br_policy_class=SACTorchPolicy,
     #                                    get_br_config=kuhn_sac_params,

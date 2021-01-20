@@ -11,7 +11,7 @@ from grl.xfdo.xfdo_manager.protobuf.xfdo_manager_pb2_grpc import XFDOManagerServ
 from grl.xfdo.xfdo_manager.protobuf.xfdo_manager_pb2 import XFDOPolicyMetadataRequest, XFDONewBestResponseParams, \
     XFDOConfirmation, XFDOPolicySpecJson, XFDOPlayerAndPolicyNum, XFDOString, XFDOPlayer, XFDOPolicySpecList
 
-from grl.xfdo.xfdo_manager.manager import XFDOManager
+from grl.xfdo.xfdo_manager.manager import XFDOManager, SolveRestrictedGame
 
 logger = logging.getLogger(__name__)
 
@@ -71,14 +71,13 @@ class _XFDOMangerServerServicerImpl(XFDOManagerServicer):
 class XFDOManagerWithServer(XFDOManager):
 
     def __init__(self,
-                 solve_restricted_game_fn: Callable[
-                     [str, Dict[int, List[PayoffTableStrategySpec]]], Tuple[List[PayoffTableStrategySpec], Dict]],
+                 solve_restricted_game: SolveRestrictedGame,
                  n_players: int = 2,
                  log_dir: str = None,
                  port: int = 4545):
 
         super(XFDOManagerWithServer, self).__init__(
-            solve_restricted_game_fn=solve_restricted_game_fn,
+            solve_restricted_game=solve_restricted_game,
             n_players=n_players,
             log_dir=log_dir)
         self._grpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=1))

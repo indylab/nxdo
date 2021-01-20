@@ -16,6 +16,8 @@ def with_base_config(base_config, extra_config):
 
 OSHI_ZUMO = "oshi_zumo"
 
+OSHI_ZUMO_OBS_LENGTH = 30
+
 DEFAULT_CONFIG = {
     'version': OSHI_ZUMO,
     'fixed_players': True,
