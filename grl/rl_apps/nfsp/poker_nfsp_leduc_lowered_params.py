@@ -36,7 +36,7 @@ from grl.utils import pretty_dict_str, datetime_str, ensure_dir, copy_attributes
 
 from grl.rl_apps.kuhn_poker_p2sro.poker_multi_agent_env import PokerMultiAgentEnv
 
-from grl.rl_apps.nfsp.config import leduc_dqn_params
+from grl.rl_apps.nfsp.config import leduc_dqn_params_lowered
 from grl.rl_apps.kuhn_poker_p2sro.poker_utils import measure_exploitability_nonlstm, openspiel_policy_from_nonlstm_rllib_policy
 from grl.nfsp_rllib.nfsp import NFSPTrainer, NFSPTorchAveragePolicy, get_store_to_avg_policy_buffer_fn
 from grl.rl_apps.nfsp.openspiel_utils import nfsp_measure_exploitability_nonlstm
@@ -76,7 +76,7 @@ def train_poker_off_policy_rl_nfsp(results_dir: str,
                                    br_policy_class: Type[Policy],
                                    get_br_config: Callable[[Space], Dict],
                                    print_train_results: bool = True):
-    ray.init(address='auto', _redis_password='5241590000000000', local_mode=False)
+    ray.init(local_mode=True, num_cpus=1, num_gpus=0)
 
     def log(message, level=logging.INFO):
         logger.log(level, message)
@@ -244,7 +244,7 @@ def train_poker_off_policy_rl_nfsp(results_dir: str,
         "num_gpus": 0.0,
         "num_workers": 0,
         "num_gpus_per_worker": 0.0,
-        "num_envs_per_worker": 1,
+        "num_envs_per_worker": 64,
         "multiagent": {
             "policies_to_train": ["best_response_0", "best_response_1"],
             "policies": {
@@ -273,6 +273,8 @@ def train_poker_off_policy_rl_nfsp(results_dir: str,
     }
     br_trainer_config = merge_dicts(br_trainer_config, get_br_config(tmp_env.action_space))
 
+    br_trainer_config["rollout_fragment_length"] = br_trainer_config["rollout_fragment_length"] // (br_trainer_config["num_envs_per_worker"] * max(1, br_trainer_config["num_workers"]))
+
     br_trainer = br_trainer_class(config=br_trainer_config, logger_creator=get_trainer_logger_creator(base_dir=results_dir,
                                                                                           env_class=PokerMultiAgentEnv))
 
@@ -289,23 +291,27 @@ def train_poker_off_policy_rl_nfsp(results_dir: str,
         for policy_id, policy in trainer.workers.local_worker().policy_map.items():
             policy.policy_id = policy_id
 
-    br_trainer.workers.local_worker().policy_map["average_policy_0"] = avg_trainer.workers.local_worker().policy_map["average_policy_0"]
-    br_trainer.workers.local_worker().policy_map["average_policy_1"] = avg_trainer.workers.local_worker().policy_map["average_policy_1"]
+    # Single worker
+    # br_trainer.workers.local_worker().policy_map["average_policy_0"] = avg_trainer.workers.local_worker().policy_map["average_policy_0"]
+    # br_trainer.workers.local_worker().policy_map["average_policy_1"] = avg_trainer.workers.local_worker().policy_map["average_policy_1"]
+
+
+
     # br_trainer.set_weights(avg_trainer.get_weights(["average_policy_0"]))
     # br_trainer.set_weights(avg_trainer.get_weights(["average_policy_1"]))
     print("starting")
     while True:
-        print("avg train...")
+        # print("avg train...")
         avg_train_results = avg_trainer.train()
-        # br_trainer.set_weights(avg_trainer.get_weights(["average_policy_0"]))
-        # br_trainer.set_weights(avg_trainer.get_weights(["average_policy_1"]))
+        br_trainer.set_weights(avg_trainer.get_weights(["average_policy_0"]))
+        br_trainer.set_weights(avg_trainer.get_weights(["average_policy_1"]))
         br_trainer.latest_avg_trainer_result = copy.deepcopy(avg_train_results)
-        print("br train...")
+        # print("br train...")
         train_iter_results = br_trainer.train()  # do a step (or several) in the main RL loop
 
 
         train_iter_count += 1
-        print("printing results..")
+        # print("printing results..")
         if print_train_results:
             # Delete verbose debugging info before printing
             if "hist_stats" in train_iter_results:
@@ -332,7 +338,7 @@ if __name__ == "__main__":
         train_poker_off_policy_rl_nfsp(print_train_results=True,
                                        br_trainer_class=DQNTrainer,
                                        br_policy_class=SimpleQTorchPolicy,
-                                       get_br_config=leduc_dqn_params,
+                                       get_br_config=leduc_dqn_params_lowered,
                                        results_dir=results_dir)
     # elif args.algo.lower() == 'sac':
     #     train_poker_off_policy_rl_nfsp(print_train_results=True,

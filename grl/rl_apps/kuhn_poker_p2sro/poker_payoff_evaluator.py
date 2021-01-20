@@ -157,7 +157,7 @@ if __name__ == '__main__':
 
     ray.init(ignore_reinit_error=False, local_mode=False)
 
-    num_workers = 8
+    num_workers = 16
 
     evaluator_refs = [run_poker_evaluation_loop.remote(commandline_args) for _ in range(num_workers)]
     ray.wait(evaluator_refs, num_returns=num_workers)

@@ -127,7 +127,7 @@ class ReservoirReplayBuffer:
         self._num_timesteps_sampled += num_items
 
         out_batch = self._encode_sample(idxes)
-        assert out_batch.count == 128
+        # assert out_batch.count == 128
         return out_batch
 
     @DeveloperAPI
@@ -349,7 +349,7 @@ class LocalReservoirReplayBuffer(LocalReplayBuffer):
         self.num_added += batch.count
 
     def replay(self):
-        print(f"REPLAY!")
+        # print(f"REPLAY!")
         if self._fake_batch:
             fake_batch = SampleBatch(self._fake_batch)
             return MultiAgentBatch({
@@ -367,7 +367,7 @@ class LocalReservoirReplayBuffer(LocalReplayBuffer):
             else:
                 samples = {}
                 for policy_id, replay_buffer in self.replay_buffers.items():
-                    print(replay_buffer.stats())
+                    # print(replay_buffer.stats())
                     samples[policy_id] = replay_buffer.sample(
                         self.replay_batch_size)
                 return MultiAgentBatch(samples, self.replay_batch_size)

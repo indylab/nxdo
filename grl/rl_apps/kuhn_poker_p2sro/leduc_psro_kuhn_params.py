@@ -262,8 +262,8 @@ def train_poker_best_response(player, results_dir, print_train_results=True):
         "env_config": env_config,
         "gamma": 1.0,
         "num_gpus": 0,
-        "num_workers": 4,
-        "num_envs_per_worker": 8,
+        "num_workers": 0,
+        "num_envs_per_worker": 1,
         "multiagent": {
             "policies_to_train": [f"best_response"],
             "policies": {

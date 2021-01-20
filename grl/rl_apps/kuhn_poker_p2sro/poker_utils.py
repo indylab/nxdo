@@ -239,7 +239,6 @@ def openspiel_policy_from_nonlstm_rllib_policy(openspiel_game: OpenSpielGame,
                 (np.asarray(info_state_vector, dtype=np.float32), np.asarray(valid_actions_mask, dtype=np.float32)),
                 axis=0)
         else:
-            assert False, "ok to remove if this isnt leduc"
             obs = np.asarray(info_state_vector, dtype=np.float32)
 
         _, _, action_info = rllib_policy.compute_single_action(obs=obs, state=[], explore=False)
