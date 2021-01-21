@@ -26,7 +26,7 @@ def get_valid_action_fcn_class(obs_len: int, action_space_n: int) -> Type[FullyC
         @override(FullyConnectedNetwork)
         def __init__(self, obs_space, action_space, num_outputs, model_config,
                      name):
-            obs_space = Box(low=0.0, high=1.0, shape=obs_len)
+            obs_space = Box(low=0.0, high=1.0, shape=(obs_len,))
             FullyConnectedNetwork.__init__(self, obs_space=obs_space, action_space=action_space,
                                            num_outputs=num_outputs, model_config=model_config, name=name)
 
@@ -35,7 +35,9 @@ def get_valid_action_fcn_class(obs_len: int, action_space_n: int) -> Type[FullyC
             obs = input_dict["obs_flat"].float()
 
             assert obs.shape[1] == obs_len + action_space_n, \
-                f"obs shape with valid action fc net is {obs.shape}"
+                f"obs shape with valid action fc net is {obs.shape}\n" \
+                f"obs_len without actions: {obs_len}\n" \
+                f"action space n: {action_space_n}"
 
             # print(f"torch obs: {obs}")
             obs = obs[:, :-action_space_n]

@@ -289,11 +289,12 @@ def train_poker_best_response(player, results_dir, scenario_name, print_train_re
             "policy_mapping_fn": select_policy,
         },
     }
+
     trainer_config = merge_dicts(trainer_config, get_trainer_config(action_space=tmp_env.action_space))
 
     # trainer_config["rollout_fragment_length"] = trainer_config["rollout_fragment_length"] // max(1, trainer_config["num_workers"] * trainer_config["num_envs_per_worker"] )
 
-    ray.init(ignore_reinit_error=True, local_mode=False)
+    ray.init(log_to_driver=os.getenv("RAY_LOG_TO_DRIVER", False), address='auto', _redis_password='5241590000000000', ignore_reinit_error=True, local_mode=False)
     trainer = trainer_class(config=trainer_config,
                             logger_creator=get_trainer_logger_creator(base_dir=results_dir, scenario_name=scenario_name))
 

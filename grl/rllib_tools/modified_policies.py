@@ -1,8 +1,11 @@
-from typing import List, Dict
+from typing import List, Dict, Tuple
+import gym
 
+import ray
 from ray.rllib.utils import try_import_torch
 
 torch, _ = try_import_torch()
+
 
 from ray.rllib.agents.sac import SACTorchPolicy
 from ray.rllib.utils.typing import TensorType
@@ -12,17 +15,76 @@ from ray.rllib.models.action_dist import ActionDistribution
 from ray.rllib.models.torch.torch_action_dist import TorchDistributionWrapper
 from ray.rllib.agents.dqn.simple_q_torch_policy import SimpleQTorchPolicy
 
+from ray.rllib.utils.typing import TensorType, TrainerConfigDict
+from ray.rllib.agents.dqn.simple_q_tf_policy import Q_SCOPE, Q_TARGET_SCOPE
+from ray.rllib.utils.error import UnsupportedSpaceException
+from ray.rllib.models import ModelCatalog
+from ray.rllib.models.torch.torch_action_dist import TorchCategorical
 
 def _simple_dqn_extra_action_out_fn(policy: Policy, input_dict, state_batches, model,
                         action_dist: ActionDistribution) -> Dict[str, TensorType]:
     action = action_dist.deterministic_sample()
-    action_probs = torch.zeros_like(policy.q_values).long()
+    action_probs = torch.zeros_like(policy.q_values)
     action_probs[0][action[0]] = 1.0
     return {"q_values": policy.q_values, "action_probs": action_probs}
 
+def _build_q_models(policy: Policy, obs_space: gym.spaces.Space,
+                   action_space: gym.spaces.Space,
+                   config: TrainerConfigDict) -> ModelV2:
+    """Build q_model and target_q_model for Simple Q learning
 
-SimpleQTorchPolicyWithActionProbsOut = SimpleQTorchPolicy.with_updates(
-    extra_action_out_fn=_simple_dqn_extra_action_out_fn
+    Note that this function works for both Tensorflow and PyTorch.
+
+    Args:
+        policy (Policy): The Policy, which will use the model for optimization.
+        obs_space (gym.spaces.Space): The policy's observation space.
+        action_space (gym.spaces.Space): The policy's action space.
+        config (TrainerConfigDict):
+
+    Returns:
+        ModelV2: The Model for the Policy to use.
+            Note: The target q model will not be returned, just assigned to
+            `policy.target_q_model`.
+    """
+    if not isinstance(action_space, gym.spaces.Discrete):
+        raise UnsupportedSpaceException(
+            "Action space {} is not supported for DQN.".format(action_space))
+
+    policy.q_model = ModelCatalog.get_model_v2(
+        obs_space=obs_space,
+        action_space=action_space,
+        num_outputs=action_space.n,
+        model_config=config["model"],
+        framework=config["framework"],
+        name=Q_SCOPE)
+    if torch.cuda.is_available():
+        policy.q_model = policy.q_model.to("cuda")
+
+    policy.target_q_model = ModelCatalog.get_model_v2(
+        obs_space=obs_space,
+        action_space=action_space,
+        num_outputs=action_space.n,
+        model_config=config["model"],
+        framework=config["framework"],
+        name=Q_TARGET_SCOPE)
+    if torch.cuda.is_available():
+        policy.target_q_model = policy.target_q_model.to("cuda")
+
+    policy.q_func_vars = policy.q_model.variables()
+    policy.target_q_func_vars = policy.target_q_model.variables()
+
+    return policy.q_model
+
+def _build_q_model_and_distribution(
+        policy: Policy, obs_space: gym.spaces.Space,
+        action_space: gym.spaces.Space,
+        config: TrainerConfigDict) -> Tuple[ModelV2, TorchDistributionWrapper]:
+    return _build_q_models(policy, obs_space, action_space, config), \
+        TorchCategorical
+
+SimpleQTorchPolicyPatched = SimpleQTorchPolicy.with_updates(
+    extra_action_out_fn=_simple_dqn_extra_action_out_fn,
+    make_model_and_action_dist=_build_q_model_and_distribution,
 )
 
 

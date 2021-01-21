@@ -1,6 +1,7 @@
 import json
 import grpc
 import logging
+import traceback
 from typing import Tuple, List, Dict, Callable, Union
 from concurrent import futures
 from google.protobuf.empty_pb2 import Empty
@@ -18,8 +19,9 @@ logger = logging.getLogger(__name__)
 
 class _XFDOMangerServerServicerImpl(XFDOManagerServicer):
 
-    def __init__(self, manager: XFDOManager):
+    def __init__(self, manager: XFDOManager, stop_server_fn: Callable):
         self._manager = manager
+        self._stop_server_fn = stop_server_fn
 
     def GetLogDir(self, request, context):
         return XFDOString(string=self._manager.get_log_dir())
@@ -56,8 +58,16 @@ class _XFDOMangerServerServicerImpl(XFDOManagerServicer):
         return response
 
     def SubmitFinalBRPolicy(self, request: XFDOPolicyMetadataRequest, context):
-        self._manager.submit_final_br_policy(player=request.player, policy_num=request.policy_num,
-                                             metadata_dict=json.loads(request.metadata_json))
+        with self._manager.modification_lock:
+            try:
+                self._manager.submit_final_br_policy(player=request.player, policy_num=request.policy_num,
+                                                     metadata_dict=json.loads(request.metadata_json))
+            except Exception as err:
+                print(f"{type(err)}: {err}")
+                traceback.print_exc()
+                print("Submitting BR failed, shutting down manager.")
+                self._stop_server_fn()
+
         return XFDOConfirmation(result=True)
 
     def IsPolicyFixed(self, request: XFDOPlayerAndPolicyNum, context):
@@ -81,7 +91,7 @@ class XFDOManagerWithServer(XFDOManager):
             n_players=n_players,
             log_dir=log_dir)
         self._grpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=1))
-        servicer = _XFDOMangerServerServicerImpl(manager=self)
+        servicer = _XFDOMangerServerServicerImpl(manager=self, stop_server_fn=self.stop_server)
         add_XFDOManagerServicer_to_server(servicer=servicer, server=self._grpc_server)
         address = f'[::]:{port}'
         self._grpc_server.add_insecure_port(address)
@@ -92,7 +102,7 @@ class XFDOManagerWithServer(XFDOManager):
         self._grpc_server.wait_for_termination()
 
     def stop_server(self):
-        self._grpc_server.stop(grace=2)
+        self._grpc_server.stop(grace=0)
 
 
 class RemoteXFDOManagerClient(XFDOManager):

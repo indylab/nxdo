@@ -1,13 +1,13 @@
 from abc import ABC, abstractmethod
 import numpy as np
 from copy import deepcopy
-from threading import RLock
+from threading import RLock, _RLock
 from itertools import product
 from typing import List, Tuple, Union, Dict, Callable
 import json
 import os
 from grl.p2sro.payoff_table import PayoffTable, PayoffTableStrategySpec
-from grl.utils import datetime_str
+from grl.utils import datetime_str, ensure_dir
 
 
 class RestrictedGameSolveResult:
@@ -61,7 +61,7 @@ class XFDOManager(object):
 
         self._latest_metanash_spec_for_each_player: List[PayoffTableStrategySpec] = [None, None]
 
-        self._modification_lock = RLock()
+        self.modification_lock = RLock()
 
     def n_players(self) -> int:
         return self._n_players
@@ -73,7 +73,7 @@ class XFDOManager(object):
         Tuple[Dict[int, PayoffTableStrategySpec], Dict[int, List[PayoffTableStrategySpec]], int],
         Tuple[None, None, None]
     ]:
-        with self._modification_lock:
+        with self.modification_lock:
             if player < 0 or player >= self._n_players:
                 raise ValueError(f"player {player} is out of range. Must be in [0, n_players).")
 
@@ -91,7 +91,7 @@ class XFDOManager(object):
                     self._current_double_oracle_iteration)
 
     def submit_final_br_policy(self, player, policy_num, metadata_dict):
-        with self._modification_lock:
+        with self.modification_lock:
             if player < 0 or player >= self._n_players:
                 raise ValueError(f"player {player} is out of range. Must be in [0, n_players).")
             if policy_num != self._current_double_oracle_iteration:
@@ -132,11 +132,19 @@ class XFDOManager(object):
                 with open(self._json_log_path, "+a") as json_file:
                     json_file.writelines([json.dumps(data_to_log)+'\n'])
 
+                for checkpoint_player, player_metanash_spec in enumerate(game_solve_result.latest_metanash_spec_for_each_player):
+                    checkpoint_path = os.path.join(
+                        self.log_dir, "xfdo_metanash_specs",
+                        f"{checkpoint_player}_metanash_{self._current_double_oracle_iteration}.json")
+                    ensure_dir(checkpoint_path)
+                    with open(checkpoint_path, "+w") as checkpoint_spec_file:
+                        checkpoint_spec_file.write(player_metanash_spec.to_json())
+
                 self._current_double_oracle_iteration += 1
                 self._player_brs_are_finished_this_iter = {p: False for p in range(self._n_players)}
 
     def is_policy_fixed(self, player, policy_num) -> bool:
-        with self._modification_lock:
+        with self.modification_lock:
             if player < 0 or player >= self._n_players:
                 raise ValueError(f"player {player} is out of range. Must be in [0, n_players).")
             if policy_num < self._current_double_oracle_iteration:

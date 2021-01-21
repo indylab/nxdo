@@ -16,7 +16,7 @@ def with_base_config(base_config, extra_config):
 
 OSHI_ZUMO = "oshi_zumo"
 
-OSHI_ZUMO_OBS_LENGTH = 30
+OSHI_ZUMO_OBS_LENGTH = 111
 
 DEFAULT_CONFIG = {
     'version': OSHI_ZUMO,
@@ -39,7 +39,7 @@ class OshiZumoMultiAgentEnv(MultiAgentEnv):
         self._continuous_action_space = env_config['continuous_action_space']
         self._append_valid_actions_mask_to_obs = env_config["append_valid_actions_mask_to_obs"]
 
-        self.openspiel_env = Environment(game_name=self.game_version, discount=1.0)
+        self.openspiel_env = self._get_openspiel_env()
 
         self.base_num_discrete_actions = self.openspiel_env.action_spec()["num_actions"]
         self.num_discrete_actions = int(self.base_num_discrete_actions * self._dummy_action_multiplier)
@@ -60,6 +60,9 @@ class OshiZumoMultiAgentEnv(MultiAgentEnv):
         self.curr_time_step: TimeStep = None
         self.player_map = None
 
+    def _get_openspiel_env(self):
+        return Environment(game_name=self.game_version, discount=1.0)
+
     def _get_current_obs(self):
 
         done = self.curr_time_step.last()
@@ -68,12 +71,18 @@ class OshiZumoMultiAgentEnv(MultiAgentEnv):
             player_ids = [0, 1]
         else:
             curr_player_id = self.curr_time_step.observations["current_player"]
-            player_ids = [curr_player_id]
+            if curr_player_id == -2:
+                player_ids = [0, 1]
+            else:
+                player_ids = [curr_player_id]
 
         for player_id in player_ids:
             legal_actions = self.curr_time_step.observations["legal_actions"][player_id]
             legal_actions_mask = np.zeros(self.openspiel_env.action_spec()["num_actions"])
             legal_actions_mask[legal_actions] = 1.0
+
+            # print(self.curr_time_step.observations)
+            # exit()
 
             info_state = self.curr_time_step.observations["info_state"][player_id]
 
@@ -122,47 +131,53 @@ class OshiZumoMultiAgentEnv(MultiAgentEnv):
                 "__all__" (required) is used to indicate env termination.
             infos (dict): Optional info values for each agent id.
         """
-        curr_player_id = self.curr_time_step.observations["current_player"]
-        legal_actions = self.curr_time_step.observations["legal_actions"][curr_player_id]
 
-        player_action = action_dict[self.player_map(curr_player_id)]
-        orig_player_action = player_action
+        assert 0 in action_dict
+        assert 1 in action_dict
 
-        if self._continuous_action_space:
-            # player action is between -1 and 1, normalize to 0 and 1 and then quantize to a discrete action
-            player_action = (player_action / 2.0) + 1.0
-            assert 0.0 - 1e-9 <= player_action <= 1.0 + 1e-9
-            # place discrete actions in [0, 1] and find closest corresponding discrete action to player action
-            nearest_discrete_action = min(range(0, self.num_discrete_actions),
-                                          key=lambda x: abs(x/(self.num_discrete_actions - 1) - player_action))
-            # player action is now a discrete action
-            player_action = nearest_discrete_action
+        player_actions = []
+        for player in [0, 1]:
+            legal_actions = self.curr_time_step.observations["legal_actions"][player]
 
-        if self._dummy_action_multiplier != 1:
-            # extended dummy action space is just the base discrete actions repeated multiple times
-            # convert to the base discrete action space.
-            player_action = player_action % self.base_num_discrete_actions
+            player_action = action_dict[self.player_map(player)]
+            orig_player_action = player_action
 
-        if player_action not in self._base_action_space:
-            raise ValueError("Processed player action isn't in the base action space.\n"
-                             f"orig action: {orig_player_action}\n"
-                             f"processed action: {player_action}\n"
-                             f"action space: {self.action_space}\n"
-                             f"base action space: {self._base_action_space}")
+            if self._continuous_action_space:
+                # player action is between -1 and 1, normalize to 0 and 1 and then quantize to a discrete action
+                player_action = (player_action / 2.0) + 1.0
+                assert 0.0 - 1e-9 <= player_action <= 1.0 + 1e-9
+                # place discrete actions in [0, 1] and find closest corresponding discrete action to player action
+                nearest_discrete_action = min(range(0, self.num_discrete_actions),
+                                              key=lambda x: abs(x/(self.num_discrete_actions - 1) - player_action))
+                # player action is now a discrete action
+                player_action = nearest_discrete_action
 
-        # If action is illegal, do a random legal action instead
-        if player_action not in legal_actions:
-            raise ValueError("illegal actions are now not allowed")
-            # player_action = random.choice(legal_actions)
-            # if self._apply_penalty_for_invalid_actions:
-            #     self._invalid_action_penalties[curr_player_id] = True
+            if self._dummy_action_multiplier != 1:
+                # extended dummy action space is just the base discrete actions repeated multiple times
+                # convert to the base discrete action space.
+                player_action = player_action % self.base_num_discrete_actions
 
-        self.curr_time_step = self.openspiel_env.step([player_action])
+            if player_action not in self._base_action_space:
+                raise ValueError("Processed player action isn't in the base action space.\n"
+                                 f"orig action: {orig_player_action}\n"
+                                 f"processed action: {player_action}\n"
+                                 f"action space: {self.action_space}\n"
+                                 f"base action space: {self._base_action_space}")
+
+            # If action is illegal, do a random legal action instead
+            if player_action not in legal_actions:
+                raise ValueError("illegal actions are now not allowed")
+                # player_action = random.choice(legal_actions)
+                # if self._apply_penalty_for_invalid_actions:
+                #     self._invalid_action_penalties[curr_player_id] = True
+            player_actions.append(player_action)
+
+        self.curr_time_step = self.openspiel_env.step(player_actions)
 
         new_curr_player_id = self.curr_time_step.observations["current_player"]
         obs = self._get_current_obs()
         done = self.curr_time_step.last()
-        dones = {self.player_map(new_curr_player_id): done, "__all__": done}
+        dones = {0: done, 1: done, "__all__": done}
 
         if done:
             # dones = {0: True, 1: True, "__all__": True}
@@ -192,21 +207,19 @@ class OshiZumoMultiAgentEnv(MultiAgentEnv):
                 infos[self.player_map(1)]['game_result'] = 'tied'
                 infos[self.player_map(0)]['game_result'] = 'tied'
         else:
-            assert self.curr_time_step.rewards[new_curr_player_id] == 0, "curr_time_step rewards in non terminal state are {}".format(self.curr_time_step.rewards)
-            assert self.curr_time_step.rewards[-(new_curr_player_id-1)] == 0
+            assert all(rew == 0 for rew in self.curr_time_step.rewards), "curr_time_step rewards in non terminal state are {}".format(self.curr_time_step.rewards)
 
             # dones = {self.player_map(new_curr_player_id): False, "__all__": False}
-            rewards = {self.player_map(new_curr_player_id): self.curr_time_step.rewards[new_curr_player_id]}
-            assert self.curr_time_step.rewards[1 - new_curr_player_id] == 0.0
+            rewards = {self.player_map(p): self.curr_time_step.rewards[p] for p in range(2)}
             infos = {}
-
-        if self._apply_penalty_for_invalid_actions:
-            for player_id, penalty in enumerate(self._invalid_action_penalties):
-                if penalty and self.player_map(player_id) in rewards:
-                    rewards[self.player_map(player_id)] -= 4.0
-                    self._invalid_action_penalties[player_id] = False
 
         return obs, rewards, dones, infos
 
 
-register_env(POKER_ENV, lambda env_config: PokerMultiAgentEnv(env_config))
+TINY_OSHI_ZUMO_OBS_LENGTH = 21
+
+class TinyOshiZumoMultiAgentEnv(OshiZumoMultiAgentEnv):
+
+    def _get_openspiel_env(self):
+        assert self.game_version == "oshi_zumo_tiny"
+        return Environment(game_name="oshi_zumo", discount=1.0, coins=6, size=2, horizon=8)

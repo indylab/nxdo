@@ -36,7 +36,6 @@ from grl.utils import pretty_dict_str, datetime_str, ensure_dir, copy_attributes
 from grl.nfsp_rllib.nfsp import get_store_to_avg_policy_buffer_fn
 from grl.rl_apps.nfsp.openspiel_utils import nfsp_measure_exploitability_nonlstm
 from grl.rllib_tools.space_saving_logger import SpaceSavingLogger
-from grl.rl_apps.scenarios.poker import scenarios
 from grl.rl_apps.scenarios.stopping_conditions import StoppingCondition
 from grl.p2sro.payoff_table import PayoffTableStrategySpec
 from grl.xfdo.restricted_game import RestrictedGame
@@ -126,13 +125,14 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
     policy_classes: Dict[str, Type[Policy]] = scenario["policy_classes_nfsp"]
     anticipatory_param: float = scenario["anticipatory_param_nfsp"]
     get_trainer_config = scenario["get_trainer_config_nfsp"]
+    get_avg_trainer_config = scenario["get_avg_trainer_config_nfsp"]
     calculate_openspiel_metanash: bool = scenario["calculate_openspiel_metanash"]
     calc_metanash_every_n_iters: int = scenario["calc_metanash_every_n_iters"]
     metrics_smoothing_episodes_override: int = scenario["metanash_metrics_smoothing_episodes_override"]
 
     assert scenario["xfdo_metanash_method"] == "nfsp"
 
-    ray.init(ignore_reinit_error=True, local_mode=False)
+    ray.init(log_to_driver=os.getenv("RAY_LOG_TO_DRIVER", False), address='auto', _redis_password='5241590000000000', ignore_reinit_error=True, local_mode=False)
 
     def log(message, level=logging.INFO):
         logger.log(level, message)
@@ -164,9 +164,7 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
 
     assert all(restricted_game_action_spaces[0] == space for space in restricted_game_action_spaces)
 
-    avg_policy_model_config = get_trainer_config(action_space=tmp_env.action_space)["model"]
-
-    avg_trainer = avg_trainer_class(config={
+    avg_trainer_config = merge_dicts({
         "log_level": "DEBUG",
         "framework": "torch",
         "env": RestrictedGame,
@@ -178,19 +176,16 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
         "multiagent": {
             "policies_to_train": ["average_policy_0", "average_policy_1"],
             "policies": {
-                "average_policy_0": (policy_classes["average_policy"], tmp_env.observation_space, restricted_game_action_spaces[0], {
-                    "model": avg_policy_model_config
-                }),
-                "average_policy_1": (policy_classes["average_policy"], tmp_env.observation_space, restricted_game_action_spaces[1], {
-                    "model": avg_policy_model_config
-                }),
-                "delegate_policy": (policy_classes["delegate_policy"], tmp_base_env.observation_space, tmp_env.base_action_space, {}),
-
+                "average_policy_0": (policy_classes["average_policy"], tmp_env.observation_space, restricted_game_action_spaces[0], {"explore": False}),
+                "average_policy_1": (policy_classes["average_policy"], tmp_env.observation_space, restricted_game_action_spaces[1], {"explore": False}),
+                "delegate_policy": (policy_classes["delegate_policy"], tmp_base_env.observation_space, tmp_env.base_action_space, {"explore": False}),
             },
             "policy_mapping_fn": assert_not_called,
         },
 
-    }, logger_creator=get_trainer_logger_creator(base_dir=results_dir,
+    }, get_avg_trainer_config(restricted_game_action_spaces[0]))
+
+    avg_trainer = avg_trainer_class(config=avg_trainer_config, logger_creator=get_trainer_logger_creator(base_dir=results_dir,
                                                  scenario_name=f"nfsp_restricted_game_avg_trainer"))
 
     store_to_avg_policy_buffer = get_store_to_avg_policy_buffer_fn(nfsp_trainer=avg_trainer)
@@ -228,6 +223,8 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
                 elif policy_id == br_policy_id:
                     if "q_values" in postprocessed_batch:
                         del postprocessed_batch.data["q_values"]
+                    if "action_probs" in postprocessed_batch:
+                        del postprocessed_batch.data["action_probs"]
                     del postprocessed_batch.data["action_dist_inputs"]
 
                 if policy_id in ("average_policy_0", "best_response_0"):
@@ -261,17 +258,20 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
 
         def on_train_result(self, *, trainer, result: dict, **kwargs):
             super().on_train_result(trainer=trainer, result=result, **kwargs)
+            training_iteration = result["training_iteration"]
 
-            br_0_rew = result["policy_reward_mean"]["best_response_0"]
-            br_1_rew = result["policy_reward_mean"]["best_response_1"]
-            avg_br_reward = (br_0_rew + br_1_rew) / 2.0
-            result["avg_br_reward_both_players"] = avg_br_reward
+            if "policy_reward_mean" in result:
+                br_0_rew = result["policy_reward_mean"]["best_response_0"]
+                br_1_rew = result["policy_reward_mean"]["best_response_1"]
+                avg_br_reward = (br_0_rew + br_1_rew) / 2.0
+                result["avg_br_reward_both_players"] = avg_br_reward
+            else:
+                assert training_iteration < 5
 
             # print(trainer.latest_avg_trainer_result.keys())
             # log(pretty_dict_str(trainer.latest_avg_trainer_result))
             # if trainer.latest_avg_trainer_result is not None:
             #     result["avg_trainer_info"] = trainer.latest_avg_trainer_result.get("info", {})
-            training_iteration = result["training_iteration"]
             if (calculate_openspiel_metanash and
                     (training_iteration == 1 or training_iteration % calc_metanash_every_n_iters == 0)):
                 openspiel_game_version = base_env_config["version"]
@@ -279,7 +279,9 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
                 local_avg_policy_1 = trainer.workers.local_worker().policy_map["average_policy_1"]
                 exploitability = xfdo_nfsp_measure_exploitability_nonlstm(
                     rllib_policies=[local_avg_policy_0, local_avg_policy_1],
-                    poker_game_version=openspiel_game_version)
+                    poker_game_version=openspiel_game_version,
+                    action_space_converters=trainer.get_local_converters()
+                )
                 result["z_avg_policy_exploitability"] = exploitability
 
                 # check_local_avg_policy_0 = trainer.avg_trainer.workers.local_worker().policy_map["average_policy_0"]
@@ -312,19 +314,13 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
         "multiagent": {
             "policies_to_train": ["best_response_0", "best_response_1"],
             "policies": {
-                "average_policy_0": (policy_classes["average_policy"], tmp_env.observation_space, restricted_game_action_spaces[0], {
-                    "model": avg_policy_model_config,
-                    "explore": False,
-                }),
+                "average_policy_0": (policy_classes["average_policy"], tmp_env.observation_space, restricted_game_action_spaces[0], {"explore": False}),
                 "best_response_0": (policy_classes["best_response"], tmp_env.observation_space, restricted_game_action_spaces[0], {}),
 
-                "average_policy_1": (policy_classes["average_policy"], tmp_env.observation_space, restricted_game_action_spaces[1], {
-                    "model": avg_policy_model_config,
-                    "explore": False,
-                }),
+                "average_policy_1": (policy_classes["average_policy"], tmp_env.observation_space, restricted_game_action_spaces[1], {"explore": False}),
                 "best_response_1": (policy_classes["best_response"], tmp_env.observation_space, restricted_game_action_spaces[1], {}),
 
-                "delegate_policy": (policy_classes["delegate_policy"], tmp_base_env.observation_space, tmp_env.base_action_space, {}),
+                "delegate_policy": (policy_classes["delegate_policy"], tmp_base_env.observation_space, tmp_env.base_action_space, {"explore": False}),
 
             },
             "policy_mapping_fn": select_policy,
@@ -424,6 +420,10 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
             strategy_id=strategy_id,
             metadata={"checkpoint_path": checkpoint_path})
         avg_policy_specs.append(avg_policy_spec)
+
+    avg_trainer.cleanup()
+    br_trainer.cleanup()
+    ray.shutdown()
 
     assert final_train_result is not None
     return avg_policy_specs, final_train_result

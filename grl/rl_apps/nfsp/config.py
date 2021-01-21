@@ -1,3 +1,4 @@
+import os
 import numpy as np
 from typing import Dict
 from gym.spaces import Space, Discrete
@@ -7,7 +8,7 @@ from ray.rllib.models import MODEL_DEFAULTS
 from grl.rllib_tools.valid_actions_fcnet import get_valid_action_fcn_class
 from grl.rllib_tools.valid_actions_epsilon_greedy import ValidActionsEpsilonGreedy
 from grl.rl_apps.kuhn_poker_p2sro.poker_multi_agent_env import OBS_SHAPES, LEDUC_POKER
-from grl.rl_apps.kuhn_poker_p2sro.oshi_zumo_multi_agent_env import OSHI_ZUMO_OBS_LENGTH
+from grl.rl_apps.kuhn_poker_p2sro.oshi_zumo_multi_agent_env import OSHI_ZUMO_OBS_LENGTH, TINY_OSHI_ZUMO_OBS_LENGTH
 
 # def debug_before_learn_on_batch(x: MultiAgentBatch, *args, **kwargs):
 #     print(f"DQN trainer learn on batch {[s.count for s in x.policy_batches.values()]}")
@@ -135,9 +136,65 @@ def nfsp_kuhn_dqn_params(action_space: Space) -> Dict:
         }),
     }
 
+def nfsp_kuhn_avg_policy_params(action_space: Space) -> Dict:
+    return {
+        "learning_starts": 2000,
+        "train_batch_size": 128,
+        "lr": 0.01,
+        "model": merge_dicts(MODEL_DEFAULTS, {
+            "fcnet_activation": "relu",
+            "fcnet_hiddens": [128],
+        }),
+    }
 
+def nfsp_kuhn_avg_policy_params_gpu(action_space: Space) -> Dict:
+    return {
+        "num_gpus": os.getenv("WORKER_GPU_NUM", 0.0625),
+        "num_workers": 0,
+        "num_gpus_per_worker": os.getenv("WORKER_GPU_NUM", 0.0625),
+        "num_envs_per_worker": 1,
+        "learning_starts": 16000,
+        "train_batch_size": 4096,
+        "lr": 0.1,
+        "model": merge_dicts(MODEL_DEFAULTS, {
+            "fcnet_activation": "relu",
+            "fcnet_hiddens": [128],
+        }),
+    }
 
-def kuhn_dqn_params_gpu(action_space: Space) -> Dict:
+def nfsp_leduc_avg_policy_params(action_space: Space) -> Dict:
+    assert isinstance(action_space, Discrete)
+    action_space: Discrete = action_space
+    return {
+        "learning_starts": 2000,
+        "train_batch_size": 128,
+        "lr": 0.01,
+        "model": merge_dicts(MODEL_DEFAULTS, {
+            "fcnet_activation": "relu",
+            "fcnet_hiddens": [128],
+            "custom_model": get_valid_action_fcn_class(obs_len=_LEDUC_OBS_LEN, action_space_n=action_space.n),
+        }),
+    }
+
+def nfsp_leduc_avg_policy_params_gpu(action_space: Space) -> Dict:
+    assert isinstance(action_space, Discrete)
+    action_space: Discrete = action_space
+    return {
+        "num_gpus": os.getenv("WORKER_GPU_NUM", 0.0625),
+        "num_workers": 0,
+        "num_gpus_per_worker": os.getenv("WORKER_GPU_NUM", 0.0625),
+        "num_envs_per_worker": 1,
+        "learning_starts": 16000,
+        "train_batch_size": 4096,
+        "lr": 0.1,
+        "model": merge_dicts(MODEL_DEFAULTS, {
+            "fcnet_activation": "relu",
+            "fcnet_hiddens": [128],
+            "custom_model": get_valid_action_fcn_class(obs_len=_LEDUC_OBS_LEN, action_space_n=action_space.n),
+        }),
+    }
+
+def nfsp_kuhn_dqn_params_gpu(action_space: Space) -> Dict:
     return {
         "framework": "torch",
         # Smooth metrics over this many episodes.
@@ -227,16 +284,16 @@ def kuhn_dqn_params_gpu(action_space: Space) -> Dict:
         # If not None, clip gradients during optimization at this value
         "grad_clip": None,
 
-        "num_gpus": 0.2,
-        "num_workers": 0,
-        "num_gpus_per_worker": 0.1,
-        "num_envs_per_worker": 16,
+        "num_gpus": os.getenv("WORKER_GPU_NUM", 0.0625),
+        "num_workers": 8,
+        "num_gpus_per_worker": os.getenv("WORKER_GPU_NUM", 0.0625),
+        "num_envs_per_worker": 32,
 
         # How many steps of the model to sample before learning starts.
-        "learning_starts": 8000,
+        "learning_starts": 16000,
         # Update the replay buffer with this many samples at once. Note that
         # this setting applies per-worker if num_workers > 1.q
-        "rollout_fragment_length": 64,
+        "rollout_fragment_length": 8,
 
         "batch_mode": "truncate_episodes",
 
@@ -246,7 +303,7 @@ def kuhn_dqn_params_gpu(action_space: Space) -> Dict:
         # Size of a batch sampled from replay buffer for training. Note that
         # if async_updates is set, then each worker returns gradients for a
         # batch of this size.
-        "train_batch_size": 2048,
+        "train_batch_size": 4096,
 
         # Whether to compute priorities on workers.
         "worker_side_prioritization": False,
@@ -413,7 +470,7 @@ def leduc_dqn_params_lowered(action_space: Space) -> Dict:
         # === Exploration Settings ===
         "exploration_config": {
             # The Exploration class to use.
-            "type": LeducEpsilonGreedy,
+            "type": ValidActionsEpsilonGreedy,
             # Config for the Exploration class' constructor:
             "initial_epsilon": 0.06,
             "final_epsilon": 0.001,
@@ -498,13 +555,13 @@ def leduc_dqn_params_lowered(action_space: Space) -> Dict:
         "model": merge_dicts(MODEL_DEFAULTS, {
             "fcnet_activation": "relu",
             "fcnet_hiddens": [128],
-            "custom_model": LeducDQNFullyConnectedNetwork,
+            "custom_model": get_valid_action_fcn_class(obs_len=_LEDUC_OBS_LEN, action_space_n=action_space.n),
         }),
     }
 
 
 
-def leduc_dqn_params_lowered_gpu(action_space: Space) -> Dict:
+def nfsp_leduc_dqn_params_gpu(action_space: Space) -> Dict:
     return {
         "framework": "torch",
         # Smooth metrics over this many episodes.
@@ -533,7 +590,7 @@ def leduc_dqn_params_lowered_gpu(action_space: Space) -> Dict:
         # === Exploration Settings ===
         "exploration_config": {
             # The Exploration class to use.
-            "type": LeducEpsilonGreedy,
+            "type": ValidActionsEpsilonGreedy,
             # Config for the Exploration class' constructor:
             "initial_epsilon": 0.06,
             "final_epsilon": 0.001,
@@ -552,7 +609,7 @@ def leduc_dqn_params_lowered_gpu(action_space: Space) -> Dict:
         "explore": True,
 
         # Update the target network every `target_network_update_freq` steps.
-        "target_network_update_freq": 19200,
+        "target_network_update_freq": 10000,
         # "target_network_update_freq": 1,
 
         # === Replay buffer ===
@@ -592,17 +649,17 @@ def leduc_dqn_params_lowered_gpu(action_space: Space) -> Dict:
         # If not None, clip gradients during optimization at this value
         "grad_clip": None,
 
-        "num_gpus": 0.5,
-        "num_workers": 16,
-        "num_gpus_per_worker": 0.1,
-        "num_envs_per_worker": 4,
+        "num_gpus": os.getenv("WORKER_GPU_NUM", 0.0625),
+        "num_workers": 8,
+        "num_gpus_per_worker": os.getenv("WORKER_GPU_NUM", 0.0625),
+        "num_envs_per_worker": 32,
 
 
         # How many steps of the model to sample before learning starts.
-        "learning_starts": 8000,
+        "learning_starts": 16000,
         # Update the replay buffer with this many samples at once. Note that
         # this setting applies per-worker if num_workers > 1.q
-        "rollout_fragment_length": 4,
+        "rollout_fragment_length": 8,
         "batch_mode": "truncate_episodes",
 
         # "rollout_fragment_length": 1,
@@ -611,7 +668,7 @@ def leduc_dqn_params_lowered_gpu(action_space: Space) -> Dict:
         # Size of a batch sampled from replay buffer for training. Note that
         # if async_updates is set, then each worker returns gradients for a
         # batch of this size.
-        "train_batch_size": 2048,
+        "train_batch_size": 4096,
 
         # Whether to compute priorities on workers.
         "worker_side_prioritization": False,
@@ -625,7 +682,7 @@ def leduc_dqn_params_lowered_gpu(action_space: Space) -> Dict:
         "model": merge_dicts(MODEL_DEFAULTS, {
             "fcnet_activation": "relu",
             "fcnet_hiddens": [128],
-            "custom_model": LeducDQNFullyConnectedNetwork,
+            "custom_model": get_valid_action_fcn_class(obs_len=_LEDUC_OBS_LEN, action_space_n=action_space.n),
         }),
     }
 
@@ -752,6 +809,29 @@ def nfsp_oshi_zumo_dqn_params_like_kuhn(action_space: Space) -> Dict:
         }),
     }
 
+def nfsp_tiny_oshi_zumo_dqn_params_like_kuhn(action_space: Space) -> Dict:
+    params = nfsp_oshi_zumo_dqn_params_like_kuhn(action_space=action_space)
+    params["model"]["custom_model"] = get_valid_action_fcn_class(obs_len=TINY_OSHI_ZUMO_OBS_LENGTH, action_space_n=action_space.n)
+    return params
+
+def nfsp_tiny_oshi_zumo_avg_policy_params_like_leduc(action_space: Space) -> Dict:
+    params = nfsp_oshi_zumo_avg_policy_params_like_leduc(action_space=action_space)
+    params["model"]["custom_model"] = get_valid_action_fcn_class(obs_len=TINY_OSHI_ZUMO_OBS_LENGTH, action_space_n=action_space.n)
+    return params
+
+def nfsp_oshi_zumo_avg_policy_params_like_leduc(action_space: Space) -> Dict:
+    assert isinstance(action_space, Discrete)
+    action_space: Discrete = action_space
+    return {
+        "learning_starts": 2000,
+        "train_batch_size": 128,
+        "lr": 0.01,
+        "model": merge_dicts(MODEL_DEFAULTS, {
+            "fcnet_activation": "relu",
+            "fcnet_hiddens": [128],
+            "custom_model": get_valid_action_fcn_class(obs_len=OSHI_ZUMO_OBS_LENGTH, action_space_n=action_space.n),
+        }),
+    }
 
 def nfsp_oshi_zumo_dqn_params_like_leduc(action_space: Space) -> Dict:
     assert isinstance(action_space, Discrete)

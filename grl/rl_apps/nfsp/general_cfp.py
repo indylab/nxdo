@@ -148,7 +148,7 @@ def train_cfp(results_dir: str, scenario_name: str, print_train_results: bool = 
     calc_metanash_every_n_iters: int = scenario["calc_metanash_every_n_iters"]
     cfp_get_stopping_condition = scenario["cfp_get_stopping_condition"]
 
-    ray.init(ignore_reinit_error=True, local_mode=False)
+    ray.init(log_to_driver=os.getenv("RAY_LOG_TO_DRIVER", False), address='auto', _redis_password='5241590000000000', ignore_reinit_error=True, local_mode=False)
 
     def log(message, level=logging.INFO):
         logger.log(level, message)

@@ -5,6 +5,7 @@ import grl
 from grl.p2sro.p2sro_manager import P2SROManagerWithServer, SimpleP2SROManagerLogger
 from grl.utils import datetime_str, ensure_dir
 from grl.rl_apps.scenarios.poker import scenarios
+from grl.rl_apps.kuhn_poker_p2sro.general_psro_eval import launch_evals
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
@@ -46,4 +47,9 @@ if __name__ == '__main__':
         log_dir=log_dir
     )
     print(f"Launched P2SRO Manager with server.")
+
+    launch_evals(scenario_name=scenario_name, block=False)
+
+    print(f"Launched evals")
+
     manager.wait_for_server_termination()

@@ -210,7 +210,7 @@ def train_poker_best_response(br_player: int, scenario_name: str, print_train_re
     default_xfdo_port = scenario["xfdo_port"]
     get_trainer_config = scenario["get_trainer_config_br"]
     xfdo_br_get_stopping_condition = scenario["get_stopping_condition_br"]
-    xfdo_metanash_method: str = scenario["xdfo_metanash_method"]
+    xfdo_metanash_method: str = scenario["xfdo_metanash_method"]
     use_cfp_metanash = (xfdo_metanash_method == "cfp")
 
     xfdo_manager = RemoteXFDOManagerClient(n_players=2,
@@ -277,7 +277,7 @@ def train_poker_best_response(br_player: int, scenario_name: str, print_train_re
     }
     trainer_config = merge_dicts(trainer_config, get_trainer_config(action_space=tmp_env.base_action_space))
 
-    ray.init(ignore_reinit_error=True, local_mode=False)
+    ray.init(log_to_driver=os.getenv("RAY_LOG_TO_DRIVER", False), address='auto', _redis_password='5241590000000000', ignore_reinit_error=True, local_mode=False)
     trainer = trainer_class(config=trainer_config)
 
     if use_cfp_metanash and cfp_metanash_specs_for_players:
@@ -288,8 +288,9 @@ def train_poker_best_response(br_player: int, scenario_name: str, print_train_re
     elif not use_cfp_metanash:
         # metanash is single pure strat spec
         def _set_worker_metanash(worker: RolloutWorker):
-            metanash_policy = worker.policy_map["metanash"]
-            load_pure_strat(policy=metanash_policy, pure_strat_spec=metanash_specs_for_players[other_player])
+            if metanash_specs_for_players is not None:
+                metanash_policy = worker.policy_map["metanash"]
+                load_pure_strat(policy=metanash_policy, pure_strat_spec=metanash_specs_for_players[other_player])
         trainer.workers.foreach_worker(_set_worker_metanash)
 
     trainer.weights_cache = {}
@@ -319,6 +320,7 @@ def train_poker_best_response(br_player: int, scenario_name: str, print_train_re
                 del train_iter_results["hist_stats"]
             if "td_error" in train_iter_results["info"]["learner"][f"best_response"]:
                 del train_iter_results["info"]["learner"][f"best_response"]["td_error"]
+            log(f"Trainer log dir is {trainer.logdir}")
             log(pretty_dict_str(train_iter_results))
 
         total_timesteps_training_br = train_iter_results["timesteps_total"]
@@ -340,6 +342,10 @@ def train_poker_best_response(br_player: int, scenario_name: str, print_train_re
             active_policy_num=active_policy_num,
             average_br_reward=br_reward_this_iter,
         ))
+
+    trainer.cleanup()
+    del trainer
+    ray.shutdown()
 
     # wait for both player policies to be fixed.
     for player_to_wait_on in range(2):

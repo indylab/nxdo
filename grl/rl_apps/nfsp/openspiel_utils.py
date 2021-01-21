@@ -33,6 +33,13 @@ def nfsp_measure_exploitability_nonlstm(rllib_policies: List[Policy],
         open_spiel_env_config = {
             "players": pyspiel.GameParameter(2)
         }
+    elif poker_game_version in ["oshi_zumo_tiny"]:
+        poker_game_version = "oshi_zumo"
+        open_spiel_env_config = {
+            "coins": pyspiel.GameParameter(6),
+            "size": pyspiel.GameParameter(2),
+            "horizon": pyspiel.GameParameter(8),
+        }
     else:
         open_spiel_env_config = {}
 

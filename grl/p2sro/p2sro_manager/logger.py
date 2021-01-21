@@ -63,10 +63,16 @@ class SimpleP2SROManagerLogger(P2SROManagerLogger):
         # save a checkpoint of the payoff table
         data = self._manager.get_copy_of_latest_data()
         latest_payoff_table, active_policy_nums_per_player, fixed_policy_nums_per_player = data
+        # pt_checkpoint_path = os.path.join(self._payoff_table_checkpoint_dir,
+        #                                   f"payoff_table_checkpoint_{self._payoff_table_checkpoint_count}.json")
+        # policy_nums_path = os.path.join(self._payoff_table_checkpoint_dir,
+        #                                 f"policy_nums_checkpoint_{self._payoff_table_checkpoint_count}.json")
+
         pt_checkpoint_path = os.path.join(self._payoff_table_checkpoint_dir,
-                                          f"payoff_table_checkpoint_{self._payoff_table_checkpoint_count}.json")
+                                          f"payoff_table_checkpoint_latest.json")
         policy_nums_path = os.path.join(self._payoff_table_checkpoint_dir,
-                                        f"policy_nums_checkpoint_{self._payoff_table_checkpoint_count}.json")
+                                        f"policy_nums_checkpoint_latest.json")
+
         ensure_dir(file_path=pt_checkpoint_path)
         ensure_dir(file_path=policy_nums_path)
 

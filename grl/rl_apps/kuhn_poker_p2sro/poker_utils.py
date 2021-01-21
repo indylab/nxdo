@@ -1,5 +1,4 @@
 from grl.p2sro.payoff_table import PayoffTable
-from grl.rllib_tools.valid_actions_fcnet import LeducDQNFullyConnectedNetwork
 from ray.rllib.policy import Policy
 from ray.rllib.models.action_dist import ActionDistribution
 
@@ -229,7 +228,7 @@ def openspiel_policy_from_nonlstm_rllib_policy(openspiel_game: OpenSpielGame,
 
         info_state_vector = state.information_state_as_normalized_vector()
 
-        if openspiel_game.get_type().short_name == "leduc_poker":
+        if openspiel_game.get_type().short_name in ["leduc_poker", "oshi_zumo", "oshi_zumo_tiny"]:
             # Observation includes both the info_state and legal actions, but agent isn't forced to take legal actions.
             # Taking an illegal action will result in a random legal action being played.
             # Allows easy compatibility with standard RL implementations for small action-space games like this one.
@@ -423,8 +422,8 @@ def get_stats_for_single_payoff_table(payoff_table:PayoffTable, highest_policy_n
         # )
     # ) for _ in range(2)]
 
-    if poker_game_version == "leduc_poker":
-        assert isinstance(policies[0].model, LeducDQNFullyConnectedNetwork)
+    # if poker_game_version == "leduc_poker":
+    #     assert isinstance(policies[0].model, LeducDQNFullyConnectedNetwork)
 
     def set_policy_weights(policy: Policy, checkpoint_path: str):
         checkpoint_data = deepdish.io.load(path=checkpoint_path)
