@@ -75,7 +75,7 @@ class SolveRestrictedGameDynamicRewardThreshold1(SolveRestrictedGame):
 
     def __init__(self,
                  scenario: dict,
-                 dont_solve_first_n_iters: int,
+                 dont_solve_first_n_xfdo_iters: int,
                  starting_rew_threshold: float,
                  min_rew_threshold: float,
                  min_episodes: int, required_fields: List[str]):
@@ -85,8 +85,8 @@ class SolveRestrictedGameDynamicRewardThreshold1(SolveRestrictedGame):
         self._current_rew_threshold = starting_rew_threshold
         self._min_rew_threshold = min_rew_threshold
 
-        self._current_iter = 0
-        self._dont_solve_first_current_iters = dont_solve_first_n_iters
+        self._current_xfdo_iter = 0
+        self._dont_solve_first_n_xfdo_iters = dont_solve_first_n_xfdo_iters
 
         if required_fields is None:
             required_fields = []
@@ -108,7 +108,7 @@ class SolveRestrictedGameDynamicRewardThreshold1(SolveRestrictedGame):
                  br_spec_lists_for_each_player: Dict[int, List[PayoffTableStrategySpec]]) -> RestrictedGameSolveResult:
         # This method is called each time we need to solve the metanash for XFDO
 
-        if self._current_iter < self._dont_solve_first_current_iters:
+        if self._current_xfdo_iter < self._dont_solve_first_n_xfdo_iters:
             # Instantly get back an untrained metanash (an untrained avg policy network in the case of NFSP)
             stopping_condition = TwoPlayerBRRewardsBelowAmtStoppingCondition(
                 stop_if_br_avg_rew_falls_below=100000.0,
@@ -124,7 +124,7 @@ class SolveRestrictedGameDynamicRewardThreshold1(SolveRestrictedGame):
                 required_fields_in_last_train_iter=self.required_fields
             )
 
-        self._current_iter += 1
+        self._current_xfdo_iter += 1
 
         return _solve_game(scenario=self.scenario,
                            log_dir=log_dir,
