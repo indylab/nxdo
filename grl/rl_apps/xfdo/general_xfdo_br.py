@@ -275,6 +275,10 @@ def train_poker_best_response(br_player: int, scenario_name: str, print_train_re
             "policy_mapping_fn": select_policy,
         },
     }
+
+    if metanash_specs_for_players is not None:
+        trainer_config["multiagent"]["policies"]["metanash"][3]["model"] = {"custom_model": None}
+
     trainer_config = merge_dicts(trainer_config, get_trainer_config(action_space=tmp_env.base_action_space))
 
     ray.init(log_to_driver=os.getenv("RAY_LOG_TO_DRIVER", False), address='auto', _redis_password='5241590000000000', ignore_reinit_error=True, local_mode=False)

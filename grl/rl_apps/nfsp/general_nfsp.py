@@ -110,6 +110,19 @@ def create_metadata_with_new_checkpoint(br_trainer: Trainer,
         "episodes_training": episodes_training
     }
 
+@ray.remote(num_cpus=0)
+class StatDeque(object):
+    def __init__(self, max_items: int):
+        self._data = []
+        self._max_items = max_items
+
+    def add(self, item):
+        self._data.append(item)
+        if len(self._data) > self._max_items:
+            del self._data[0]
+
+    def get_mean(self):
+        return np.mean(self._data)
 
 def train_off_policy_rl_nfsp(results_dir: str,
                              scenario_name: str,
@@ -229,17 +242,16 @@ def train_off_policy_rl_nfsp(results_dir: str,
                 if policy_id in ("average_policy_1", "best_response_1"):
                     assert agent_id == 1
 
-        # # TODO figure avg br reward tracking out
-        # def on_episode_end(self, *, worker: "RolloutWorker", base_env: BaseEnv, policies: Dict[PolicyID, Policy],
-        #                    episode: MultiAgentEpisode, env_index: int, **kwargs):
-        #     super().on_episode_end(worker=worker, base_env=base_env, policies=policies, episode=episode,
-        #                            env_index=env_index, **kwargs)
-        #
-        #     episode_policies = set(k[1] for k in episode.agent_rewards.keys())
-        #     if episode_policies == {(0, "average_policy_0"), (1, "best_response_1")}:
-        #         episode.custom_metrics["avg_br_reward_both_players"] = episode.agent_rewards[(1, "best_response_1")]
-        #     elif episode_policies == {(1, "average_policy_1"), (0, "best_response_0")}:
-        #         episode.custom_metrics["avg_br_reward_both_players"] = episode.agent_rewards[(0, "best_response_0")]
+        def on_episode_end(self, *, worker: "RolloutWorker", base_env: BaseEnv, policies: Dict[PolicyID, Policy],
+                           episode: MultiAgentEpisode, env_index: int, **kwargs):
+            super().on_episode_end(worker=worker, base_env=base_env, policies=policies, episode=episode,
+                                   env_index=env_index, **kwargs)
+
+            episode_policies = set(episode.agent_rewards.keys())
+            if episode_policies == {(0, "average_policy_0"), (1, "best_response_1")}:
+                worker.avg_br_reward_deque.add.remote(episode.agent_rewards[(1, "best_response_1")])
+            elif episode_policies == {(1, "average_policy_1"), (0, "best_response_0")}:
+                worker.avg_br_reward_deque.add.remote(episode.agent_rewards[(0, "best_response_0")])
 
         def on_sample_end(self, *, worker: "RolloutWorker", samples: SampleBatch, **kwargs):
             super().on_sample_end(worker=worker, samples=samples, **kwargs)
@@ -269,6 +281,8 @@ def train_off_policy_rl_nfsp(results_dir: str,
         def on_train_result(self, *, trainer, result: dict, **kwargs):
             super().on_train_result(trainer=trainer, result=result, **kwargs)
             result["scenario_name"] = trainer.scenario_name
+
+            result["avg_br_reward_both_players"] = ray.get(trainer.avg_br_reward_deque.get_mean.remote())
 
             # print(trainer.latest_avg_trainer_result.keys())
             # log(pretty_dict_str(trainer.latest_avg_trainer_result))
@@ -339,6 +353,12 @@ def train_off_policy_rl_nfsp(results_dir: str,
 
     br_trainer = trainer_class(config=br_trainer_config,
                                logger_creator=get_trainer_logger_creator(base_dir=results_dir, scenario_name=scenario_name))
+
+    avg_br_reward_deque = StatDeque.remote(max_items=br_trainer_config["metrics_smoothing_episodes"])
+    def _set_avg_br_rew_deque(worker: RolloutWorker):
+        worker.avg_br_reward_deque = avg_br_reward_deque
+    br_trainer.workers.foreach_worker(_set_avg_br_rew_deque)
+    br_trainer.avg_br_reward_deque = avg_br_reward_deque
 
     # assert isinstance(br_trainer.workers.local_worker().policy_map["average_policy_1"].model, LeducDQNFullyConnectedNetwork)
     # assert isinstance(br_trainer.workers.local_worker().policy_map["average_policy_0"].model, LeducDQNFullyConnectedNetwork)

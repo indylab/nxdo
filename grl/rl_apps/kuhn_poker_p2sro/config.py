@@ -7,6 +7,7 @@ from ray.rllib.models import MODEL_DEFAULTS
 from grl.rllib_tools.valid_actions_fcnet import get_valid_action_fcn_class
 from grl.rllib_tools.valid_actions_epsilon_greedy import ValidActionsEpsilonGreedy
 from grl.rl_apps.kuhn_poker_p2sro.poker_multi_agent_env import OBS_SHAPES, LEDUC_POKER
+from grl.rl_apps.kuhn_poker_p2sro.oshi_zumo_multi_agent_env import OSHI_ZUMO_OBS_LENGTH
 
 _LEDUC_OBS_LEN = OBS_SHAPES[LEDUC_POKER][0]
 
@@ -498,9 +499,9 @@ def psro_leduc_dqn_params_gpu(action_space: Space) -> Dict:
         # If not None, clip gradients during optimization at this value
         "grad_clip": None,
 
-        "num_gpus": os.getenv("WORKER_GPU_NUM", 0.0625),
-        "num_workers": 8,
-        "num_gpus_per_worker": os.getenv("WORKER_GPU_NUM", 0.0625),
+        "num_gpus": float(os.getenv("WORKER_GPU_NUM", 0.0)),
+        "num_workers": 4,
+        "num_gpus_per_worker": float(os.getenv("WORKER_GPU_NUM", 0.0)),
         "num_envs_per_worker": 1,
 
 
@@ -535,6 +536,11 @@ def psro_leduc_dqn_params_gpu(action_space: Space) -> Dict:
         }),
     }
 
+
+def psro_20x_dummy_leduc_params_gpu(action_space: Space) -> Dict:
+    params = psro_leduc_dqn_params_gpu(action_space=action_space)
+    params["model"]["custom_model"] = get_valid_action_fcn_class(obs_len=_LEDUC_OBS_LEN, action_space_n=action_space.n, dummy_actions_multiplier=20)
+    return params
 
 
 def psro_kuhn_dqn_params_gpu(action_space: Space) -> Dict:
@@ -627,9 +633,9 @@ def psro_kuhn_dqn_params_gpu(action_space: Space) -> Dict:
         # If not None, clip gradients during optimization at this value
         "grad_clip": None,
 
-        "num_gpus": os.getenv("WORKER_GPU_NUM", 0.0625),
-        "num_workers": 8,
-        "num_gpus_per_worker": os.getenv("WORKER_GPU_NUM", 0.0625),
+        "num_gpus": float(os.getenv("WORKER_GPU_NUM", 0.0)),
+        "num_workers": 4,
+        "num_gpus_per_worker": float(os.getenv("WORKER_GPU_NUM", 0.0)),
         "num_envs_per_worker": 1,
 
 
@@ -662,3 +668,17 @@ def psro_kuhn_dqn_params_gpu(action_space: Space) -> Dict:
             "fcnet_hiddens": [128],
         }),
     }
+
+
+def psro_20x_dummy_leduc_params_gpu_v2(action_space: Space) -> Dict:
+    params = psro_20x_dummy_leduc_params_gpu(action_space=action_space)
+    params["lr"] = 0.001
+    params["metrics_smoothing_episodes"] = 3000
+    return params
+
+def psro_oshi_zumo_dqn_params_like_leduc_gpu(action_space: Space) -> Dict:
+    params = psro_leduc_dqn_params_gpu(action_space=action_space)
+    params["lr"] = 0.001
+    params["model"]["fcnet_hiddens"] = [128, 128]
+    params["model"]["custom_model"] = get_valid_action_fcn_class(obs_len=OSHI_ZUMO_OBS_LENGTH, action_space_n=action_space.n)
+    return params

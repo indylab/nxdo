@@ -252,10 +252,10 @@ def openspiel_policy_from_nonlstm_rllib_policy(openspiel_game: OpenSpielGame,
         if len(action_probs) > len(valid_actions_mask) and len(action_probs) % len(valid_actions_mask) == 0:
             # we may be using a dummy action variant of poker
             dummy_action_probs = action_probs.copy()
-            action_probs = np.zeros_like(valid_actions_mask)
+            action_probs = np.zeros_like(valid_actions_mask, dtype=np.float64)
             for i, action_prob in enumerate(dummy_action_probs):
                 action_probs[i % len(valid_actions_mask)] += action_prob
-            assert np.isclose(sum(action_probs), 1.0)
+            assert np.isclose(sum(action_probs), 1.0), sum(action_probs)
 
         # Since the rl env will execute a random legal action if an illegal action is chosen, redistribute probability
         # of choosing an illegal action evenly across all legal actions.
@@ -386,7 +386,7 @@ def psro_measure_exploitability_nonlstm(br_checkpoint_path_tuple_list: List[Tupl
 
 def get_stats_for_single_payoff_table(payoff_table:PayoffTable, highest_policy_num: int, poker_env_config, policy_class, policy_config):
 
-    ray.init(ignore_reinit_error=True, local_mode=True, num_cpus=1)
+    ray.init(address='auto', _redis_password='5241590000000000', ignore_reinit_error=True, local_mode=False, num_cpus=0)
 
     poker_game_version = poker_env_config["version"]
     temp_env = PokerMultiAgentEnv(env_config=poker_env_config)
@@ -426,6 +426,9 @@ def get_stats_for_single_payoff_table(payoff_table:PayoffTable, highest_policy_n
     #     assert isinstance(policies[0].model, LeducDQNFullyConnectedNetwork)
 
     def set_policy_weights(policy: Policy, checkpoint_path: str):
+
+        checkpoint_path = checkpoint_path.replace("/home/jblanier/", "/home/jb/")
+
         checkpoint_data = deepdish.io.load(path=checkpoint_path)
         weights = checkpoint_data["weights"]
         weights = {k.replace("_dot_", "."): v for k, v in weights.items()}
@@ -442,19 +445,22 @@ def get_stats_for_single_payoff_table(payoff_table:PayoffTable, highest_policy_n
                                                         as_player=1,
                                                         as_policy_num=n_policies,
                                                         fictitious_play_iters=2000,
-                                                        mix_with_uniform_dist_coeff=0.0)[0].probabilities_for_each_strategy()
+                                                        mix_with_uniform_dist_coeff=0.0,
+                                                        print_matrix=False)[0].probabilities_for_each_strategy()
 
         metanash_probs_1 = get_latest_metanash_strategies(payoff_table=payoff_table,
                                                           as_player=0,
                                                           as_policy_num=n_policies,
                                                           fictitious_play_iters=2000,
-                                                          mix_with_uniform_dist_coeff=0.0)[1].probabilities_for_each_strategy()
+                                                          mix_with_uniform_dist_coeff=0.0,
+                                                          print_matrix=False)[1].probabilities_for_each_strategy()
 
         pure_strat_index = get_latest_metanash_strategies(payoff_table=payoff_table,
                                        as_player=0,
                                        as_policy_num=n_policies,
                                        fictitious_play_iters=2000,
-                                       mix_with_uniform_dist_coeff=0.0)[1].sample_policy_spec().get_pure_strat_indexes()
+                                       mix_with_uniform_dist_coeff=0.0,
+                                       print_matrix=False)[1].sample_policy_spec().get_pure_strat_indexes()
         # print(f"pure strat index: {pure_strat_index}")
 
 

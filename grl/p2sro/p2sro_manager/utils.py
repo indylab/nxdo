@@ -26,7 +26,8 @@ def get_latest_metanash_strategies(payoff_table: PayoffTable,
                                    as_player: int,
                                    as_policy_num: int,
                                    fictitious_play_iters: int,
-                                   mix_with_uniform_dist_coeff: float = 0.0) -> Dict[int, PolicySpecDistribution]:
+                                   mix_with_uniform_dist_coeff: float = 0.0,
+                                   print_matrix: bool = True) -> Dict[int, PolicySpecDistribution]:
 
     # Currently this function only handles 2-player games
     if as_policy_num == None:
@@ -56,8 +57,9 @@ def get_latest_metanash_strategies(payoff_table: PayoffTable,
 
         player_payoff_matrix_current_player_is_rows = player_payoff_matrix.transpose((other_player, as_player))
 
-        print(f"payoff matrix as {other_player} (row) against {as_player} (columns):")
-        print(player_payoff_matrix_current_player_is_rows)
+        if print_matrix:
+            print(f"payoff matrix as {other_player} (row) against {as_player} (columns):")
+            print(player_payoff_matrix_current_player_is_rows)
 
         row_averages, col_averages, exps = fictitious_play(iters=fictitious_play_iters,
                                           payoffs=player_payoff_matrix_current_player_is_rows)

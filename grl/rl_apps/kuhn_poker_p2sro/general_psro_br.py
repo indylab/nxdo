@@ -134,7 +134,8 @@ def update_all_workers_to_latest_metanash(trainer: DQNTrainer,
                                           br_player: int,
                                           metanash_player: int,
                                           p2sro_manager: RemoteP2SROManagerClient,
-                                          active_policy_num: int):
+                                          active_policy_num: int,
+                                          mix_metanash_with_uniform_dist_coeff: float):
 
     latest_payoff_table, active_policy_nums, fixed_policy_nums = p2sro_manager.get_copy_of_latest_data()
     latest_strategies: Dict[int, PolicySpecDistribution] = get_latest_metanash_strategies(
@@ -142,7 +143,7 @@ def update_all_workers_to_latest_metanash(trainer: DQNTrainer,
         as_player=br_player,
         as_policy_num=active_policy_num,
         fictitious_play_iters=2000,
-        mix_with_uniform_dist_coeff=0.0
+        mix_with_uniform_dist_coeff=mix_metanash_with_uniform_dist_coeff
     )
 
     if latest_strategies is None:
@@ -166,6 +167,7 @@ def sync_active_policy_br_and_metanash_with_p2sro_manager(trainer: DQNTrainer,
                                                             player: int,
                                                             metanash_player: int,
                                                             p2sro_manager: RemoteP2SROManagerClient,
+                                                            mix_metanash_with_uniform_dist_coeff: float,
                                                             active_policy_num: int,
                                                             timesteps_training_br: int,
                                                             episodes_training_br: int):
@@ -179,7 +181,8 @@ def sync_active_policy_br_and_metanash_with_p2sro_manager(trainer: DQNTrainer,
         ))
 
     update_all_workers_to_latest_metanash(p2sro_manager=p2sro_manager, br_player=player, metanash_player=metanash_player, trainer=trainer,
-                                          active_policy_num=active_policy_num)
+                                          active_policy_num=active_policy_num,
+                                          mix_metanash_with_uniform_dist_coeff=mix_metanash_with_uniform_dist_coeff)
 
 
 class P2SROPreAndPostEpisodeCallbacks(DefaultCallbacks):
@@ -254,6 +257,7 @@ def train_poker_best_response(player, results_dir, scenario_name, print_train_re
     p2sro = scenario["p2sro"]
     get_trainer_config = scenario["get_trainer_config"]
     psro_get_stopping_condition = scenario["psro_get_stopping_condition"]
+    mix_metanash_with_uniform_dist_coeff = scenario["mix_metanash_with_uniform_dist_coeff"]
 
     other_player = 1 - player
     
@@ -319,6 +323,7 @@ def train_poker_best_response(player, results_dir, scenario_name, print_train_re
                                                           player=player,
                                                           metanash_player=other_player,
                                                           p2sro_manager=p2sro_manager,
+                                                          mix_metanash_with_uniform_dist_coeff=mix_metanash_with_uniform_dist_coeff,
                                                           active_policy_num=active_policy_num,
                                                           timesteps_training_br=0,
                                                           episodes_training_br=0)
@@ -355,6 +360,7 @@ def train_poker_best_response(player, results_dir, scenario_name, print_train_re
                                                                   player=player,
                                                                   metanash_player=other_player,
                                                                   p2sro_manager=p2sro_manager,
+                                                                  mix_metanash_with_uniform_dist_coeff=mix_metanash_with_uniform_dist_coeff,
                                                                   active_policy_num=active_policy_num,
                                                                   timesteps_training_br=total_timesteps_training_br,
                                                                   episodes_training_br=total_episodes_training_br)
@@ -375,6 +381,8 @@ def train_poker_best_response(player, results_dir, scenario_name, print_train_re
             active_policy_num=active_policy_num
         ))
 
+    trainer.cleanup()
+    ray.shutdown()
 
     # wait for both player policies to be fixed and then track exploitability.
     for player_to_wait_on in range(2):

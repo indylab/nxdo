@@ -80,7 +80,7 @@ def openspiel_policy_from_nonlstm_rllib_xfdo_policy(openspiel_game: OpenSpielGam
         if len(action_probs) > len(valid_actions_mask) and len(action_probs) % len(valid_actions_mask) == 0:
             # we may be using a dummy action variant of poker
             dummy_action_probs = action_probs.copy()
-            action_probs = np.zeros_like(valid_actions_mask)
+            action_probs = np.zeros_like(valid_actions_mask, dtype=np.float64)
             for i, action_prob in enumerate(dummy_action_probs):
                 action_probs[i % len(valid_actions_mask)] += action_prob
             assert np.isclose(sum(action_probs), 1.0)

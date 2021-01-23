@@ -1,16 +1,9 @@
-from abc import ABC, abstractmethod
-
 import numpy as np
-from copy import deepcopy
-from threading import RLock
-from itertools import product
-from typing import List, Tuple, Union, Dict, Callable
-import json
-import os
-from typing import Callable
-from grl.p2sro.payoff_table import PayoffTable, PayoffTableStrategySpec
-from grl.utils import datetime_str
-from grl.rl_apps.scenarios.stopping_conditions import StoppingCondition, TwoPlayerBRRewardsBelowAmtStoppingCondition
+
+from typing import List, Dict
+
+from grl.p2sro.payoff_table import PayoffTableStrategySpec
+from grl.rl_apps.scenarios.stopping_conditions import TwoPlayerBRRewardsBelowAmtStoppingCondition
 
 from grl.xfdo.xfdo_manager.manager import SolveRestrictedGame, RestrictedGameSolveResult
 
@@ -63,7 +56,6 @@ class SolveRestrictedGameFixedRewardThreshold(SolveRestrictedGame):
 
         self.required_fields = required_fields
 
-
     def __call__(self,
                  log_dir: str,
                  br_spec_lists_for_each_player: Dict[int, List[PayoffTableStrategySpec]]) -> RestrictedGameSolveResult:
@@ -79,31 +71,62 @@ class SolveRestrictedGameFixedRewardThreshold(SolveRestrictedGame):
                            stopping_condition=stopping_condition)
 
 
-class SolveRestrictedGameDynamicRewardThreshold(SolveRestrictedGame):
+class SolveRestrictedGameDynamicRewardThreshold1(SolveRestrictedGame):
 
-    def __init__(self, scenario: dict,
-                 get_reward_threshold: Callable[[Dict[int, List[PayoffTableStrategySpec]]], float],
+    def __init__(self,
+                 scenario: dict,
+                 dont_solve_first_n_iters: int,
+                 starting_rew_threshold: float,
+                 min_rew_threshold: float,
                  min_episodes: int, required_fields: List[str]):
+
         self.scenario = scenario
-        self.get_reward_threshold = get_reward_threshold
-        self.min_episodes = min_episodes
+        self._min_episodes = min_episodes
+        self._current_rew_threshold = starting_rew_threshold
+        self._min_rew_threshold = min_rew_threshold
+
+        self._current_iter = 0
+        self._dont_solve_first_current_iters = dont_solve_first_n_iters
 
         if required_fields is None:
             required_fields = []
         if scenario["calculate_openspiel_metanash"] and "z_avg_policy_exploitability" not in required_fields:
             required_fields.append("z_avg_policy_exploitability")
-
         self.required_fields = required_fields
+
+    def _update_reward_threshold(self, br_spec_lists_for_each_player: Dict[int, List[PayoffTableStrategySpec]]) -> float:
+        latest_avg_br_reward = float(np.mean(
+            [spec_list[-1].metadata["average_br_reward"] for spec_list in br_spec_lists_for_each_player.values()])
+        )
+        # Halve the current threshold if the latest br had a lower reward than it.
+        # Current threshold cannot go below the min_threshold value.
+        if latest_avg_br_reward < self._current_rew_threshold:
+            self._current_rew_threshold = max(self._min_rew_threshold, self._current_rew_threshold / 2.0)
 
     def __call__(self,
                  log_dir: str,
                  br_spec_lists_for_each_player: Dict[int, List[PayoffTableStrategySpec]]) -> RestrictedGameSolveResult:
-        stopping_condition = TwoPlayerBRRewardsBelowAmtStoppingCondition(
-            stop_if_br_avg_rew_falls_below=self.get_reward_threshold(br_spec_lists_for_each_player),
-            min_episodes=self.min_episodes,
-            required_fields_in_last_train_iter=self.required_fields
-        )
+        # This method is called each time we need to solve the metanash for XFDO
 
-        return _solve_game(scenario=self.scenario, log_dir=log_dir,
+        if self._current_iter < self._dont_solve_first_current_iters:
+            # Instantly get back an untrained metanash (an untrained avg policy network in the case of NFSP)
+            stopping_condition = TwoPlayerBRRewardsBelowAmtStoppingCondition(
+                stop_if_br_avg_rew_falls_below=100000.0,
+                min_episodes=0,
+                required_fields_in_last_train_iter=self.required_fields
+            )
+        else:
+            self._update_reward_threshold(br_spec_lists_for_each_player=br_spec_lists_for_each_player)
+
+            stopping_condition = TwoPlayerBRRewardsBelowAmtStoppingCondition(
+                stop_if_br_avg_rew_falls_below=self._current_rew_threshold,
+                min_episodes=self._min_episodes,
+                required_fields_in_last_train_iter=self.required_fields
+            )
+
+        self._current_iter += 1
+
+        return _solve_game(scenario=self.scenario,
+                           log_dir=log_dir,
                            br_spec_lists_for_each_player=br_spec_lists_for_each_player,
                            stopping_condition=stopping_condition)

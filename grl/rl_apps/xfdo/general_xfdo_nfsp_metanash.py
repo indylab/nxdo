@@ -17,6 +17,7 @@ torch, _ = try_import_torch()
 
 from ray.rllib import SampleBatch, Policy
 from ray.rllib.agents import Trainer
+
 from ray.rllib.utils.torch_ops import convert_to_non_torch_type, \
     convert_to_torch_tensor
 from ray.rllib.utils.typing import ModelGradients, ModelWeights, \
@@ -112,6 +113,24 @@ def create_get_pure_strat_cached(cache: dict):
         policy.policy_spec = pure_strat_spec
     return load_pure_strat_cached
 
+
+@ray.remote(num_cpus=0)
+class StatDeque(object):
+    def __init__(self, max_items: int):
+        self._data = []
+        self._max_items = max_items
+
+    def add(self, item):
+        self._data.append(item)
+        if len(self._data) > self._max_items:
+            del self._data[0]
+
+    def get_mean(self):
+        if len(self._data) == 0:
+            return None
+        return np.mean(self._data)
+
+
 def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
                              scenario: dict,
                              player_to_base_game_action_specs: Dict[int, List[PayoffTableStrategySpec]],
@@ -176,14 +195,14 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
         "multiagent": {
             "policies_to_train": ["average_policy_0", "average_policy_1"],
             "policies": {
-                "average_policy_0": (policy_classes["average_policy"], tmp_env.observation_space, restricted_game_action_spaces[0], {"explore": False}),
-                "average_policy_1": (policy_classes["average_policy"], tmp_env.observation_space, restricted_game_action_spaces[1], {"explore": False}),
+                "average_policy_0": (policy_classes["average_policy"], tmp_env.observation_space, restricted_game_action_spaces[0], {"explore": False, "model": {"custom_model": None}}),
+                "average_policy_1": (policy_classes["average_policy"], tmp_env.observation_space, restricted_game_action_spaces[1], {"explore": False, "model": {"custom_model": None}}),
                 "delegate_policy": (policy_classes["delegate_policy"], tmp_base_env.observation_space, tmp_env.base_action_space, {"explore": False}),
             },
             "policy_mapping_fn": assert_not_called,
         },
 
-    }, get_avg_trainer_config(restricted_game_action_spaces[0]))
+    }, get_avg_trainer_config(tmp_env.base_action_space))
 
     avg_trainer = avg_trainer_class(config=avg_trainer_config, logger_creator=get_trainer_logger_creator(base_dir=results_dir,
                                                  scenario_name=f"nfsp_restricted_game_avg_trainer"))
@@ -256,17 +275,22 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
                     del samples.policy_batches[average_policy_id]
                     samples.policy_batches[br_policy_id] = all_policies_samples
 
+        def on_episode_end(self, *, worker: "RolloutWorker", base_env: BaseEnv, policies: Dict[PolicyID, Policy],
+                           episode: MultiAgentEpisode, env_index: int, **kwargs):
+            super().on_episode_end(worker=worker, base_env=base_env, policies=policies, episode=episode,
+                                   env_index=env_index, **kwargs)
+            episode_policies = set(episode.agent_rewards.keys())
+            if episode_policies == {(0, "average_policy_0"), (1, "best_response_1")}:
+                worker.avg_br_reward_deque.add.remote(episode.agent_rewards[(1, "best_response_1")])
+            elif episode_policies == {(1, "average_policy_1"), (0, "best_response_0")}:
+                worker.avg_br_reward_deque.add.remote(episode.agent_rewards[(0, "best_response_0")])
+
+
         def on_train_result(self, *, trainer, result: dict, **kwargs):
             super().on_train_result(trainer=trainer, result=result, **kwargs)
             training_iteration = result["training_iteration"]
 
-            if "policy_reward_mean" in result:
-                br_0_rew = result["policy_reward_mean"]["best_response_0"]
-                br_1_rew = result["policy_reward_mean"]["best_response_1"]
-                avg_br_reward = (br_0_rew + br_1_rew) / 2.0
-                result["avg_br_reward_both_players"] = avg_br_reward
-            else:
-                assert training_iteration < 5
+            result["avg_br_reward_both_players"] = ray.get(trainer.avg_br_reward_deque.get_mean.remote())
 
             # print(trainer.latest_avg_trainer_result.keys())
             # log(pretty_dict_str(trainer.latest_avg_trainer_result))
@@ -314,11 +338,11 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
         "multiagent": {
             "policies_to_train": ["best_response_0", "best_response_1"],
             "policies": {
-                "average_policy_0": (policy_classes["average_policy"], tmp_env.observation_space, restricted_game_action_spaces[0], {"explore": False}),
-                "best_response_0": (policy_classes["best_response"], tmp_env.observation_space, restricted_game_action_spaces[0], {}),
+                "average_policy_0": (policy_classes["average_policy"], tmp_env.observation_space, restricted_game_action_spaces[0], {"explore": False, "model": {"custom_model": None}}),
+                "best_response_0": (policy_classes["best_response"], tmp_env.observation_space, restricted_game_action_spaces[0], {"model": {"custom_model": None}}),
 
-                "average_policy_1": (policy_classes["average_policy"], tmp_env.observation_space, restricted_game_action_spaces[1], {"explore": False}),
-                "best_response_1": (policy_classes["best_response"], tmp_env.observation_space, restricted_game_action_spaces[1], {}),
+                "average_policy_1": (policy_classes["average_policy"], tmp_env.observation_space, restricted_game_action_spaces[1], {"explore": False, "model": {"custom_model": None}}),
+                "best_response_1": (policy_classes["best_response"], tmp_env.observation_space, restricted_game_action_spaces[1], {"model": {"custom_model": None}}),
 
                 "delegate_policy": (policy_classes["delegate_policy"], tmp_base_env.observation_space, tmp_env.base_action_space, {"explore": False}),
 
@@ -326,16 +350,21 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
             "policy_mapping_fn": select_policy,
         },
     }
-
     assert all(restricted_game_action_spaces[0] == space for space in restricted_game_action_spaces), \
         "If not true, the line below with \"get_trainer_config\" may need to be changed to a better solution."
-    br_trainer_config = merge_dicts(br_trainer_config, get_trainer_config(restricted_game_action_spaces[0]))
+    br_trainer_config = merge_dicts(br_trainer_config, get_trainer_config(tmp_env.base_action_space))
 
     br_trainer_config["metrics_smoothing_episodes"] = metrics_smoothing_episodes_override
 
     br_trainer = trainer_class(config=br_trainer_config,
                                logger_creator=get_trainer_logger_creator(base_dir=results_dir,
                                                                          scenario_name="nfsp_restricted_game_trainer"))
+
+    avg_br_reward_deque = StatDeque.remote(max_items=br_trainer_config["metrics_smoothing_episodes"])
+    def _set_avg_br_rew_deque(worker: RolloutWorker):
+        worker.avg_br_reward_deque = avg_br_reward_deque
+    br_trainer.workers.foreach_worker(_set_avg_br_rew_deque)
+    br_trainer.avg_br_reward_deque = avg_br_reward_deque
 
     weights_cache = {}
     for _trainer in [br_trainer, avg_trainer]:
@@ -351,7 +380,7 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
             worker_delegate_policy.player_converters = player_converters
 
         _trainer.workers.foreach_worker(_set_worker_converters)
-        _trainer.get_local_converters = lambda: trainer.workers.local_worker().policy_map[
+        _trainer.get_local_converters = lambda: _trainer.workers.local_worker().policy_map[
             "delegate_policy"].player_converters
 
     # assert isinstance(br_trainer.workers.local_worker().policy_map["average_policy_1"].model, LeducDQNFullyConnectedNetwork)
@@ -362,14 +391,9 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
     br_trainer.latest_avg_trainer_result = None
     train_iter_count = 0
 
-    for trainer in [br_trainer, avg_trainer]:
-        for policy_id, policy in trainer.workers.local_worker().policy_map.items():
+    for _trainer in [br_trainer, avg_trainer]:
+        for policy_id, policy in _trainer.workers.local_worker().policy_map.items():
             policy.policy_id = policy_id
-
-    br_trainer.workers.local_worker().policy_map["average_policy_0"] = avg_trainer.workers.local_worker().policy_map["average_policy_0"]
-    br_trainer.workers.local_worker().policy_map["average_policy_1"] = avg_trainer.workers.local_worker().policy_map["average_policy_1"]
-    # br_trainer.set_weights(avg_trainer.get_weights(["average_policy_0"]))
-    # br_trainer.set_weights(avg_trainer.get_weights(["average_policy_1"]))
 
     if restricted_game_action_spaces[0].n == 1:
         final_train_result = {"episodes_total": 0, "timesteps_total": 0, "training_iteration": 0}
@@ -377,19 +401,18 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
         tmp_callback.on_train_result(trainer=br_trainer, result=final_train_result)
         print(f"\n\nexploitability: {final_train_result['z_avg_policy_exploitability']}\n\n")
     else:
-        print("starting")
+
+        avg_weights = avg_trainer.get_weights(["average_policy_0", "average_policy_1"])
+        br_trainer.workers.foreach_worker(lambda worker: worker.set_weights(avg_weights))
         while True:
-            print("avg train...")
             avg_train_results = avg_trainer.train()
-            # br_trainer.set_weights(avg_trainer.get_weights(["average_policy_0"]))
-            # br_trainer.set_weights(avg_trainer.get_weights(["average_policy_1"]))
+            avg_weights = avg_trainer.get_weights(["average_policy_0", "average_policy_1"])
+            br_trainer.workers.foreach_worker(lambda worker: worker.set_weights(avg_weights))
             br_trainer.latest_avg_trainer_result = copy.deepcopy(avg_train_results)
-            print("br train...")
             train_iter_results = br_trainer.train()  # do a step (or several) in the main RL loop
 
 
             train_iter_count += 1
-            print("printing results..")
             if print_train_results:
                 # Delete verbose debugging info before printing
                 if "hist_stats" in train_iter_results:

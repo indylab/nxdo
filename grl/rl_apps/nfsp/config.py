@@ -8,7 +8,7 @@ from ray.rllib.models import MODEL_DEFAULTS
 from grl.rllib_tools.valid_actions_fcnet import get_valid_action_fcn_class
 from grl.rllib_tools.valid_actions_epsilon_greedy import ValidActionsEpsilonGreedy
 from grl.rl_apps.kuhn_poker_p2sro.poker_multi_agent_env import OBS_SHAPES, LEDUC_POKER
-from grl.rl_apps.kuhn_poker_p2sro.oshi_zumo_multi_agent_env import OSHI_ZUMO_OBS_LENGTH, TINY_OSHI_ZUMO_OBS_LENGTH
+from grl.rl_apps.kuhn_poker_p2sro.oshi_zumo_multi_agent_env import OSHI_ZUMO_OBS_LENGTH
 
 # def debug_before_learn_on_batch(x: MultiAgentBatch, *args, **kwargs):
 #     print(f"DQN trainer learn on batch {[s.count for s in x.policy_batches.values()]}")
@@ -149,9 +149,9 @@ def nfsp_kuhn_avg_policy_params(action_space: Space) -> Dict:
 
 def nfsp_kuhn_avg_policy_params_gpu(action_space: Space) -> Dict:
     return {
-        "num_gpus": os.getenv("WORKER_GPU_NUM", 0.0625),
+        "num_gpus": float(os.getenv("WORKER_GPU_NUM", 0.0)),
         "num_workers": 0,
-        "num_gpus_per_worker": os.getenv("WORKER_GPU_NUM", 0.0625),
+        "num_gpus_per_worker": float(os.getenv("WORKER_GPU_NUM", 0.0)),
         "num_envs_per_worker": 1,
         "learning_starts": 16000,
         "train_batch_size": 4096,
@@ -180,9 +180,9 @@ def nfsp_leduc_avg_policy_params_gpu(action_space: Space) -> Dict:
     assert isinstance(action_space, Discrete)
     action_space: Discrete = action_space
     return {
-        "num_gpus": os.getenv("WORKER_GPU_NUM", 0.0625),
+        "num_gpus": float(os.getenv("WORKER_GPU_NUM", 0.0)),
         "num_workers": 0,
-        "num_gpus_per_worker": os.getenv("WORKER_GPU_NUM", 0.0625),
+        "num_gpus_per_worker": float(os.getenv("WORKER_GPU_NUM", 0.0)),
         "num_envs_per_worker": 1,
         "learning_starts": 16000,
         "train_batch_size": 4096,
@@ -284,9 +284,9 @@ def nfsp_kuhn_dqn_params_gpu(action_space: Space) -> Dict:
         # If not None, clip gradients during optimization at this value
         "grad_clip": None,
 
-        "num_gpus": os.getenv("WORKER_GPU_NUM", 0.0625),
-        "num_workers": 8,
-        "num_gpus_per_worker": os.getenv("WORKER_GPU_NUM", 0.0625),
+        "num_gpus": float(os.getenv("WORKER_GPU_NUM", 0.0)),
+        "num_workers": 4,
+        "num_gpus_per_worker": float(os.getenv("WORKER_GPU_NUM", 0.0)),
         "num_envs_per_worker": 32,
 
         # How many steps of the model to sample before learning starts.
@@ -649,9 +649,9 @@ def nfsp_leduc_dqn_params_gpu(action_space: Space) -> Dict:
         # If not None, clip gradients during optimization at this value
         "grad_clip": None,
 
-        "num_gpus": os.getenv("WORKER_GPU_NUM", 0.0625),
-        "num_workers": 8,
-        "num_gpus_per_worker": os.getenv("WORKER_GPU_NUM", 0.0625),
+        "num_gpus": float(os.getenv("WORKER_GPU_NUM", 0.0)),
+        "num_workers": 4,
+        "num_gpus_per_worker": float(os.getenv("WORKER_GPU_NUM", 0.0)),
         "num_envs_per_worker": 32,
 
 
@@ -809,152 +809,30 @@ def nfsp_oshi_zumo_dqn_params_like_kuhn(action_space: Space) -> Dict:
         }),
     }
 
-def nfsp_tiny_oshi_zumo_dqn_params_like_kuhn(action_space: Space) -> Dict:
-    params = nfsp_oshi_zumo_dqn_params_like_kuhn(action_space=action_space)
-    params["model"]["custom_model"] = get_valid_action_fcn_class(obs_len=TINY_OSHI_ZUMO_OBS_LENGTH, action_space_n=action_space.n)
+
+def nfsp_oshi_zumo_avg_policy_params_like_leduc_gpu(action_space: Space) -> Dict:
+    params = nfsp_leduc_avg_policy_params_gpu(action_space=action_space)
+    params["lr"] = 0.01
+    params["model"]["fcnet_hiddens"] = [128, 128]
+    params["model"]["custom_model"] = get_valid_action_fcn_class(obs_len=OSHI_ZUMO_OBS_LENGTH, action_space_n=action_space.n)
     return params
 
-def nfsp_tiny_oshi_zumo_avg_policy_params_like_leduc(action_space: Space) -> Dict:
-    params = nfsp_oshi_zumo_avg_policy_params_like_leduc(action_space=action_space)
-    params["model"]["custom_model"] = get_valid_action_fcn_class(obs_len=TINY_OSHI_ZUMO_OBS_LENGTH, action_space_n=action_space.n)
+def nfsp_oshi_zumo_dqn_params_like_leduc_gpu(action_space: Space) -> Dict:
+    params = nfsp_leduc_dqn_params_gpu(action_space=action_space)
+    params["lr"] = 0.001
+    params["model"]["fcnet_hiddens"] = [128, 128]
+    params["model"]["custom_model"] = get_valid_action_fcn_class(obs_len=OSHI_ZUMO_OBS_LENGTH, action_space_n=action_space.n)
     return params
 
-def nfsp_oshi_zumo_avg_policy_params_like_leduc(action_space: Space) -> Dict:
-    assert isinstance(action_space, Discrete)
-    action_space: Discrete = action_space
-    return {
-        "learning_starts": 2000,
-        "train_batch_size": 128,
-        "lr": 0.01,
-        "model": merge_dicts(MODEL_DEFAULTS, {
-            "fcnet_activation": "relu",
-            "fcnet_hiddens": [128],
-            "custom_model": get_valid_action_fcn_class(obs_len=OSHI_ZUMO_OBS_LENGTH, action_space_n=action_space.n),
-        }),
-    }
+def nfsp_20x_dummy_leduc_avg_policy_params_gpu(action_space: Space) -> Dict:
+    params = nfsp_leduc_avg_policy_params_gpu(action_space=action_space)
+    params["model"]["custom_model"] = get_valid_action_fcn_class(obs_len=_LEDUC_OBS_LEN, action_space_n=action_space.n, dummy_actions_multiplier=20)
+    return params
 
-def nfsp_oshi_zumo_dqn_params_like_leduc(action_space: Space) -> Dict:
-    assert isinstance(action_space, Discrete)
-    action_space: Discrete = action_space
-    return {
-        "framework": "torch",
-        # Smooth metrics over this many episodes.
-        "metrics_smoothing_episodes": 1000,
-        # === Model ===
-        # Number of atoms for representing the distribution of return. When
-        # this is greater than 1, distributional Q-learning is used.
-        # the discrete supports are bounded by v_min and v_max
-        "num_atoms": 1,
-        "v_min": -10.0,
-        "v_max": 10.0,
-        # Whether to use noisy network
-        "noisy": False,
-        # control the initial value of noisy nets
-        "sigma0": 0.5,
-        # Whether to use dueling dqn
-        "dueling": False,
-        # Dense-layer setup for each the advantage branch and the value branch
-        # in a dueling architecture.
-        "hiddens": [256],
-        # Whether to use double dqn
-        "double_q": True,
-        # N-step Q learning
-        "n_step": 1,
-
-        # === Exploration Settings ===
-        "exploration_config": {
-            # The Exploration class to use.
-            "type": ValidActionsEpsilonGreedy,
-            # Config for the Exploration class' constructor:
-            "initial_epsilon": 0.06,
-            "final_epsilon": 0.001,
-            "epsilon_timesteps": int(20e6) * 10,  # Timesteps over which to anneal epsilon.
-
-            # For soft_q, use:
-            # "exploration_config" = {
-            #   "type": "SoftQ"
-            #   "temperature": [float, e.g. 1.0]
-            # }
-        },
-        # Switch to greedy actions in evaluation workers.
-        "evaluation_config": {
-            "explore": False,
-        },
-        "explore": True,
-
-        # Update the target network every `target_network_update_freq` steps.
-        "target_network_update_freq": 19200 * 10,
-        # "target_network_update_freq": 1,
-
-        # === Replay buffer ===
-        # Size of the replay buffer. Note that if async_updates is set, then
-        # each worker will have a replay buffer of this size.
-        "buffer_size": int(2e5),
-
-        # If True prioritized replay buffer will be used.
-        "prioritized_replay": False,
-        # Alpha parameter for prioritized replay buffer.
-        "prioritized_replay_alpha": 0.0,
-        # Beta parameter for sampling from prioritized replay buffer.
-        "prioritized_replay_beta": 0.0,
-        # Final value of beta (by default, we use constant beta=0.4).
-        "final_prioritized_replay_beta": 0.0,
-        # Time steps over which the beta parameter is annealed.
-        "prioritized_replay_beta_annealing_timesteps": 20000,
-        # Epsilon to add to the TD errors when updating priorities.
-        "prioritized_replay_eps": 0.0,
-        # Whether to LZ4 compress observations
-        "compress_observations": False,
-        # Callback to run before learning on a multi-agent batch of experiences.
-        # "before_learn_on_batch": debug_before_learn_on_batch,
-        # If set, this will fix the ratio of replayed from a buffer and learned on
-        # timesteps to sampled from an environment and stored in the replay buffer
-        # timesteps. Otherwise, the replay will proceed at the native ratio
-        # determined by (train_batch_size / rollout_fragment_length).
-        "training_intensity": None,
-
-        # === Optimization ===
-        # Learning rate for adam optimizer
-        "lr": 0.01,
-        # Learning rate schedule
-        "lr_schedule": None,
-        # Adam epsilon hyper parameter
-        "adam_epsilon": 1e-8,
-        # If not None, clip gradients during optimization at this value
-        "grad_clip": None,
-        # How many steps of the model to sample before learning starts.
-        "learning_starts": 2000,
-        # Update the replay buffer with this many samples at once. Note that
-        # this setting applies per-worker if num_workers > 1.q
-        "rollout_fragment_length": 64,
-        "batch_mode": "truncate_episodes",
-
-        # "rollout_fragment_length": 1,
-        # "batch_mode": "complete_episodes",
-
-        # Size of a batch sampled from replay buffer for training. Note that
-        # if async_updates is set, then each worker returns gradients for a
-        # batch of this size.
-        "train_batch_size": 128,
-
-        # Whether to compute priorities on workers.
-        "worker_side_prioritization": False,
-        # Prevent iterations from going lower than this time span
-        "min_iter_time_s": 0,
-        # Minimum env steps to optimize for per train call. This value does
-        # not affect learning (JB: this is a lie!), only the length of train iterations.
-        "timesteps_per_iteration": 0,
-
-
-        "model": merge_dicts(MODEL_DEFAULTS, {
-            "fcnet_activation": "relu",
-            "fcnet_hiddens": [128],
-            "custom_model": get_valid_action_fcn_class(obs_len=OSHI_ZUMO_OBS_LENGTH, action_space_n=action_space.n),
-        }),
-    }
-
-
-
+def nfsp_20x_dummy_leduc_params_gpu(action_space: Space) -> Dict:
+    params = nfsp_leduc_dqn_params_gpu(action_space=action_space)
+    params["model"]["custom_model"] = get_valid_action_fcn_class(obs_len=_LEDUC_OBS_LEN, action_space_n=action_space.n, dummy_actions_multiplier=20)
+    return params
 
 def nfsp_kuhn_sac_params(action_space: Space) -> Dict:
 
@@ -1008,3 +886,16 @@ def nfsp_kuhn_sac_params(action_space: Space) -> Dict:
         "timesteps_per_iteration": 0,
 
     }
+
+
+def nfsp_20x_dummy_leduc_params_gpu_v2(action_space: Space) -> Dict:
+    params = nfsp_20x_dummy_leduc_params_gpu(action_space=action_space)
+    params["lr"] = 0.001
+    params["metrics_smoothing_episodes"] = 3000
+    return params
+
+def nfsp_20x_dummy_leduc_avg_policy_params_gpu_v2(action_space: Space) -> Dict:
+    params = nfsp_20x_dummy_leduc_avg_policy_params_gpu(action_space=action_space)
+    params["lr"] = 0.01
+    params["metrics_smoothing_episodes"] = 3000
+    return params
