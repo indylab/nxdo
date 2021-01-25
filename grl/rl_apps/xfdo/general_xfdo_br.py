@@ -14,7 +14,7 @@ from ray.rllib.utils import merge_dicts, try_import_torch
 torch, _ = try_import_torch()
 
 from ray.rllib.agents import Trainer
-
+from ray.rllib.env.multi_agent_env import MultiAgentEnv
 from ray.rllib.utils.torch_ops import convert_to_non_torch_type, \
     convert_to_torch_tensor
 from ray.rllib.utils.typing import ModelGradients, ModelWeights, \
@@ -34,6 +34,7 @@ from grl.xfdo.restricted_game import RestrictedGame
 from grl.rllib_tools.space_saving_logger import SpaceSavingLogger
 from grl.rl_apps.scenarios.poker import scenarios
 from grl.rl_apps.scenarios.stopping_conditions import StoppingCondition
+from grl.xfdo.openspiel.opnsl_restricted_game import OpenSpielRestrictedGame, AgentRestrictedGameOpenSpielObsConversions, get_restricted_game_obs_conversions
 
 logger = logging.getLogger(__name__)
 
@@ -195,6 +196,33 @@ def set_restricted_game_conversations_for_all_workers(
     trainer.workers.foreach_worker(_set_conversions)
 
 
+def set_restricted_game_conversions_for_all_workers_openspiel(
+        trainer: Trainer,
+        tmp_base_env: MultiAgentEnv,
+        delegate_policy_id: PolicyID,
+        agent_id_to_restricted_game_specs: Dict[AgentID, List[PayoffTableStrategySpec]],
+        load_policy_spec_fn):
+    local_delegate_policy = trainer.workers.local_worker().policy_map[delegate_policy_id]
+    player_converters = {}
+    for p, restricted_game_specs in agent_id_to_restricted_game_specs.items():
+        if len(restricted_game_specs) == 0:
+            continue
+        player_converters[p] = (get_restricted_game_obs_conversions(player=p, delegate_policy=local_delegate_policy,
+                                                                     policy_specs=restricted_game_specs,
+                                                                     load_policy_spec_fn=load_policy_spec_fn,
+                                                                     tmp_base_env=tmp_base_env))
+    assert len(player_converters) == 0 or len(player_converters) == 1
+    def _set_worker_converters(worker: RolloutWorker):
+        worker_delegate_policy = worker.policy_map[delegate_policy_id]
+        for p, player_converter in player_converters.items():
+            worker.foreach_env(lambda env: env.set_obs_conversion_dict(p, player_converter))
+        worker_delegate_policy.player_converters = player_converters
+
+    trainer.workers.foreach_worker(_set_worker_converters)
+    trainer.get_local_converters = lambda: trainer.workers.local_worker().policy_map[
+        delegate_policy_id].player_converters
+
+
 def train_poker_best_response(br_player: int, scenario_name: str, print_train_results: bool = True):
 
     try:
@@ -202,6 +230,9 @@ def train_poker_best_response(br_player: int, scenario_name: str, print_train_re
     except KeyError:
         raise NotImplementedError(f"Unknown scenario name: \'{scenario_name}\'. Existing scenarios are:\n"
                                   f"{list(scenarios.keys())}")
+
+    use_openspiel_restricted_game: bool = scenario["use_openspiel_restricted_game"]
+    restricted_game_custom_model = scenario["restricted_game_custom_model"]
 
     env_class = scenario["env_class"]
     base_env_config = scenario["env_config"]
@@ -247,19 +278,28 @@ def train_poker_best_response(br_player: int, scenario_name: str, print_train_re
         "create_env_fn": lambda: env_class(env_config=base_env_config),
         "raise_if_no_restricted_players": metanash_specs_for_players is not None
     }
+    tmp_base_eny = env_class(env_config=base_env_config)
 
-    tmp_env = RestrictedGame(env_config=restricted_env_config)
-
-    if metanash_specs_for_players is not None:
-        other_player_restricted_action_space = Discrete(n=len(delegate_specs_for_players[other_player]))
-        # input(f"other_player_restricted_action_space: {other_player_restricted_action_space}")
-        # input(f"avg_policy_specs: {[spec.to_json() for spec in metanash_specs_for_players.values()]}")
+    if use_openspiel_restricted_game:
+        restricted_game_class = OpenSpielRestrictedGame
     else:
+        restricted_game_class = RestrictedGame
+
+    tmp_env = restricted_game_class(env_config=restricted_env_config)
+
+    if metanash_specs_for_players is None or use_openspiel_restricted_game:
         other_player_restricted_action_space = tmp_env.base_action_space
+    else:
+        other_player_restricted_action_space = Discrete(n=len(delegate_specs_for_players[other_player]))
+
+    if metanash_specs_for_players is None and use_openspiel_restricted_game:
+        other_player_restricted_obs_space = tmp_env.base_observation_space
+    else:
+        other_player_restricted_obs_space = tmp_env.observation_space
 
     trainer_config = {
         "callbacks": P2SROPreAndPostEpisodeCallbacks,
-        "env": RestrictedGame,
+        "env": restricted_game_class,
         "env_config": restricted_env_config,
         "gamma": 1.0,
         "num_gpus": 0,
@@ -268,16 +308,16 @@ def train_poker_best_response(br_player: int, scenario_name: str, print_train_re
         "multiagent": {
             "policies_to_train": [f"best_response"],
             "policies": {
-                f"metanash": (policy_classes["metanash"], tmp_env.observation_space, other_player_restricted_action_space, {"explore": False}),
-                f"metanash_delegate": (policy_classes["best_response"], tmp_env.observation_space, tmp_env.base_action_space, {"explore": False}),
-                f"best_response": (policy_classes["best_response"], tmp_env.observation_space, tmp_env.base_action_space, {}),
+                f"metanash": (policy_classes["metanash"], other_player_restricted_obs_space, other_player_restricted_action_space, {"explore": False}),
+                f"metanash_delegate": (policy_classes["best_response"], tmp_env.base_observation_space, tmp_env.base_action_space, {"explore": False}),
+                f"best_response": (policy_classes["best_response"], tmp_env.base_observation_space, tmp_env.base_action_space, {}),
             },
             "policy_mapping_fn": select_policy,
         },
     }
 
     if metanash_specs_for_players is not None:
-        trainer_config["multiagent"]["policies"]["metanash"][3]["model"] = {"custom_model": None}
+        trainer_config["multiagent"]["policies"]["metanash"][3]["model"] = {"custom_model": restricted_game_custom_model}
 
     trainer_config = merge_dicts(trainer_config, get_trainer_config(action_space=tmp_env.base_action_space))
 
@@ -299,10 +339,19 @@ def train_poker_best_response(br_player: int, scenario_name: str, print_train_re
 
     trainer.weights_cache = {}
     if delegate_specs_for_players:
-        set_restricted_game_conversations_for_all_workers(trainer=trainer, delegate_policy_id="metanash_delegate",
-                                                          agent_id_to_restricted_game_specs={
-                                                              other_player: delegate_specs_for_players[other_player]},
-                                                          load_policy_spec_fn=create_get_pure_strat_cached(cache=trainer.weights_cache))
+        if use_openspiel_restricted_game:
+            set_restricted_game_conversions_for_all_workers_openspiel(trainer=trainer,
+                                                                      tmp_base_env=tmp_base_eny,
+                                                                      delegate_policy_id="metanash_delegate",
+                                                              agent_id_to_restricted_game_specs={
+                                                                  other_player: delegate_specs_for_players[
+                                                                      other_player]},
+                                                              load_policy_spec_fn=load_pure_strat)
+        else:
+            set_restricted_game_conversations_for_all_workers(trainer=trainer, delegate_policy_id="metanash_delegate",
+                                                              agent_id_to_restricted_game_specs={
+                                                                  other_player: delegate_specs_for_players[other_player]},
+                                                              load_policy_spec_fn=create_get_pure_strat_cached(cache=trainer.weights_cache))
 
     log(f"got policy {active_policy_num}")
 

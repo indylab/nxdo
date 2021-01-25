@@ -56,7 +56,7 @@ class PokerMultiAgentEnv(MultiAgentEnv):
 
         if not isinstance(env_config['dummy_action_multiplier'], int) and env_config['dummy_action_multiplier'] > 0:
             raise ValueError("dummy_action_multiplier must be a positive non-zero int")
-        self._dummy_action_multiplier = env_config['dummy_action_multiplier']
+        self.dummy_action_multiplier = env_config['dummy_action_multiplier']
         self._continuous_action_space = env_config['continuous_action_space']
 
         self._apply_penalty_for_invalid_actions = env_config["penalty_for_invalid_actions"]
@@ -75,7 +75,7 @@ class PokerMultiAgentEnv(MultiAgentEnv):
                                          **open_spiel_env_config)
 
         self.base_num_discrete_actions = self.openspiel_env.action_spec()["num_actions"]
-        self.num_discrete_actions = int(self.base_num_discrete_actions * self._dummy_action_multiplier)
+        self.num_discrete_actions = int(self.base_num_discrete_actions * self.dummy_action_multiplier)
         self._base_action_space = Discrete(self.base_num_discrete_actions)
 
         if self._continuous_action_space:
@@ -171,7 +171,7 @@ class PokerMultiAgentEnv(MultiAgentEnv):
             # player action is now a discrete action
             player_action = nearest_discrete_action
 
-        if self._dummy_action_multiplier != 1:
+        if self.dummy_action_multiplier != 1:
             # extended dummy action space is just the base discrete actions repeated multiple times
             # convert to the base discrete action space.
             player_action = player_action % self.base_num_discrete_actions

@@ -20,6 +20,11 @@ class NoStoppingCondition(StoppingCondition):
         return False
 
 
+class StopImmediately(StoppingCondition):
+
+    def should_stop_this_iter(self, latest_trainer_result: dict, *args, **kwargs) -> bool:
+        return True
+
 class SingleBRRewardPlateauStoppingCondition(StoppingCondition):
 
     def __init__(self,

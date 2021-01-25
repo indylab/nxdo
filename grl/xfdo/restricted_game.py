@@ -23,6 +23,7 @@ class RestrictedGame(MultiAgentEnv):
         self.agents_to_action_converters = {}
 
         self.observation_space = self.base_env.observation_space
+        self.base_observation_space = self.base_env.observation_space
         self.base_action_space = self.base_env.action_space
 
         self._agents_to_current_obs = {}

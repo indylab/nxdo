@@ -38,6 +38,7 @@ class SpaceSavingLogger(UnifiedLogger):
         self.should_log_result_fn = should_log_result_fn
 
     def on_result(self, result):
+        print(f"log dir is {self.logdir}")
         should_log_result = True
         if self.should_log_result_fn is not None:
             should_log_result = self.should_log_result_fn(result)

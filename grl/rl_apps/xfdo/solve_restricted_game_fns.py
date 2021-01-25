@@ -78,12 +78,14 @@ class SolveRestrictedGameDynamicRewardThreshold1(SolveRestrictedGame):
                  dont_solve_first_n_xfdo_iters: int,
                  starting_rew_threshold: float,
                  min_rew_threshold: float,
+                 epsilon: float,
                  min_episodes: int, required_fields: List[str]):
 
         self.scenario = scenario
         self._min_episodes = min_episodes
         self._current_rew_threshold = starting_rew_threshold
         self._min_rew_threshold = min_rew_threshold
+        self._epsilon = epsilon
 
         self._current_xfdo_iter = 0
         self._dont_solve_first_n_xfdo_iters = dont_solve_first_n_xfdo_iters
@@ -100,7 +102,7 @@ class SolveRestrictedGameDynamicRewardThreshold1(SolveRestrictedGame):
         )
         # Halve the current threshold if the latest br had a lower reward than it.
         # Current threshold cannot go below the min_threshold value.
-        if latest_avg_br_reward < self._current_rew_threshold:
+        if latest_avg_br_reward < self._current_rew_threshold + self._epsilon:
             self._current_rew_threshold = max(self._min_rew_threshold, self._current_rew_threshold / 2.0)
 
     def __call__(self,

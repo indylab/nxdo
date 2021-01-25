@@ -1,6 +1,7 @@
 
 from grl.rl_apps.kuhn_poker_p2sro.config import psro_kuhn_sac_params, psro_kuhn_dqn_params, psro_leduc_dqn_params, \
-    psro_leduc_dqn_params_gpu, psro_kuhn_dqn_params_gpu, psro_oshi_zumo_dqn_params_like_leduc_gpu, psro_20x_dummy_leduc_params_gpu, psro_20x_dummy_leduc_params_gpu_v2
+    psro_leduc_dqn_params_gpu, psro_kuhn_dqn_params_gpu, psro_oshi_zumo_dqn_params_like_leduc_gpu, psro_20x_dummy_leduc_params_gpu, \
+    psro_20x_dummy_leduc_params_gpu_v2
 
 
 from grl.rl_apps.nfsp.config import nfsp_kuhn_sac_params, nfsp_leduc_dqn_params, nfsp_kuhn_dqn_params, \
@@ -11,7 +12,7 @@ from grl.rl_apps.nfsp.config import nfsp_kuhn_sac_params, nfsp_leduc_dqn_params,
 
 from grl.rl_apps.kuhn_poker_p2sro.poker_multi_agent_env import PokerMultiAgentEnv
 from grl.rl_apps.kuhn_poker_p2sro.oshi_zumo_multi_agent_env import OshiZumoMultiAgentEnv, TinyOshiZumoMultiAgentEnv
-from grl.rl_apps.scenarios.stopping_conditions import EpisodesSingleBRRewardPlateauStoppingCondition, NoStoppingCondition, \
+from grl.rl_apps.scenarios.stopping_conditions import EpisodesSingleBRRewardPlateauStoppingCondition, NoStoppingCondition, StopImmediately, \
     TwoPlayerBRRewardsBelowAmtStoppingCondition, TimeStepsSingleBRRewardPlateauStoppingCondition
 
 from ray.rllib.agents.sac import SACTrainer, SACTorchPolicy
@@ -21,9 +22,18 @@ from ray.rllib.agents.dqn import DQNTrainer
 from grl.nfsp_rllib.nfsp import NFSPTrainer, NFSPTorchAveragePolicy, get_store_to_avg_policy_buffer_fn
 from grl.rllib_tools.modified_policies import SimpleQTorchPolicyPatched, SACTorchPolicyWithBehaviorLogitsOut
 
-from grl.rl_apps.xfdo.solve_restricted_game_fns import SolveRestrictedGameFixedRewardThreshold, SolveRestrictedGameDynamicRewardThreshold
+from grl.rl_apps.xfdo.solve_restricted_game_fns import SolveRestrictedGameFixedRewardThreshold, SolveRestrictedGameDynamicRewardThreshold1
 
-import numpy as np
+
+from ray.rllib.utils import merge_dicts
+from ray.rllib.models import MODEL_DEFAULTS
+from grl.rllib_tools.valid_actions_fcnet import get_valid_action_fcn_class
+from grl.rllib_tools.valid_actions_epsilon_greedy import ValidActionsEpsilonGreedy
+from grl.rl_apps.kuhn_poker_p2sro.poker_multi_agent_env import OBS_SHAPES, LEDUC_POKER
+from grl.rl_apps.kuhn_poker_p2sro.oshi_zumo_multi_agent_env import OSHI_ZUMO_OBS_LENGTH
+
+_LEDUC_OBS_LEN = OBS_SHAPES[LEDUC_POKER][0]
+
 
 scenarios = {
 
@@ -577,6 +587,8 @@ scenarios = {
 
     "kuhn_xfdo_dqn_nfsp_gpu": {
         "xfdo_port": 4400,
+        "use_openspiel_restricted_game": False,
+        "restricted_game_custom_model": None,
         "xfdo_metanash_method": "nfsp",
         "get_restricted_game_solver": lambda scenario: SolveRestrictedGameFixedRewardThreshold(
             scenario=scenario, br_reward_threshold=0.01, min_episodes=300000,
@@ -621,6 +633,8 @@ scenarios = {
 
     "leduc_xfdo_dqn_nfsp_gpu": {
         "xfdo_port": 4405,
+        "use_openspiel_restricted_game": False,
+        "restricted_game_custom_model": None,
         "xfdo_metanash_method": "nfsp",
         "get_restricted_game_solver": lambda scenario: SolveRestrictedGameFixedRewardThreshold(
             scenario=scenario, br_reward_threshold=0.1, min_episodes=300000,
@@ -666,6 +680,8 @@ scenarios = {
 
     "20x_dummy_leduc_xfdo_dqn_nfsp_gpu": {
         "xfdo_port": 4410,
+        "use_openspiel_restricted_game": False,
+        "restricted_game_custom_model": None,
         "xfdo_metanash_method": "nfsp",
         "get_restricted_game_solver": lambda scenario: SolveRestrictedGameFixedRewardThreshold(
             scenario=scenario, br_reward_threshold=0.1, min_episodes=300000,
@@ -710,13 +726,19 @@ scenarios = {
         "metanash_metrics_smoothing_episodes_override": 50000,
     },
 
-    "20x_dummy_leduc_xfdo_dqn_nfsp_gpu_dynamic_threshold_80": {
+    "20x_dummy_leduc_xfdo_dqn_nfsp_gpu_dynamic_threshold_1": {
         "xfdo_port": 4415,
+        "use_openspiel_restricted_game": False,
+        "restricted_game_custom_model": None,
         "xfdo_metanash_method": "nfsp",
-        "get_restricted_game_solver": lambda scenario: SolveRestrictedGameDynamicRewardThreshold(
-            scenario=scenario, min_episodes=50000,
+        "get_restricted_game_solver": lambda scenario: SolveRestrictedGameDynamicRewardThreshold1(
+            scenario=scenario,
+            dont_solve_first_n_xfdo_iters=5,
+            starting_rew_threshold=2.0,
+            min_rew_threshold=0.1,
+            min_episodes=50000,
+            epsilon=0.05,
             required_fields=["z_avg_policy_exploitability"],
-            get_reward_threshold=lambda payoffs_spec_lists_per_player: max(0.1, float(0.8 * np.mean([speclist[-1].metadata["average_br_reward"] for speclist in payoffs_spec_lists_per_player.values()])))
         ),
 
         "env_class": PokerMultiAgentEnv,
@@ -760,6 +782,8 @@ scenarios = {
 
     "20x_dummy_leduc_xfdo_dqn_nfsp_gpu_v2": {
         "xfdo_port": 4420,
+        "use_openspiel_restricted_game": False,
+        "restricted_game_custom_model": None,
         "xfdo_metanash_method": "nfsp",
         "get_restricted_game_solver": lambda scenario: SolveRestrictedGameFixedRewardThreshold(
             scenario=scenario, br_reward_threshold=0.1, min_episodes=300000,
@@ -804,13 +828,19 @@ scenarios = {
         "metanash_metrics_smoothing_episodes_override": 50000,
     },
 
-    "20x_dummy_leduc_xfdo_dqn_nfsp_gpu_v2_dynamic_threshold_80": {
+    "20x_dummy_leduc_xfdo_dqn_nfsp_gpu_v2_dynamic_threshold_1": {
         "xfdo_port": 4425,
+        "use_openspiel_restricted_game": False,
+        "restricted_game_custom_model": None,
         "xfdo_metanash_method": "nfsp",
-        "get_restricted_game_solver": lambda scenario: SolveRestrictedGameDynamicRewardThreshold(
-            scenario=scenario, min_episodes=50000,
+        "get_restricted_game_solver": lambda scenario: SolveRestrictedGameDynamicRewardThreshold1(
+            scenario=scenario,
+            dont_solve_first_n_xfdo_iters=5,
+            starting_rew_threshold=2.0,
+            min_rew_threshold=0.1,
+            min_episodes=50000,
+            epsilon=0.05,
             required_fields=["z_avg_policy_exploitability"],
-            get_reward_threshold=lambda payoffs_spec_lists_per_player: max(0.1, float(0.8 * np.mean([speclist[-1].metadata["average_br_reward"] for speclist in payoffs_spec_lists_per_player.values()])))
         ),
 
         "env_class": PokerMultiAgentEnv,
@@ -851,13 +881,19 @@ scenarios = {
         "metanash_metrics_smoothing_episodes_override": 50000,
     },
 
-    "leduc_xfdo_dqn_nfsp_gpu_dynamic_threshold_80": {
+    "leduc_xfdo_dqn_nfsp_gpu_dynamic_threshold_1": {
         "xfdo_port": 4430,
+        "use_openspiel_restricted_game": False,
+        "restricted_game_custom_model": None,
         "xfdo_metanash_method": "nfsp",
-        "get_restricted_game_solver": lambda scenario: SolveRestrictedGameDynamicRewardThreshold(
-            scenario=scenario, min_episodes=50000,
+        "get_restricted_game_solver": lambda scenario: SolveRestrictedGameDynamicRewardThreshold1(
+            scenario=scenario,
+            dont_solve_first_n_xfdo_iters=5,
+            starting_rew_threshold=2.0,
+            min_rew_threshold=0.1,
+            min_episodes=50000,
+            epsilon=0.05,
             required_fields=["z_avg_policy_exploitability"],
-            get_reward_threshold=lambda payoffs_spec_lists_per_player: max(0.1, float(0.8 * np.mean([speclist[-1].metadata["average_br_reward"] for speclist in payoffs_spec_lists_per_player.values()])))
         ),
 
         "env_class": PokerMultiAgentEnv,
@@ -892,6 +928,166 @@ scenarios = {
         "anticipatory_param_nfsp": 0.1,
         "get_trainer_config_nfsp": nfsp_leduc_dqn_params_gpu,
         "get_avg_trainer_config_nfsp": nfsp_leduc_avg_policy_params_gpu,
+        "calculate_openspiel_metanash": True,
+        "calc_metanash_every_n_iters": 50,
+        "metanash_metrics_smoothing_episodes_override": 50000,
+    },
+
+
+    "va_20x_dummy_leduc_xfdo_dqn_nfsp_gpu_dynamic_threshold_1": {
+        "xfdo_port": 4435,
+        "use_openspiel_restricted_game": True,
+        "restricted_game_custom_model": get_valid_action_fcn_class(obs_len=_LEDUC_OBS_LEN, action_space_n=3 * 20, dummy_actions_multiplier=1),
+        "xfdo_metanash_method": "nfsp",
+        "get_restricted_game_solver": lambda scenario: SolveRestrictedGameDynamicRewardThreshold1(
+            scenario=scenario,
+            dont_solve_first_n_xfdo_iters=5,
+            starting_rew_threshold=2.0,
+            min_rew_threshold=0.1,
+            min_episodes=50000,
+            epsilon=0.05,
+            required_fields=["z_avg_policy_exploitability"],
+        ),
+
+        "env_class": PokerMultiAgentEnv,
+        "env_config": {
+            'version': "leduc_poker",
+            "fixed_players": True,
+            "append_valid_actions_mask_to_obs": True,
+            "dummy_action_multiplier": 20,
+        },
+
+        "trainer_class_br": DQNTrainer,
+        "policy_classes_br": {
+            "metanash": NFSPTorchAveragePolicy,
+            "best_response": SimpleQTorchPolicyPatched,
+        },
+
+        "get_trainer_config_br": psro_20x_dummy_leduc_params_gpu,
+        "get_stopping_condition_br": lambda: EpisodesSingleBRRewardPlateauStoppingCondition(
+            br_policy_id="best_response",
+            dont_check_plateau_before_n_episodes=int(2e4),
+            check_plateau_every_n_episodes=int(2e4),
+            minimum_reward_improvement_otherwise_plateaued=0.01,
+            max_train_episodes=int(1e5),
+        ),
+
+        "trainer_class_nfsp": DQNTrainer,
+        "avg_trainer_class_nfsp": NFSPTrainer,
+        "policy_classes_nfsp": {
+            "average_policy": NFSPTorchAveragePolicy,
+            "delegate_policy": SimpleQTorchPolicyPatched,
+            "best_response": SimpleQTorchPolicyPatched,
+        },
+        "anticipatory_param_nfsp": 0.1,
+        "get_trainer_config_nfsp": nfsp_20x_dummy_leduc_params_gpu,
+        "get_avg_trainer_config_nfsp": nfsp_20x_dummy_leduc_avg_policy_params_gpu,
+        "calculate_openspiel_metanash": True,
+        "calc_metanash_every_n_iters": 50,
+        "metanash_metrics_smoothing_episodes_override": 50000,
+    },
+
+    "20x_dummy_leduc_xfdo_dqn_nfsp_gpu_dynamic_threshold_1_aggressive": {
+        "xfdo_port": 4440,
+        "use_openspiel_restricted_game": False,
+        "restricted_game_custom_model": None,
+        "xfdo_metanash_method": "nfsp",
+        "get_restricted_game_solver": lambda scenario: SolveRestrictedGameDynamicRewardThreshold1(
+            scenario=scenario,
+            dont_solve_first_n_xfdo_iters=7,
+            starting_rew_threshold=1.0,
+            min_rew_threshold=0.1,
+            min_episodes=50000,
+            epsilon=0.05,
+            required_fields=["z_avg_policy_exploitability"],
+        ),
+
+        "env_class": PokerMultiAgentEnv,
+        "env_config": {
+            'version': "leduc_poker",
+            "fixed_players": True,
+            "append_valid_actions_mask_to_obs": True,
+            "dummy_action_multiplier": 20,
+        },
+
+        "trainer_class_br": DQNTrainer,
+        "policy_classes_br": {
+            "metanash": NFSPTorchAveragePolicy,
+            "best_response": SimpleQTorchPolicyPatched,
+        },
+
+        "get_trainer_config_br": psro_20x_dummy_leduc_params_gpu,
+        "get_stopping_condition_br": lambda: EpisodesSingleBRRewardPlateauStoppingCondition(
+            br_policy_id="best_response",
+            dont_check_plateau_before_n_episodes=int(2e4),
+            check_plateau_every_n_episodes=int(2e4),
+            minimum_reward_improvement_otherwise_plateaued=0.01,
+            max_train_episodes=int(1e5),
+        ),
+
+        "trainer_class_nfsp": DQNTrainer,
+        "avg_trainer_class_nfsp": NFSPTrainer,
+        "policy_classes_nfsp": {
+            "average_policy": NFSPTorchAveragePolicy,
+            "delegate_policy": SimpleQTorchPolicyPatched,
+            "best_response": SimpleQTorchPolicyPatched,
+        },
+        "anticipatory_param_nfsp": 0.1,
+        "get_trainer_config_nfsp": nfsp_20x_dummy_leduc_params_gpu,
+        "get_avg_trainer_config_nfsp": nfsp_20x_dummy_leduc_avg_policy_params_gpu,
+        "calculate_openspiel_metanash": True,
+        "calc_metanash_every_n_iters": 50,
+        "metanash_metrics_smoothing_episodes_override": 50000,
+    },
+
+    "va_20x_dummy_leduc_xfdo_dqn_nfsp_gpu_dynamic_threshold_1_aggressive": {
+        "xfdo_port": 4445,
+        "use_openspiel_restricted_game": True,
+        "restricted_game_custom_model": get_valid_action_fcn_class(obs_len=_LEDUC_OBS_LEN, action_space_n=3 * 20, dummy_actions_multiplier=1),
+        "xfdo_metanash_method": "nfsp",
+        "get_restricted_game_solver": lambda scenario: SolveRestrictedGameDynamicRewardThreshold1(
+            scenario=scenario,
+            dont_solve_first_n_xfdo_iters=7,
+            starting_rew_threshold=1.0,
+            min_rew_threshold=0.1,
+            min_episodes=50000,
+            epsilon=0.05,
+            required_fields=["z_avg_policy_exploitability"],
+        ),
+
+        "env_class": PokerMultiAgentEnv,
+        "env_config": {
+            'version': "leduc_poker",
+            "fixed_players": True,
+            "append_valid_actions_mask_to_obs": True,
+            "dummy_action_multiplier": 20,
+        },
+
+        "trainer_class_br": DQNTrainer,
+        "policy_classes_br": {
+            "metanash": NFSPTorchAveragePolicy,
+            "best_response": SimpleQTorchPolicyPatched,
+        },
+
+        "get_trainer_config_br": psro_20x_dummy_leduc_params_gpu,
+        "get_stopping_condition_br": lambda: EpisodesSingleBRRewardPlateauStoppingCondition(
+            br_policy_id="best_response",
+            dont_check_plateau_before_n_episodes=int(2e4),
+            check_plateau_every_n_episodes=int(2e4),
+            minimum_reward_improvement_otherwise_plateaued=0.01,
+            max_train_episodes=int(1e5),
+        ),
+
+        "trainer_class_nfsp": DQNTrainer,
+        "avg_trainer_class_nfsp": NFSPTrainer,
+        "policy_classes_nfsp": {
+            "average_policy": NFSPTorchAveragePolicy,
+            "delegate_policy": SimpleQTorchPolicyPatched,
+            "best_response": SimpleQTorchPolicyPatched,
+        },
+        "anticipatory_param_nfsp": 0.1,
+        "get_trainer_config_nfsp": nfsp_20x_dummy_leduc_params_gpu,
+        "get_avg_trainer_config_nfsp": nfsp_20x_dummy_leduc_avg_policy_params_gpu,
         "calculate_openspiel_metanash": True,
         "calc_metanash_every_n_iters": 50,
         "metanash_metrics_smoothing_episodes_override": 50000,

@@ -11,6 +11,7 @@ from grl.rl_apps.kuhn_poker_p2sro.oshi_zumo_multi_agent_env import OSHI_ZUMO_OBS
 
 _LEDUC_OBS_LEN = OBS_SHAPES[LEDUC_POKER][0]
 
+
 def psro_kuhn_sac_params(action_space: Discrete):
     return {
         # Smooth metrics over this many episodes.

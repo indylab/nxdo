@@ -1,5 +1,7 @@
 from typing import Dict, Callable, List, Tuple
 
+from gym.spaces import Box
+
 import numpy as np
 from open_spiel.python.policy import TabularPolicy
 from pyspiel import Game as OpenSpielGame
@@ -39,7 +41,8 @@ def get_restricted_game_obs_conversions(
         load_policy_spec_fn(delegate_policy, policy_spec)
 
         for state_index, state in enumerate(empty_tabular_policy.states):
-            if state.current_player() != player and state.current_player() != -2:
+            if state.current_player() != player:
+                assert state.current_player() in [0, 1], state.current_player()
                 continue
 
             valid_actions_mask = state.legal_actions_mask()
@@ -95,16 +98,16 @@ def get_restricted_game_obs_conversions(
 
             if obs_key in orig_obs_to_restricted_game_valid_actions_mask:
                 orig_obs_to_restricted_game_valid_actions_mask[obs_key] = np.clip(
-                    orig_obs_to_restricted_game_valid_actions_mask[obs_key] + original_action_probs, a_max=1.0)
+                    orig_obs_to_restricted_game_valid_actions_mask[obs_key] + original_action_probs, a_max=1.0, a_min=0.0)
             else:
                 orig_obs_to_restricted_game_valid_actions_mask[obs_key] = original_action_probs.copy()
 
     assert set(orig_obs_to_info_state_vector.keys()) == set(orig_obs_to_restricted_game_valid_actions_mask.keys())
     orig_obs_to_restricted_game_obs = {}
-    for orig_obs in orig_obs_to_info_state_vector.keys():
-        orig_info_state_vector = orig_obs_to_info_state_vector[orig_obs]
-        restricted_game_valid_actions_mask = orig_obs_to_restricted_game_valid_actions_mask[orig_obs]
-        orig_obs_to_restricted_game_obs = np.concatenate((
+    for orig_obs_keys in orig_obs_to_info_state_vector.keys():
+        orig_info_state_vector = orig_obs_to_info_state_vector[orig_obs_keys]
+        restricted_game_valid_actions_mask = orig_obs_to_restricted_game_valid_actions_mask[orig_obs_keys]
+        orig_obs_to_restricted_game_obs[orig_obs_keys] = np.concatenate((
             np.asarray(orig_info_state_vector, dtype=np.float32),
             np.asarray(restricted_game_valid_actions_mask, dtype=np.float32)
         ), axis=0)
@@ -116,7 +119,7 @@ def get_restricted_game_obs_conversions(
     )
 
 
-class OpenSpielRestrictedGame:
+class OpenSpielRestrictedGame(MultiAgentEnv):
 
     def __init__(self, env_config: dict):
         self.base_env: MultiAgentEnv = env_config["create_env_fn"]()
@@ -126,7 +129,14 @@ class OpenSpielRestrictedGame:
 
         self.agent_conversions: Dict[AgentID, AgentRestrictedGameOpenSpielObsConversions] = {}
 
-        self.observation_space = self.base_env.observation_space
+        base_env_action_space_without_dummy = self.base_env.action_space.n / self.base_env.dummy_action_multiplier
+        rstr_obs_len = (np.shape(list(self.base_env.reset().values())[0])[0] - base_env_action_space_without_dummy) + self.base_env.action_space.n
+
+        self.observation_space = Box(low=self.base_env.observation_space.low[0],
+                                     high=self.base_env.observation_space.high[0],
+                                     shape=(int(rstr_obs_len),)
+                                     )
+        self.base_observation_space = self.base_env.observation_space
         self.base_action_space = self.base_env.action_space
 
         self._agents_to_current_valid_actions_mask = {}
@@ -134,36 +144,52 @@ class OpenSpielRestrictedGame:
     def set_obs_conversion_dict(self, agent_id: AgentID, obs_conversions: AgentRestrictedGameOpenSpielObsConversions):
         self.agent_conversions[agent_id] = obs_conversions
 
-    def _convert_obs_to_restricted_game(self, base_game_obs_dict: MultiAgentDict):
+    def _convert_obs_to_restricted_game(self, base_game_obs_dict: MultiAgentDict, dones):
         obs_dict_out = {}
+
+        self._agents_to_current_valid_actions_mask = {agent: None for agent in range(2)}
+
         for agent_id, base_game_obs in base_game_obs_dict.items():
             if agent_id in self.agent_conversions:
-                base_game_obs_as_tuple = tuple(base_game_obs)
-                restricted_game_obs = self.agent_conversions[agent_id].orig_obs_to_restricted_game_obs[
-                    base_game_obs_as_tuple]
-                self._agents_to_current_valid_actions_mask[agent_id] = \
-                self.agent_conversions[agent_id].orig_obs_to_restricted_game_valid_actions_mask[base_game_obs_as_tuple]
-                obs_dict_out[agent_id] = restricted_game_obs
+                if not dones["__all__"]:
+                    base_game_obs_as_tuple = tuple(base_game_obs)
+                    try:
+                        restricted_game_obs = self.agent_conversions[agent_id].orig_obs_to_restricted_game_obs[
+                            base_game_obs_as_tuple]
+                        assert len(restricted_game_obs) == 90, "only needs to be true for 20x dummy leduc"
+                    except KeyError:
+                        assert isinstance(base_game_obs_as_tuple, tuple)
+                        assert base_game_obs_as_tuple[0] == list(self.agent_conversions[agent_id].orig_obs_to_restricted_game_obs.keys())[0][0], f"key provided is {base_game_obs_as_tuple}\n agent id is {agent_id} \n example key is {list(self.agent_conversions[agent_id].orig_obs_to_restricted_game_obs.keys())[0]}"
+                        assert len(base_game_obs_as_tuple) == len(list(self.agent_conversions[agent_id].orig_obs_to_restricted_game_obs.keys())[0]), f"{len(base_game_obs_as_tuple)} {len(list(self.agent_conversions[agent_id].orig_obs_to_restricted_game_obs.keys())[0])}"
+                        print(f"keys are: {self.agent_conversions[agent_id].orig_obs_to_restricted_game_obs.keys()}\n\nlooking for {base_game_obs_as_tuple}")
+                        raise
+                    self._agents_to_current_valid_actions_mask[agent_id] = self.agent_conversions[agent_id].orig_obs_to_restricted_game_valid_actions_mask[base_game_obs_as_tuple]
+                    obs_dict_out[agent_id] = restricted_game_obs
+                else:
+                    restricted_game_obs = np.zeros(shape=self.observation_space.shape, dtype=np.float32)
+                    restricted_game_obs[:len(base_game_obs)] = base_game_obs
+                    obs_dict_out[agent_id] = restricted_game_obs
             else:
                 obs_dict_out[agent_id] = base_game_obs
-                self._agents_to_current_valid_actions_mask[agent_id] = None
         return obs_dict_out
 
     def reset(self) -> MultiAgentDict:
         if self._raise_if_no_restricted_players and len(self.agent_conversions) == 0:
             raise ValueError("Restricted environment reset with no restricted players.")
         obs_dict = self.base_env.reset()
-        return self._convert_obs_to_restricted_game(base_game_obs_dict=obs_dict)
+        return self._convert_obs_to_restricted_game(base_game_obs_dict=obs_dict, dones={0: False, 1: False, "__all__": False})
 
     def step(self, action_dict: MultiAgentDict) -> Tuple[
         MultiAgentDict, MultiAgentDict, MultiAgentDict, MultiAgentDict]:
 
         for agent_id, action in action_dict.items():
             if self._agents_to_current_valid_actions_mask[agent_id] is not None:
-                assert self._agents_to_current_valid_actions_mask[agent_id][action] == 1.0
+                assert self._agents_to_current_valid_actions_mask[agent_id][action] == 1.0, f"\nagent is {agent_id} " \
+                                                                                            f"action is {action}" \
+                                                                                            f"rstr valid_actions are {self._agents_to_current_valid_actions_mask[agent_id]}"
 
         base_obs_dict, rews, dones, infos = self.base_env.step(action_dict=action_dict)
 
-        restricted_game_obs = self._convert_obs_to_restricted_game(base_game_obs_dict=base_obs_dict)
+        restricted_game_obs = self._convert_obs_to_restricted_game(base_game_obs_dict=base_obs_dict, dones=dones)
 
         return restricted_game_obs, rews, dones, infos
