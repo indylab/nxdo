@@ -1,3 +1,7 @@
+import ray
+from ray.rllib.utils import merge_dicts, try_import_torch
+torch, _ = try_import_torch()
+
 import os
 import time
 import logging
@@ -9,9 +13,6 @@ from typing import Dict, List, Type, Callable
 from tables.exceptions import HDF5ExtError
 import deepdish
 import argparse
-import ray
-from ray.rllib.utils import merge_dicts, try_import_torch
-torch, _ = try_import_torch()
 
 from ray.rllib.agents import Trainer
 from ray.rllib.env.multi_agent_env import MultiAgentEnv

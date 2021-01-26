@@ -64,8 +64,11 @@ def openspiel_policy_from_nonlstm_rllib_xfdo_policy(openspiel_game: OpenSpielGam
 
         if is_openspiel_restricted_game:
             os_restricted_game_convertor: AgentRestrictedGameOpenSpielObsConversions = restricted_game_convertor
-            obs = os_restricted_game_convertor.orig_obs_to_restricted_game_obs[tuple(obs)]
-
+            try:
+                obs = os_restricted_game_convertor.orig_obs_to_restricted_game_obs[tuple(obs)]
+            except KeyError:
+                print(f"missing key: {tuple(obs)}\nexample key: {list(os_restricted_game_convertor.orig_obs_to_restricted_game_obs.keys())[0]}")
+                raise
         _, _, restricted_action_info = rllib_policy.compute_single_action(obs=obs, state=[], explore=False)
         restricted_game_action_probs = _parse_action_probs_from_action_info(action_info=restricted_action_info)
 
@@ -135,6 +138,7 @@ def xfdo_nfsp_measure_exploitability_nonlstm(rllib_policies: List[Policy],
     openspiel_game = pyspiel.load_game(poker_game_version, open_spiel_env_config)
 
     opnsl_policies = []
+    assert isinstance(restricted_game_convertors, list)
     for action_space_converter, rllib_policy in zip(restricted_game_convertors, rllib_policies):
         openspiel_policy = openspiel_policy_from_nonlstm_rllib_xfdo_policy(openspiel_game=openspiel_game,
                                                                            rllib_policy=rllib_policy,
@@ -167,6 +171,7 @@ def xfdo_snfsp_measure_exploitability_nonlstm(br_checkpoint_path_tuple_list: Lis
     def policy_iterable():
         for checkpoint_path_tuple in br_checkpoint_path_tuple_list:
             openspiel_policies = []
+            assert isinstance(restricted_game_convertors, list)
             for player, (restricted_game_convertor, player_rllib_policy) in enumerate(zip(restricted_game_convertors, rllib_policies)):
                 checkpoint_path = checkpoint_path_tuple[player]
                 set_policy_weights_fn(player_rllib_policy, checkpoint_path)

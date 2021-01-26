@@ -1,3 +1,8 @@
+import ray
+from ray.rllib.utils import merge_dicts, try_import_torch
+torch, _ = try_import_torch()
+
+
 import os
 import logging
 import argparse

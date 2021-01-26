@@ -1,4 +1,4 @@
-
+import os
 from grl.rl_apps.kuhn_poker_p2sro.config import psro_kuhn_sac_params, psro_kuhn_dqn_params, psro_leduc_dqn_params, \
     psro_leduc_dqn_params_gpu, psro_kuhn_dqn_params_gpu, psro_oshi_zumo_dqn_params_like_leduc_gpu, psro_20x_dummy_leduc_params_gpu, \
     psro_20x_dummy_leduc_params_gpu_v2
@@ -33,6 +33,8 @@ from grl.rl_apps.kuhn_poker_p2sro.poker_multi_agent_env import OBS_SHAPES, LEDUC
 from grl.rl_apps.kuhn_poker_p2sro.oshi_zumo_multi_agent_env import OSHI_ZUMO_OBS_LENGTH
 
 _LEDUC_OBS_LEN = OBS_SHAPES[LEDUC_POKER][0]
+
+_GRL_SEED = int(os.getenv("GRL_SEED", 0))
 
 
 scenarios = {
@@ -418,8 +420,8 @@ scenarios = {
             "best_response": SimpleQTorchPolicyPatched,
             "eval": SimpleQTorchPolicyPatched,
         },
-        "psro_port": 4100,
-        "eval_port": 4200,
+        "psro_port": 4100 + _GRL_SEED,
+        "eval_port": 4200 + _GRL_SEED,
         "num_eval_workers": 8,
         "games_per_payoff_eval": 20000,
         "p2sro": False,
@@ -448,8 +450,8 @@ scenarios = {
             "best_response": SimpleQTorchPolicyPatched,
             "eval": SimpleQTorchPolicyPatched,
         },
-        "psro_port": 4105,
-        "eval_port": 4205,
+        "psro_port": 4105 + _GRL_SEED,
+        "eval_port": 4205 + _GRL_SEED,
         "num_eval_workers": 8,
         "games_per_payoff_eval": 3000,
         "p2sro": False,
@@ -479,8 +481,8 @@ scenarios = {
             "best_response": SimpleQTorchPolicyPatched,
             "eval": SimpleQTorchPolicyPatched,
         },
-        "psro_port": 4110,
-        "eval_port": 4210,
+        "psro_port": 4110 + _GRL_SEED,
+        "eval_port": 4210 + _GRL_SEED,
         "num_eval_workers": 8,
         "games_per_payoff_eval": 3000,
         "p2sro": False,
@@ -508,8 +510,8 @@ scenarios = {
             "best_response": SimpleQTorchPolicyPatched,
             "eval": SimpleQTorchPolicyPatched,
         },
-        "psro_port": 4115,
-        "eval_port": 4215,
+        "psro_port": 4115 + _GRL_SEED,
+        "eval_port": 4215 + _GRL_SEED,
         "num_eval_workers": 8,
         "games_per_payoff_eval": 1000,
         "p2sro": False,
@@ -538,8 +540,8 @@ scenarios = {
             "best_response": SimpleQTorchPolicyPatched,
             "eval": SimpleQTorchPolicyPatched,
         },
-        "psro_port": 4120,
-        "eval_port": 4220,
+        "psro_port": 4120 + _GRL_SEED,
+        "eval_port": 4220 + _GRL_SEED,
         "num_eval_workers": 8,
         "games_per_payoff_eval": 3000,
         "p2sro": False,
@@ -586,7 +588,7 @@ scenarios = {
     # XFDO ############################################################################################
 
     "kuhn_xfdo_dqn_nfsp_gpu": {
-        "xfdo_port": 4400,
+        "xfdo_port": 4400 + _GRL_SEED,
         "use_openspiel_restricted_game": False,
         "restricted_game_custom_model": None,
         "xfdo_metanash_method": "nfsp",
@@ -632,7 +634,7 @@ scenarios = {
     },
 
     "leduc_xfdo_dqn_nfsp_gpu": {
-        "xfdo_port": 4405,
+        "xfdo_port": 4405 + _GRL_SEED,
         "use_openspiel_restricted_game": False,
         "restricted_game_custom_model": None,
         "xfdo_metanash_method": "nfsp",
@@ -679,7 +681,7 @@ scenarios = {
     },
 
     "20x_dummy_leduc_xfdo_dqn_nfsp_gpu": {
-        "xfdo_port": 4410,
+        "xfdo_port": 4410 + _GRL_SEED,
         "use_openspiel_restricted_game": False,
         "restricted_game_custom_model": None,
         "xfdo_metanash_method": "nfsp",
@@ -727,7 +729,7 @@ scenarios = {
     },
 
     "20x_dummy_leduc_xfdo_dqn_nfsp_gpu_dynamic_threshold_1": {
-        "xfdo_port": 4415,
+        "xfdo_port": 4415 + _GRL_SEED,
         "use_openspiel_restricted_game": False,
         "restricted_game_custom_model": None,
         "xfdo_metanash_method": "nfsp",
@@ -781,7 +783,7 @@ scenarios = {
 
 
     "20x_dummy_leduc_xfdo_dqn_nfsp_gpu_v2": {
-        "xfdo_port": 4420,
+        "xfdo_port": 4420 + _GRL_SEED,
         "use_openspiel_restricted_game": False,
         "restricted_game_custom_model": None,
         "xfdo_metanash_method": "nfsp",
@@ -829,7 +831,7 @@ scenarios = {
     },
 
     "20x_dummy_leduc_xfdo_dqn_nfsp_gpu_v2_dynamic_threshold_1": {
-        "xfdo_port": 4425,
+        "xfdo_port": 4425 + _GRL_SEED,
         "use_openspiel_restricted_game": False,
         "restricted_game_custom_model": None,
         "xfdo_metanash_method": "nfsp",
@@ -882,7 +884,7 @@ scenarios = {
     },
 
     "leduc_xfdo_dqn_nfsp_gpu_dynamic_threshold_1": {
-        "xfdo_port": 4430,
+        "xfdo_port": 4430 + _GRL_SEED,
         "use_openspiel_restricted_game": False,
         "restricted_game_custom_model": None,
         "xfdo_metanash_method": "nfsp",
@@ -935,7 +937,7 @@ scenarios = {
 
 
     "va_20x_dummy_leduc_xfdo_dqn_nfsp_gpu_dynamic_threshold_1": {
-        "xfdo_port": 4435,
+        "xfdo_port": 4435 + _GRL_SEED,
         "use_openspiel_restricted_game": True,
         "restricted_game_custom_model": get_valid_action_fcn_class(obs_len=_LEDUC_OBS_LEN, action_space_n=3 * 20, dummy_actions_multiplier=1),
         "xfdo_metanash_method": "nfsp",
@@ -944,7 +946,7 @@ scenarios = {
             dont_solve_first_n_xfdo_iters=5,
             starting_rew_threshold=2.0,
             min_rew_threshold=0.1,
-            min_episodes=50000,
+            min_episodes=100000,
             epsilon=0.05,
             required_fields=["z_avg_policy_exploitability"],
         ),
@@ -988,7 +990,7 @@ scenarios = {
     },
 
     "20x_dummy_leduc_xfdo_dqn_nfsp_gpu_dynamic_threshold_1_aggressive": {
-        "xfdo_port": 4440,
+        "xfdo_port": 4440 + _GRL_SEED,
         "use_openspiel_restricted_game": False,
         "restricted_game_custom_model": None,
         "xfdo_metanash_method": "nfsp",
@@ -1041,7 +1043,7 @@ scenarios = {
     },
 
     "va_20x_dummy_leduc_xfdo_dqn_nfsp_gpu_dynamic_threshold_1_aggressive": {
-        "xfdo_port": 4445,
+        "xfdo_port": 4445 + _GRL_SEED,
         "use_openspiel_restricted_game": True,
         "restricted_game_custom_model": get_valid_action_fcn_class(obs_len=_LEDUC_OBS_LEN, action_space_n=3 * 20, dummy_actions_multiplier=1),
         "xfdo_metanash_method": "nfsp",
@@ -1050,7 +1052,7 @@ scenarios = {
             dont_solve_first_n_xfdo_iters=7,
             starting_rew_threshold=1.0,
             min_rew_threshold=0.1,
-            min_episodes=50000,
+            min_episodes=100000,
             epsilon=0.05,
             required_fields=["z_avg_policy_exploitability"],
         ),

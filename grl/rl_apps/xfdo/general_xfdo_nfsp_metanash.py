@@ -1,3 +1,7 @@
+import ray
+from ray.rllib.utils import merge_dicts, try_import_torch
+torch, _ = try_import_torch()
+
 import os
 import time
 import logging
@@ -10,10 +14,6 @@ from copy import deepcopy
 from gym.spaces import Space, Discrete, Box
 import copy
 import deepdish
-
-import ray
-from ray.rllib.utils import merge_dicts, try_import_torch
-torch, _ = try_import_torch()
 
 from ray.rllib import SampleBatch, Policy
 from ray.rllib.agents import Trainer
@@ -33,7 +33,7 @@ from ray.rllib.policy.sample_batch import SampleBatch, DEFAULT_POLICY_ID, \
 from ray.rllib.agents.dqn.dqn_tf_policy import PRIO_WEIGHTS
 import grl
 from grl.utils import pretty_dict_str, datetime_str, ensure_dir, copy_attributes
-
+from grl.rllib_tools.stat_deque import StatDeque
 from grl.nfsp_rllib.nfsp import get_store_to_avg_policy_buffer_fn
 from grl.rl_apps.nfsp.openspiel_utils import nfsp_measure_exploitability_nonlstm
 from grl.rllib_tools.space_saving_logger import SpaceSavingLogger
@@ -139,24 +139,6 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
     assert scenario["xfdo_metanash_method"] == "nfsp"
 
     ray.init(log_to_driver=os.getenv("RAY_LOG_TO_DRIVER", False), address='auto', _redis_password='5241590000000000', ignore_reinit_error=True, local_mode=False)
-
-    # Defined after Ray driver is created
-    # https://github.com/ray-project/ray/issues/6240
-    @ray.remote(num_cpus=0)
-    class StatDeque(object):
-        def __init__(self, max_items: int):
-            self._data = []
-            self._max_items = max_items
-
-        def add(self, item):
-            self._data.append(item)
-            if len(self._data) > self._max_items:
-                del self._data[0]
-
-        def get_mean(self):
-            if len(self._data) == 0:
-                return None
-            return np.mean(self._data)
 
     def log(message, level=logging.INFO):
         logger.log(level, message)
@@ -388,10 +370,11 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
         local_delegate_policy = br_trainer.workers.local_worker().policy_map["delegate_policy"]
         player_converters = []
         for p in range(2):
-            player_converters.append(get_restricted_game_obs_conversions(player=p, delegate_policy=local_delegate_policy,
+            convertor = get_restricted_game_obs_conversions(player=p, delegate_policy=local_delegate_policy,
                                                                   policy_specs=player_to_base_game_action_specs[p],
                                                                   load_policy_spec_fn=create_get_pure_strat_cached(cache={}),
-                                                                  tmp_base_env=tmp_base_env))
+                                                                  tmp_base_env=tmp_base_env)
+            player_converters.append(convertor)
         for _trainer in [br_trainer, avg_trainer]:
             def _set_worker_converters(worker: RolloutWorker):
                 worker_delegate_policy = worker.policy_map["delegate_policy"]

@@ -41,9 +41,9 @@ def get_restricted_game_obs_conversions(
         load_policy_spec_fn(delegate_policy, policy_spec)
 
         for state_index, state in enumerate(empty_tabular_policy.states):
-            if state.current_player() != player:
-                assert state.current_player() in [0, 1], state.current_player()
-                continue
+            # if state.current_player() != player and state.current_player() != -2:
+            assert state.current_player() in [0, 1], state.current_player()
+                # continue
 
             valid_actions_mask = state.legal_actions_mask()
             info_state_vector = state.information_state_as_normalized_vector()

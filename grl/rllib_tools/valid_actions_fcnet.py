@@ -39,7 +39,9 @@ def get_valid_action_fcn_class(obs_len: int, action_space_n: int, dummy_actions_
             assert obs.shape[1] == obs_len + non_dummy_action_space_n, \
                 f"obs shape with valid action fc net is {obs.shape}\n" \
                 f"obs_len without actions: {obs_len}\n" \
-                f"action space n: {action_space_n}"
+                f"non_dummy_action_space_n: {non_dummy_action_space_n}\n" \
+                f"action space n: {action_space_n}\n" \
+                f"obs: {obs}"
 
             # print(f"torch obs: {obs}")
             obs = obs[:, :-non_dummy_action_space_n]
