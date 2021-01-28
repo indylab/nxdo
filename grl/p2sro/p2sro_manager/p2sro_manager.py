@@ -7,7 +7,7 @@ from typing import List, Tuple, Union
 from grl.p2sro.payoff_table import PayoffTable, PayoffTableStrategySpec
 from grl.p2sro.eval_dispatcher import EvalDispatcherWithServer, EvalResult
 from grl.p2sro.p2sro_manager.logger import P2SROManagerLogger, SimpleP2SROManagerLogger
-from grl.utils import datetime_str
+from grl.utils import datetime_str, check_if_jsonable
 
 
 class _P2SROPlayerStats(object):
@@ -59,7 +59,8 @@ class P2SROManager(object):
                  eval_dispatcher_port: int = 4536,
                  payoff_table_exponential_average_coeff: float = None,
                  manager_logger: P2SROManagerLogger = None,
-                 log_dir: str = None):
+                 log_dir: str = None,
+                 manager_metadata: dict = None):
 
         self._n_players = n_players
         self._is_two_player_symmetric_zero_sum = is_two_player_symmetric_zero_sum
@@ -92,6 +93,16 @@ class P2SROManager(object):
             manager_logger = SimpleP2SROManagerLogger(p2sro_manger=self, log_dir=self.log_dir)
         self._manager_logger = manager_logger
 
+        if manager_metadata is None:
+            manager_metadata = {}
+        manager_metadata["log_dir"] = self.get_log_dir()
+        manager_metadata["n_players"] = self.n_players()
+        is_jsonable, json_err = check_if_jsonable(check_dict=manager_metadata)
+        if not is_jsonable:
+            raise ValueError(f"manager_metadata must be JSON serializable. "
+                             f"The following error occurred when trying to serialize it:\n{json_err}")
+        self.manager_metadata = manager_metadata
+
         self._modification_lock = RLock()
 
     def n_players(self) -> int:
@@ -99,6 +110,9 @@ class P2SROManager(object):
 
     def get_log_dir(self) -> str:
         return self.log_dir
+
+    def get_manager_metadata(self) -> dict:
+        return self.manager_metadata
 
     def claim_new_active_policy_for_player(self, player, new_policy_metadata_dict) -> PayoffTableStrategySpec:
         with self._modification_lock:

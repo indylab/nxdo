@@ -34,6 +34,7 @@ from grl.xfdo.action_space_conversion import RestrictedToBaseGameActionSpaceConv
 from grl.xfdo.restricted_game import RestrictedGame
 from grl.rllib_tools.space_saving_logger import SpaceSavingLogger
 from grl.rl_apps.scenarios.poker import scenarios
+from grl.rl_apps.scenarios.ray_setup import init_ray_for_scenario
 from grl.rl_apps.scenarios.stopping_conditions import StoppingCondition
 from grl.xfdo.openspiel.opnsl_restricted_game import OpenSpielRestrictedGame, AgentRestrictedGameOpenSpielObsConversions, get_restricted_game_obs_conversions
 
@@ -248,6 +249,9 @@ def train_poker_best_response(br_player: int, scenario_name: str, print_train_re
     xfdo_manager = RemoteXFDOManagerClient(n_players=2,
                                            port=os.getenv("XFDO_PORT", default_xfdo_port),
                                            remote_server_host="127.0.0.1")
+
+    manager_metadata = xfdo_manager.get_manager_metadata()
+
     br_params = xfdo_manager.claim_new_active_policy_for_player(player=br_player)
     metanash_specs_for_players, delegate_specs_for_players, active_policy_num = br_params
 
@@ -322,7 +326,9 @@ def train_poker_best_response(br_player: int, scenario_name: str, print_train_re
 
     trainer_config = merge_dicts(trainer_config, get_trainer_config(action_space=tmp_env.base_action_space))
 
-    ray.init(log_to_driver=os.getenv("RAY_LOG_TO_DRIVER", False), address='auto', _redis_password='5241590000000000', ignore_reinit_error=True, local_mode=False)
+    ray_head_address = manager_metadata["ray_head_address"]
+    init_ray_for_scenario(scenario=scenario, head_address=ray_head_address, logging_level=logging.INFO)
+
     trainer = trainer_class(config=trainer_config)
 
     if use_cfp_metanash and cfp_metanash_specs_for_players:
@@ -397,9 +403,10 @@ def train_poker_best_response(br_player: int, scenario_name: str, print_train_re
             average_br_reward=br_reward_this_iter,
         ))
 
-    trainer.cleanup()
-    del trainer
+    # trainer.cleanup()
+    # del trainer
     ray.shutdown()
+    time.sleep(10)
 
     # wait for both player policies to be fixed.
     for player_to_wait_on in range(2):

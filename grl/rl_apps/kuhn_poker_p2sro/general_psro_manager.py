@@ -5,6 +5,7 @@ import grl
 from grl.p2sro.p2sro_manager import P2SROManagerWithServer, SimpleP2SROManagerLogger
 from grl.utils import datetime_str, ensure_dir
 from grl.rl_apps.scenarios.poker import scenarios
+from grl.rl_apps.scenarios.ray_setup import init_ray_for_scenario
 from grl.rl_apps.kuhn_poker_p2sro.general_psro_eval import launch_evals
 
 if __name__ == '__main__':
@@ -26,6 +27,8 @@ if __name__ == '__main__':
     games_per_payoff_eval = scenario["games_per_payoff_eval"]
     p2sro = scenario["p2sro"]
 
+    ray_head_address = init_ray_for_scenario(scenario=scenario, head_address=None, logging_level=logging.INFO)
+
     if p2sro:
         raise NotImplementedError("a little more setup is needed in configs to launch p2sro this way")
 
@@ -44,11 +47,12 @@ if __name__ == '__main__':
         do_external_payoff_evals_for_new_fixed_policies=True,
         games_per_external_payoff_eval=games_per_payoff_eval,
         payoff_table_exponential_average_coeff=None,
-        log_dir=log_dir
+        log_dir=log_dir,
+        manager_metadata={"ray_head_address": ray_head_address},
     )
     print(f"Launched P2SRO Manager with server.")
 
-    launch_evals(scenario_name=scenario_name, block=False)
+    launch_evals(scenario_name=scenario_name, block=False, ray_head_address=ray_head_address)
 
     print(f"Launched evals")
 

@@ -20,7 +20,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x12xfdo_manager.proto\x1a\x1bgoogle/protobuf/empty.proto\"\x1c\n\nXFDOString\x12\x0e\n\x06string\x18\x01 \x01(\t\"<\n\x16XFDOPlayerAndPolicyNum\x12\x0e\n\x06player\x18\x01 \x01(\x03\x12\x12\n\npolicy_num\x18\x02 \x01(\x03\"\x1c\n\nXFDOPlayer\x12\x0e\n\x06player\x18\x01 \x01(\x03\".\n\x12XFDOPolicySpecJson\x12\x18\n\x10policy_spec_json\x18\x01 \x01(\t\"C\n\x12XFDOPolicySpecList\x12-\n\x10policy_spec_list\x18\x01 \x03(\x0b\x32\x13.XFDOPolicySpecJson\"\xa1\x01\n\x19XFDONewBestResponseParams\x12\x37\n\x1ametanash_specs_for_players\x18\x01 \x01(\x0b\x32\x13.XFDOPolicySpecList\x12\x37\n\x1a\x64\x65legate_specs_for_players\x18\x02 \x03(\x0b\x32\x13.XFDOPolicySpecList\x12\x12\n\npolicy_num\x18\x03 \x01(\x03\"V\n\x19XFDOPolicyMetadataRequest\x12\x0e\n\x06player\x18\x01 \x01(\x03\x12\x12\n\npolicy_num\x18\x02 \x01(\x03\x12\x15\n\rmetadata_json\x18\x03 \x01(\t\"\"\n\x10XFDOConfirmation\x12\x0e\n\x06result\x18\x01 \x01(\x08\x32\x94\x02\n\x0bXFDOManager\x12\x32\n\tGetLogDir\x12\x16.google.protobuf.Empty\x1a\x0b.XFDOString\"\x00\x12J\n\x1d\x43laimNewActivePolicyForPlayer\x12\x0b.XFDOPlayer\x1a\x1a.XFDONewBestResponseParams\"\x00\x12\x46\n\x13SubmitFinalBRPolicy\x12\x1a.XFDOPolicyMetadataRequest\x1a\x11.XFDOConfirmation\"\x00\x12=\n\rIsPolicyFixed\x12\x17.XFDOPlayerAndPolicyNum\x1a\x11.XFDOConfirmation\"\x00\x62\x06proto3'
+  serialized_pb=b'\n\x12xfdo_manager.proto\x1a\x1bgoogle/protobuf/empty.proto\"\x1c\n\nXFDOString\x12\x0e\n\x06string\x18\x01 \x01(\t\"<\n\x16XFDOPlayerAndPolicyNum\x12\x0e\n\x06player\x18\x01 \x01(\x03\x12\x12\n\npolicy_num\x18\x02 \x01(\x03\"\x1c\n\nXFDOPlayer\x12\x0e\n\x06player\x18\x01 \x01(\x03\".\n\x12XFDOPolicySpecJson\x12\x18\n\x10policy_spec_json\x18\x01 \x01(\t\"C\n\x12XFDOPolicySpecList\x12-\n\x10policy_spec_list\x18\x01 \x03(\x0b\x32\x13.XFDOPolicySpecJson\"\xa1\x01\n\x19XFDONewBestResponseParams\x12\x37\n\x1ametanash_specs_for_players\x18\x01 \x01(\x0b\x32\x13.XFDOPolicySpecList\x12\x37\n\x1a\x64\x65legate_specs_for_players\x18\x02 \x03(\x0b\x32\x13.XFDOPolicySpecList\x12\x12\n\npolicy_num\x18\x03 \x01(\x03\"V\n\x19XFDOPolicyMetadataRequest\x12\x0e\n\x06player\x18\x01 \x01(\x03\x12\x12\n\npolicy_num\x18\x02 \x01(\x03\x12\x15\n\rmetadata_json\x18\x03 \x01(\t\"\"\n\x10XFDOConfirmation\x12\x0e\n\x06result\x18\x01 \x01(\x08\"%\n\x0cXFDOMetadata\x12\x15\n\rjson_metadata\x18\x01 \x01(\t2\xd3\x02\n\x0bXFDOManager\x12\x32\n\tGetLogDir\x12\x16.google.protobuf.Empty\x1a\x0b.XFDOString\"\x00\x12=\n\x12GetManagerMetaData\x12\x16.google.protobuf.Empty\x1a\r.XFDOMetadata\"\x00\x12J\n\x1d\x43laimNewActivePolicyForPlayer\x12\x0b.XFDOPlayer\x1a\x1a.XFDONewBestResponseParams\"\x00\x12\x46\n\x13SubmitFinalBRPolicy\x12\x1a.XFDOPolicyMetadataRequest\x1a\x11.XFDOConfirmation\"\x00\x12=\n\rIsPolicyFixed\x12\x17.XFDOPlayerAndPolicyNum\x1a\x11.XFDOConfirmation\"\x00\x62\x06proto3'
   ,
   dependencies=[google_dot_protobuf_dot_empty__pb2.DESCRIPTOR,])
 
@@ -317,6 +317,38 @@ _XFDOCONFIRMATION = _descriptor.Descriptor(
   serialized_end=576,
 )
 
+
+_XFDOMETADATA = _descriptor.Descriptor(
+  name='XFDOMetadata',
+  full_name='XFDOMetadata',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='json_metadata', full_name='XFDOMetadata.json_metadata', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=578,
+  serialized_end=615,
+)
+
 _XFDOPOLICYSPECLIST.fields_by_name['policy_spec_list'].message_type = _XFDOPOLICYSPECJSON
 _XFDONEWBESTRESPONSEPARAMS.fields_by_name['metanash_specs_for_players'].message_type = _XFDOPOLICYSPECLIST
 _XFDONEWBESTRESPONSEPARAMS.fields_by_name['delegate_specs_for_players'].message_type = _XFDOPOLICYSPECLIST
@@ -328,6 +360,7 @@ DESCRIPTOR.message_types_by_name['XFDOPolicySpecList'] = _XFDOPOLICYSPECLIST
 DESCRIPTOR.message_types_by_name['XFDONewBestResponseParams'] = _XFDONEWBESTRESPONSEPARAMS
 DESCRIPTOR.message_types_by_name['XFDOPolicyMetadataRequest'] = _XFDOPOLICYMETADATAREQUEST
 DESCRIPTOR.message_types_by_name['XFDOConfirmation'] = _XFDOCONFIRMATION
+DESCRIPTOR.message_types_by_name['XFDOMetadata'] = _XFDOMETADATA
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 XFDOString = _reflection.GeneratedProtocolMessageType('XFDOString', (_message.Message,), {
@@ -386,6 +419,13 @@ XFDOConfirmation = _reflection.GeneratedProtocolMessageType('XFDOConfirmation', 
   })
 _sym_db.RegisterMessage(XFDOConfirmation)
 
+XFDOMetadata = _reflection.GeneratedProtocolMessageType('XFDOMetadata', (_message.Message,), {
+  'DESCRIPTOR' : _XFDOMETADATA,
+  '__module__' : 'xfdo_manager_pb2'
+  # @@protoc_insertion_point(class_scope:XFDOMetadata)
+  })
+_sym_db.RegisterMessage(XFDOMetadata)
+
 
 
 _XFDOMANAGER = _descriptor.ServiceDescriptor(
@@ -395,8 +435,8 @@ _XFDOMANAGER = _descriptor.ServiceDescriptor(
   index=0,
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_start=579,
-  serialized_end=855,
+  serialized_start=618,
+  serialized_end=957,
   methods=[
   _descriptor.MethodDescriptor(
     name='GetLogDir',
@@ -409,9 +449,19 @@ _XFDOMANAGER = _descriptor.ServiceDescriptor(
     create_key=_descriptor._internal_create_key,
   ),
   _descriptor.MethodDescriptor(
+    name='GetManagerMetaData',
+    full_name='XFDOManager.GetManagerMetaData',
+    index=1,
+    containing_service=None,
+    input_type=google_dot_protobuf_dot_empty__pb2._EMPTY,
+    output_type=_XFDOMETADATA,
+    serialized_options=None,
+    create_key=_descriptor._internal_create_key,
+  ),
+  _descriptor.MethodDescriptor(
     name='ClaimNewActivePolicyForPlayer',
     full_name='XFDOManager.ClaimNewActivePolicyForPlayer',
-    index=1,
+    index=2,
     containing_service=None,
     input_type=_XFDOPLAYER,
     output_type=_XFDONEWBESTRESPONSEPARAMS,
@@ -421,7 +471,7 @@ _XFDOMANAGER = _descriptor.ServiceDescriptor(
   _descriptor.MethodDescriptor(
     name='SubmitFinalBRPolicy',
     full_name='XFDOManager.SubmitFinalBRPolicy',
-    index=2,
+    index=3,
     containing_service=None,
     input_type=_XFDOPOLICYMETADATAREQUEST,
     output_type=_XFDOCONFIRMATION,
@@ -431,7 +481,7 @@ _XFDOMANAGER = _descriptor.ServiceDescriptor(
   _descriptor.MethodDescriptor(
     name='IsPolicyFixed',
     full_name='XFDOManager.IsPolicyFixed',
-    index=3,
+    index=4,
     containing_service=None,
     input_type=_XFDOPLAYERANDPOLICYNUM,
     output_type=_XFDOCONFIRMATION,

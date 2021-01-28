@@ -20,6 +20,11 @@ class XFDOManagerStub(object):
                 request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
                 response_deserializer=xfdo__manager__pb2.XFDOString.FromString,
                 )
+        self.GetManagerMetaData = channel.unary_unary(
+                '/XFDOManager/GetManagerMetaData',
+                request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+                response_deserializer=xfdo__manager__pb2.XFDOMetadata.FromString,
+                )
         self.ClaimNewActivePolicyForPlayer = channel.unary_unary(
                 '/XFDOManager/ClaimNewActivePolicyForPlayer',
                 request_serializer=xfdo__manager__pb2.XFDOPlayer.SerializeToString,
@@ -41,6 +46,12 @@ class XFDOManagerServicer(object):
     """Missing associated documentation comment in .proto file."""
 
     def GetLogDir(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetManagerMetaData(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -71,6 +82,11 @@ def add_XFDOManagerServicer_to_server(servicer, server):
                     servicer.GetLogDir,
                     request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                     response_serializer=xfdo__manager__pb2.XFDOString.SerializeToString,
+            ),
+            'GetManagerMetaData': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetManagerMetaData,
+                    request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+                    response_serializer=xfdo__manager__pb2.XFDOMetadata.SerializeToString,
             ),
             'ClaimNewActivePolicyForPlayer': grpc.unary_unary_rpc_method_handler(
                     servicer.ClaimNewActivePolicyForPlayer,
@@ -111,6 +127,23 @@ class XFDOManager(object):
         return grpc.experimental.unary_unary(request, target, '/XFDOManager/GetLogDir',
             google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             xfdo__manager__pb2.XFDOString.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def GetManagerMetaData(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/XFDOManager/GetManagerMetaData',
+            google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            xfdo__manager__pb2.XFDOMetadata.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 

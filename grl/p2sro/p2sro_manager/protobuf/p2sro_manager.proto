@@ -55,8 +55,13 @@ message Confirmation {
     bool result = 1;
 }
 
+message Metadata {
+    string json_metadata = 1;
+}
+
 service P2SROManager {
     rpc CheckNumPlayers (NumPlayers) returns (Confirmation) {}
+    rpc GetManagerMetaData (google.protobuf.Empty) returns (Metadata) {}
     rpc GetLogDir (google.protobuf.Empty) returns (String) {}
     rpc ClaimNewActivePolicyForPlayer (NewActivePolicyRequest) returns (PolicySpecJson) {}
     rpc SubmitNewActivePolicyMetadata (PolicyMetadataRequest) returns (PolicySpecJson) {}

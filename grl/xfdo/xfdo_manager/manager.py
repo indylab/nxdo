@@ -1,13 +1,13 @@
 from abc import ABC, abstractmethod
 import numpy as np
 from copy import deepcopy
-from threading import RLock, _RLock
+from threading import RLock
 from itertools import product
 from typing import List, Tuple, Union, Dict, Callable
 import json
 import os
 from grl.p2sro.payoff_table import PayoffTable, PayoffTableStrategySpec
-from grl.utils import datetime_str, ensure_dir
+from grl.utils import datetime_str, ensure_dir, check_if_jsonable
 
 
 class RestrictedGameSolveResult:
@@ -27,7 +27,8 @@ class SolveRestrictedGame(ABC):
     @abstractmethod
     def __call__(self,
                  log_dir: str,
-                 br_spec_lists_for_each_player: Dict[int, List[PayoffTableStrategySpec]]) -> RestrictedGameSolveResult:
+                 br_spec_lists_for_each_player: Dict[int, List[PayoffTableStrategySpec]],
+                 manager_metadata: dict = None) -> RestrictedGameSolveResult:
         pass
 
 class XFDOManager(object):
@@ -35,7 +36,8 @@ class XFDOManager(object):
     def __init__(self,
                  solve_restricted_game: SolveRestrictedGame,
                  n_players: int = 2,
-                 log_dir: str = None):
+                 log_dir: str = None,
+                 manager_metadata: dict = None):
 
         self._solve_restricted_game = solve_restricted_game
 
@@ -61,6 +63,16 @@ class XFDOManager(object):
 
         self._latest_metanash_spec_for_each_player: List[PayoffTableStrategySpec] = [None, None]
 
+        if manager_metadata is None:
+            manager_metadata = {}
+        manager_metadata["log_dir"] = self.get_log_dir()
+        manager_metadata["n_players"] = self.n_players()
+        is_jsonable, json_err = check_if_jsonable(check_dict=manager_metadata)
+        if not is_jsonable:
+            raise ValueError(f"manager_metadata must be JSON serializable. "
+                             f"The following error occurred when trying to serialize it:\n{json_err}")
+        self.manager_metadata = manager_metadata
+
         self.modification_lock = RLock()
 
     def n_players(self) -> int:
@@ -68,6 +80,9 @@ class XFDOManager(object):
 
     def get_log_dir(self) -> str:
         return self.log_dir
+
+    def get_manager_metadata(self) -> dict:
+        return self.manager_metadata
 
     def claim_new_active_policy_for_player(self, player) -> Union[
         Tuple[Dict[int, PayoffTableStrategySpec], Dict[int, List[PayoffTableStrategySpec]], int],
@@ -116,7 +131,9 @@ class XFDOManager(object):
 
                 print("Solving restricted game")
                 game_solve_result = self._solve_restricted_game(
-                    log_dir=self.log_dir, br_spec_lists_for_each_player=self._next_iter_br_spec_lists_for_each_player)
+                    log_dir=self.log_dir, br_spec_lists_for_each_player=self._next_iter_br_spec_lists_for_each_player,
+                    manager_metadata=self.get_manager_metadata()
+                )
 
                 self._latest_metanash_spec_for_each_player = game_solve_result.latest_metanash_spec_for_each_player
                 self._episodes_count += game_solve_result.episodes_spent_in_solve

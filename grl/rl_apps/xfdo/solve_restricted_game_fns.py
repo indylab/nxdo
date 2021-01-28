@@ -3,7 +3,7 @@ import numpy as np
 from typing import List, Dict
 
 from grl.p2sro.payoff_table import PayoffTableStrategySpec
-from grl.rl_apps.scenarios.stopping_conditions import TwoPlayerBRRewardsBelowAmtStoppingCondition
+from grl.rl_apps.scenarios.stopping_conditions import TwoPlayerBRRewardsBelowAmtStoppingCondition, StoppingCondition
 
 from grl.xfdo.xfdo_manager.manager import SolveRestrictedGame, RestrictedGameSolveResult
 
@@ -14,18 +14,19 @@ from grl.rl_apps.xfdo.general_xfdo_cfp_metanash import train_cfp_restricted_game
 def _solve_game(scenario: dict,
                 log_dir: str,
                 br_spec_lists_for_each_player: Dict[int, List[PayoffTableStrategySpec]],
-                stopping_condition) -> RestrictedGameSolveResult:
+                stopping_condition: StoppingCondition,
+                manager_metadata: dict = None) -> RestrictedGameSolveResult:
 
     if scenario["xfdo_metanash_method"] == "nfsp":
         avg_policy_specs, final_train_result = train_off_policy_rl_nfsp_restricted_game(
             results_dir=log_dir, scenario=scenario, player_to_base_game_action_specs=br_spec_lists_for_each_player,
-            stopping_condition=stopping_condition, print_train_results=True
+            stopping_condition=stopping_condition, manager_metadata=manager_metadata, print_train_results=True
         )
     elif scenario["xfdo_metanash_method"] == "cfp":
         avg_policy_specs, final_train_result = train_cfp_restricted_game(
             results_dir=log_dir, scenario=scenario,
             player_to_base_game_action_specs=br_spec_lists_for_each_player,
-            stopping_condition=stopping_condition, print_train_results=True
+            stopping_condition=stopping_condition, manager_metadata=manager_metadata, print_train_results=True
         )
     else:
         raise NotImplementedError(f"Unknown xfdo_metanash_method: {scenario['xfdo_metanash_method']}")
@@ -58,7 +59,8 @@ class SolveRestrictedGameFixedRewardThreshold(SolveRestrictedGame):
 
     def __call__(self,
                  log_dir: str,
-                 br_spec_lists_for_each_player: Dict[int, List[PayoffTableStrategySpec]]) -> RestrictedGameSolveResult:
+                 br_spec_lists_for_each_player: Dict[int, List[PayoffTableStrategySpec]],
+                 manager_metadata: dict = None) -> RestrictedGameSolveResult:
 
         stopping_condition = TwoPlayerBRRewardsBelowAmtStoppingCondition(
             stop_if_br_avg_rew_falls_below=self.br_reward_threshold,
@@ -68,7 +70,8 @@ class SolveRestrictedGameFixedRewardThreshold(SolveRestrictedGame):
 
         return _solve_game(scenario=self.scenario, log_dir=log_dir,
                            br_spec_lists_for_each_player=br_spec_lists_for_each_player,
-                           stopping_condition=stopping_condition)
+                           stopping_condition=stopping_condition,
+                           manager_metadata=manager_metadata)
 
 
 class SolveRestrictedGameDynamicRewardThreshold1(SolveRestrictedGame):
@@ -107,7 +110,8 @@ class SolveRestrictedGameDynamicRewardThreshold1(SolveRestrictedGame):
 
     def __call__(self,
                  log_dir: str,
-                 br_spec_lists_for_each_player: Dict[int, List[PayoffTableStrategySpec]]) -> RestrictedGameSolveResult:
+                 br_spec_lists_for_each_player: Dict[int, List[PayoffTableStrategySpec]],
+                 manager_metadata: dict = None) -> RestrictedGameSolveResult:
         # This method is called each time we need to solve the metanash for XFDO
 
         if self._current_xfdo_iter < self._dont_solve_first_n_xfdo_iters:
@@ -131,4 +135,5 @@ class SolveRestrictedGameDynamicRewardThreshold1(SolveRestrictedGame):
         return _solve_game(scenario=self.scenario,
                            log_dir=log_dir,
                            br_spec_lists_for_each_player=br_spec_lists_for_each_player,
-                           stopping_condition=stopping_condition)
+                           stopping_condition=stopping_condition,
+                           manager_metadata=manager_metadata)

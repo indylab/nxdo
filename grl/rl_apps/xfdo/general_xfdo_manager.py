@@ -12,7 +12,7 @@ from grl.xfdo.xfdo_manager.remote import XFDOManagerWithServer
 from grl.xfdo.xfdo_manager.manager import SolveRestrictedGame
 from grl.utils import datetime_str, ensure_dir
 from grl.rl_apps.scenarios.poker import scenarios
-
+from grl.rl_apps.scenarios.ray_setup import init_ray_for_scenario
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
@@ -33,6 +33,8 @@ if __name__ == '__main__':
 
     log_dir = os.path.join(os.path.dirname(grl.__file__), "data", scenario_name, f"manager_{datetime_str()}")
 
+    ray_head_address = init_ray_for_scenario(scenario=scenario, head_address=None, logging_level=logging.INFO)
+
     name_file_path = os.path.join(log_dir, "scenario_name.txt")
     ensure_dir(name_file_path)
     with open(name_file_path, "w+") as name_file:
@@ -42,6 +44,8 @@ if __name__ == '__main__':
         solve_restricted_game=solve_restricted_game,
         n_players=2,
         log_dir=os.path.join(os.path.dirname(grl.__file__), "data", scenario_name, f"manager_{datetime_str()}"),
-        port=os.getenv("XFDO_PORT", default_xfdo_port))
+        port=os.getenv("XFDO_PORT", default_xfdo_port),
+        manager_metadata={"ray_head_address": ray_head_address},
+    )
 
     manager.wait_for_server_termination()

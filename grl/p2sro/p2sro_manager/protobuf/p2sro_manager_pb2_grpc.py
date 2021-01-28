@@ -20,6 +20,11 @@ class P2SROManagerStub(object):
                 request_serializer=p2sro__manager__pb2.NumPlayers.SerializeToString,
                 response_deserializer=p2sro__manager__pb2.Confirmation.FromString,
                 )
+        self.GetManagerMetaData = channel.unary_unary(
+                '/P2SROManager/GetManagerMetaData',
+                request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+                response_deserializer=p2sro__manager__pb2.Metadata.FromString,
+                )
         self.GetLogDir = channel.unary_unary(
                 '/P2SROManager/GetLogDir',
                 request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
@@ -71,6 +76,12 @@ class P2SROManagerServicer(object):
     """Missing associated documentation comment in .proto file."""
 
     def CheckNumPlayers(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetManagerMetaData(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -137,6 +148,11 @@ def add_P2SROManagerServicer_to_server(servicer, server):
                     servicer.CheckNumPlayers,
                     request_deserializer=p2sro__manager__pb2.NumPlayers.FromString,
                     response_serializer=p2sro__manager__pb2.Confirmation.SerializeToString,
+            ),
+            'GetManagerMetaData': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetManagerMetaData,
+                    request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+                    response_serializer=p2sro__manager__pb2.Metadata.SerializeToString,
             ),
             'GetLogDir': grpc.unary_unary_rpc_method_handler(
                     servicer.GetLogDir,
@@ -207,6 +223,23 @@ class P2SROManager(object):
         return grpc.experimental.unary_unary(request, target, '/P2SROManager/CheckNumPlayers',
             p2sro__manager__pb2.NumPlayers.SerializeToString,
             p2sro__manager__pb2.Confirmation.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def GetManagerMetaData(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/P2SROManager/GetManagerMetaData',
+            google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            p2sro__manager__pb2.Metadata.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 

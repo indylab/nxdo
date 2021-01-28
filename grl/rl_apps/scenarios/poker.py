@@ -1,40 +1,47 @@
 import os
-from grl.rl_apps.kuhn_poker_p2sro.config import psro_kuhn_sac_params, psro_kuhn_dqn_params, psro_leduc_dqn_params, \
-    psro_leduc_dqn_params_gpu, psro_kuhn_dqn_params_gpu, psro_oshi_zumo_dqn_params_like_leduc_gpu, psro_20x_dummy_leduc_params_gpu, \
+import urllib.parse
+from grl.rl_apps.kuhn_poker_p2sro.config import psro_leduc_dqn_params_gpu, psro_kuhn_dqn_params_gpu, psro_oshi_zumo_dqn_params_like_leduc_gpu, psro_20x_dummy_leduc_params_gpu, \
     psro_20x_dummy_leduc_params_gpu_v2
 
 
-from grl.rl_apps.nfsp.config import nfsp_kuhn_sac_params, nfsp_leduc_dqn_params, nfsp_kuhn_dqn_params, \
-    nfsp_oshi_zumo_dqn_params_like_kuhn, nfsp_kuhn_dqn_params_gpu, nfsp_kuhn_avg_policy_params_gpu, nfsp_leduc_avg_policy_params, nfsp_kuhn_avg_policy_params, \
+from grl.rl_apps.nfsp.config import nfsp_kuhn_dqn_params_gpu, nfsp_kuhn_avg_policy_params_gpu, \
     nfsp_leduc_avg_policy_params_gpu, nfsp_leduc_dqn_params_gpu, nfsp_oshi_zumo_avg_policy_params_like_leduc_gpu, \
     nfsp_oshi_zumo_dqn_params_like_leduc_gpu, nfsp_20x_dummy_leduc_params_gpu, nfsp_20x_dummy_leduc_avg_policy_params_gpu, \
     nfsp_20x_dummy_leduc_avg_policy_params_gpu_v2, nfsp_20x_dummy_leduc_params_gpu_v2
 
 from grl.rl_apps.kuhn_poker_p2sro.poker_multi_agent_env import PokerMultiAgentEnv
-from grl.rl_apps.kuhn_poker_p2sro.oshi_zumo_multi_agent_env import OshiZumoMultiAgentEnv, TinyOshiZumoMultiAgentEnv
-from grl.rl_apps.scenarios.stopping_conditions import EpisodesSingleBRRewardPlateauStoppingCondition, NoStoppingCondition, StopImmediately, \
-    TwoPlayerBRRewardsBelowAmtStoppingCondition, TimeStepsSingleBRRewardPlateauStoppingCondition
+from grl.rl_apps.kuhn_poker_p2sro.oshi_zumo_multi_agent_env import OshiZumoMultiAgentEnv
+from grl.rl_apps.scenarios.stopping_conditions import EpisodesSingleBRRewardPlateauStoppingCondition, NoStoppingCondition, \
+    TimeStepsSingleBRRewardPlateauStoppingCondition, StopImmediately
 
-from ray.rllib.agents.sac import SACTrainer, SACTorchPolicy
 from ray.rllib.agents.dqn import DQNTrainer
 
 
-from grl.nfsp_rllib.nfsp import NFSPTrainer, NFSPTorchAveragePolicy, get_store_to_avg_policy_buffer_fn
-from grl.rllib_tools.modified_policies import SimpleQTorchPolicyPatched, SACTorchPolicyWithBehaviorLogitsOut
+from grl.nfsp_rllib.nfsp import NFSPTrainer, NFSPTorchAveragePolicy
+from grl.rllib_tools.modified_policies import SimpleQTorchPolicyPatched
 
 from grl.rl_apps.xfdo.solve_restricted_game_fns import SolveRestrictedGameFixedRewardThreshold, SolveRestrictedGameDynamicRewardThreshold1
 
-
-from ray.rllib.utils import merge_dicts
-from ray.rllib.models import MODEL_DEFAULTS
 from grl.rllib_tools.valid_actions_fcnet import get_valid_action_fcn_class
-from grl.rllib_tools.valid_actions_epsilon_greedy import ValidActionsEpsilonGreedy
 from grl.rl_apps.kuhn_poker_p2sro.poker_multi_agent_env import OBS_SHAPES, LEDUC_POKER
-from grl.rl_apps.kuhn_poker_p2sro.oshi_zumo_multi_agent_env import OSHI_ZUMO_OBS_LENGTH
 
 _LEDUC_OBS_LEN = OBS_SHAPES[LEDUC_POKER][0]
 
 _GRL_SEED = int(os.getenv("GRL_SEED", 0))
+_RAY_ADDRESS = os.getenv("RAY_ADDRESS")
+_CREATE_RAY_HEAD = _RAY_ADDRESS is not None and len(_RAY_ADDRESS) > 0
+
+
+def _ray_port_with_default_and_seed(default_port: int) -> int:
+    if _RAY_ADDRESS:
+        return urllib.parse.urlsplit('//' + _RAY_ADDRESS).port
+    return default_port + _GRL_SEED
+
+
+def _default_if_creating_ray_head(default):
+    if _CREATE_RAY_HEAD:
+        return None
+    return default
 
 
 scenarios = {
@@ -62,6 +69,11 @@ scenarios = {
     # },
 
     "kuhn_nfsp_dqn_gpu": {
+        "ray_cluster_cpus": _default_if_creating_ray_head(default=4),
+        "ray_cluster_gpus": _default_if_creating_ray_head(default=0),
+        "ray_object_store_memory_cap_gigabytes": 1,
+
+        
         "env_class": PokerMultiAgentEnv,
         "env_config": {
             'version': "kuhn_poker",
@@ -83,6 +95,11 @@ scenarios = {
     },
 
     "leduc_nfsp_dqn_gpu": {
+        "ray_cluster_cpus": _default_if_creating_ray_head(default=4),
+        "ray_cluster_gpus": _default_if_creating_ray_head(default=0),
+        "ray_object_store_memory_cap_gigabytes": 1,
+
+
         "env_class": PokerMultiAgentEnv,
         "env_config": {
             'version': "leduc_poker",
@@ -105,6 +122,11 @@ scenarios = {
     },
 
     "20x_dummy_leduc_nfsp_dqn_gpu": {
+        "ray_cluster_cpus": _default_if_creating_ray_head(default=4),
+        "ray_cluster_gpus": _default_if_creating_ray_head(default=0),
+        "ray_object_store_memory_cap_gigabytes": 1,
+
+
         "env_class": PokerMultiAgentEnv,
         "env_config": {
             'version': "leduc_poker",
@@ -129,6 +151,11 @@ scenarios = {
 
 
     "20x_dummy_leduc_nfsp_dqn_gpu_v2": {
+        "ray_cluster_cpus": _default_if_creating_ray_head(default=4),
+        "ray_cluster_gpus": _default_if_creating_ray_head(default=0),
+        "ray_object_store_memory_cap_gigabytes": 1,
+
+
         "env_class": PokerMultiAgentEnv,
         "env_config": {
             'version': "leduc_poker",
@@ -153,6 +180,11 @@ scenarios = {
 
 
     "oshi_zumo_nfsp_dqn_gpu": {
+        "ray_cluster_cpus": _default_if_creating_ray_head(default=4),
+        "ray_cluster_gpus": _default_if_creating_ray_head(default=0),
+        "ray_object_store_memory_cap_gigabytes": 1,
+
+
         "env_class": OshiZumoMultiAgentEnv,
         "env_config": {
             'version': "oshi_zumo",
@@ -408,6 +440,11 @@ scenarios = {
     # },
 
     "kuhn_psro_dqn_gpu": {
+        "ray_cluster_cpus": _default_if_creating_ray_head(default=8),
+        "ray_cluster_gpus": _default_if_creating_ray_head(default=0),
+        "ray_object_store_memory_cap_gigabytes": 1,
+
+
         "env_class": PokerMultiAgentEnv,
         "env_config": {
             'version': "kuhn_poker",
@@ -437,6 +474,11 @@ scenarios = {
 
 
     "leduc_psro_dqn_gpu": {
+        "ray_cluster_cpus": _default_if_creating_ray_head(default=8),
+        "ray_cluster_gpus": _default_if_creating_ray_head(default=0),
+        "ray_object_store_memory_cap_gigabytes": 1,
+
+
         "env_class": PokerMultiAgentEnv,
         "env_config": {
             'version': "leduc_poker",
@@ -467,6 +509,11 @@ scenarios = {
 
 
     "20x_dummy_leduc_psro_dqn_gpu": {
+        "ray_cluster_cpus": _default_if_creating_ray_head(default=8),
+        "ray_cluster_gpus": _default_if_creating_ray_head(default=0),
+        "ray_object_store_memory_cap_gigabytes": 1,
+
+
         "env_class": PokerMultiAgentEnv,
         "env_config": {
             'version': "leduc_poker",
@@ -497,6 +544,11 @@ scenarios = {
     },
 
     "oshi_zumo_psro_dqn_leduc_params_gpu": {
+        "ray_cluster_cpus": _default_if_creating_ray_head(default=8),
+        "ray_cluster_gpus": _default_if_creating_ray_head(default=0),
+        "ray_object_store_memory_cap_gigabytes": 1,
+
+
         "env_class": OshiZumoMultiAgentEnv,
         "env_config": {
             'version': "oshi_zumo",
@@ -525,7 +577,47 @@ scenarios = {
         ),
     },
 
-    "20x_dummy_leduc_psro_dqn_gpu_v2": {
+    # "20x_dummy_leduc_psro_dqn_gpu_v2": {
+    #     "ray_cluster_cpus": _default_if_creating_ray_head(default=8),
+    #     "ray_cluster_gpus": _default_if_creating_ray_head(default=0),
+        "ray_object_store_memory_cap_gigabytes": 1,
+
+    #
+    #     "env_class": PokerMultiAgentEnv,
+    #     "env_config": {
+    #         'version': "leduc_poker",
+    #         "fixed_players": True,
+    #         "append_valid_actions_mask_to_obs": True,
+    #         "dummy_action_multiplier": 20,
+    #     },
+    #     "mix_metanash_with_uniform_dist_coeff": 0.0,
+    #     "trainer_class": DQNTrainer,
+    #     "policy_classes": {
+    #         "metanash": SimpleQTorchPolicyPatched,
+    #         "best_response": SimpleQTorchPolicyPatched,
+    #         "eval": SimpleQTorchPolicyPatched,
+    #     },
+    #     "psro_port": 4120 + _GRL_SEED,
+    #     "eval_port": 4220 + _GRL_SEED,
+    #     "num_eval_workers": 8,
+    #     "games_per_payoff_eval": 3000,
+    #     "p2sro": False,
+    #     "get_trainer_config": psro_20x_dummy_leduc_params_gpu_v2,
+    #     "psro_get_stopping_condition": lambda: EpisodesSingleBRRewardPlateauStoppingCondition(
+    #         br_policy_id="best_response",
+    #         dont_check_plateau_before_n_episodes=int(4e4),
+    #         check_plateau_every_n_episodes=int(4e4),
+    #         minimum_reward_improvement_otherwise_plateaued=0.01,
+    #         max_train_episodes=int(2e5),
+    #     ),
+    # },
+
+    "20x_dummy_leduc_psro_dqn_gpu_slow_stop": {
+        "ray_cluster_cpus": _default_if_creating_ray_head(default=8),
+        "ray_cluster_gpus": _default_if_creating_ray_head(default=0),
+        "ray_object_store_memory_cap_gigabytes": 1,
+
+
         "env_class": PokerMultiAgentEnv,
         "env_config": {
             'version': "leduc_poker",
@@ -540,12 +632,12 @@ scenarios = {
             "best_response": SimpleQTorchPolicyPatched,
             "eval": SimpleQTorchPolicyPatched,
         },
-        "psro_port": 4120 + _GRL_SEED,
-        "eval_port": 4220 + _GRL_SEED,
+        "psro_port": 4125 + _GRL_SEED,
+        "eval_port": 4225 + _GRL_SEED,
         "num_eval_workers": 8,
         "games_per_payoff_eval": 3000,
         "p2sro": False,
-        "get_trainer_config": psro_20x_dummy_leduc_params_gpu_v2,
+        "get_trainer_config": psro_20x_dummy_leduc_params_gpu,
         "psro_get_stopping_condition": lambda: EpisodesSingleBRRewardPlateauStoppingCondition(
             br_policy_id="best_response",
             dont_check_plateau_before_n_episodes=int(4e4),
@@ -588,6 +680,11 @@ scenarios = {
     # XFDO ############################################################################################
 
     "kuhn_xfdo_dqn_nfsp_gpu": {
+        "ray_cluster_cpus": _default_if_creating_ray_head(default=8),
+        "ray_cluster_gpus": _default_if_creating_ray_head(default=0),
+        "ray_object_store_memory_cap_gigabytes": 1,
+
+
         "xfdo_port": 4400 + _GRL_SEED,
         "use_openspiel_restricted_game": False,
         "restricted_game_custom_model": None,
@@ -634,6 +731,11 @@ scenarios = {
     },
 
     "leduc_xfdo_dqn_nfsp_gpu": {
+        "ray_cluster_cpus": _default_if_creating_ray_head(default=8),
+        "ray_cluster_gpus": _default_if_creating_ray_head(default=0),
+        "ray_object_store_memory_cap_gigabytes": 1,
+
+
         "xfdo_port": 4405 + _GRL_SEED,
         "use_openspiel_restricted_game": False,
         "restricted_game_custom_model": None,
@@ -681,6 +783,11 @@ scenarios = {
     },
 
     "20x_dummy_leduc_xfdo_dqn_nfsp_gpu": {
+        "ray_cluster_cpus": _default_if_creating_ray_head(default=8),
+        "ray_cluster_gpus": _default_if_creating_ray_head(default=0),
+        "ray_object_store_memory_cap_gigabytes": 1,
+
+
         "xfdo_port": 4410 + _GRL_SEED,
         "use_openspiel_restricted_game": False,
         "restricted_game_custom_model": None,
@@ -729,6 +836,11 @@ scenarios = {
     },
 
     "20x_dummy_leduc_xfdo_dqn_nfsp_gpu_dynamic_threshold_1": {
+        "ray_cluster_cpus": _default_if_creating_ray_head(default=8),
+        "ray_cluster_gpus": _default_if_creating_ray_head(default=0),
+        "ray_object_store_memory_cap_gigabytes": 1,
+
+
         "xfdo_port": 4415 + _GRL_SEED,
         "use_openspiel_restricted_game": False,
         "restricted_game_custom_model": None,
@@ -783,6 +895,11 @@ scenarios = {
 
 
     "20x_dummy_leduc_xfdo_dqn_nfsp_gpu_v2": {
+        "ray_cluster_cpus": _default_if_creating_ray_head(default=8),
+        "ray_cluster_gpus": _default_if_creating_ray_head(default=0),
+        "ray_object_store_memory_cap_gigabytes": 1,
+
+
         "xfdo_port": 4420 + _GRL_SEED,
         "use_openspiel_restricted_game": False,
         "restricted_game_custom_model": None,
@@ -831,6 +948,11 @@ scenarios = {
     },
 
     "20x_dummy_leduc_xfdo_dqn_nfsp_gpu_v2_dynamic_threshold_1": {
+        "ray_cluster_cpus": _default_if_creating_ray_head(default=8),
+        "ray_cluster_gpus": _default_if_creating_ray_head(default=0),
+        "ray_object_store_memory_cap_gigabytes": 1,
+
+
         "xfdo_port": 4425 + _GRL_SEED,
         "use_openspiel_restricted_game": False,
         "restricted_game_custom_model": None,
@@ -884,6 +1006,11 @@ scenarios = {
     },
 
     "leduc_xfdo_dqn_nfsp_gpu_dynamic_threshold_1": {
+        "ray_cluster_cpus": _default_if_creating_ray_head(default=8),
+        "ray_cluster_gpus": _default_if_creating_ray_head(default=0),
+        "ray_object_store_memory_cap_gigabytes": 1,
+
+
         "xfdo_port": 4430 + _GRL_SEED,
         "use_openspiel_restricted_game": False,
         "restricted_game_custom_model": None,
@@ -937,6 +1064,11 @@ scenarios = {
 
 
     "va_20x_dummy_leduc_xfdo_dqn_nfsp_gpu_dynamic_threshold_1": {
+        "ray_cluster_cpus": _default_if_creating_ray_head(default=8),
+        "ray_cluster_gpus": _default_if_creating_ray_head(default=0),
+        "ray_object_store_memory_cap_gigabytes": 1,
+
+
         "xfdo_port": 4435 + _GRL_SEED,
         "use_openspiel_restricted_game": True,
         "restricted_game_custom_model": get_valid_action_fcn_class(obs_len=_LEDUC_OBS_LEN, action_space_n=3 * 20, dummy_actions_multiplier=1),
@@ -990,6 +1122,11 @@ scenarios = {
     },
 
     "20x_dummy_leduc_xfdo_dqn_nfsp_gpu_dynamic_threshold_1_aggressive": {
+        "ray_cluster_cpus": _default_if_creating_ray_head(default=8),
+        "ray_cluster_gpus": _default_if_creating_ray_head(default=0),
+        "ray_object_store_memory_cap_gigabytes": 1,
+
+
         "xfdo_port": 4440 + _GRL_SEED,
         "use_openspiel_restricted_game": False,
         "restricted_game_custom_model": None,
@@ -1043,6 +1180,11 @@ scenarios = {
     },
 
     "va_20x_dummy_leduc_xfdo_dqn_nfsp_gpu_dynamic_threshold_1_aggressive": {
+        "ray_cluster_cpus": _default_if_creating_ray_head(default=8),
+        "ray_cluster_gpus": _default_if_creating_ray_head(default=0),
+        "ray_object_store_memory_cap_gigabytes": 1,
+
+
         "xfdo_port": 4445 + _GRL_SEED,
         "use_openspiel_restricted_game": True,
         "restricted_game_custom_model": get_valid_action_fcn_class(obs_len=_LEDUC_OBS_LEN, action_space_n=3 * 20, dummy_actions_multiplier=1),

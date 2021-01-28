@@ -10,7 +10,7 @@ from grl.p2sro.payoff_table import PayoffTable, PayoffTableStrategySpec
 from grl.xfdo.xfdo_manager.protobuf.xfdo_manager_pb2_grpc import XFDOManagerServicer, add_XFDOManagerServicer_to_server, \
     XFDOManagerStub
 from grl.xfdo.xfdo_manager.protobuf.xfdo_manager_pb2 import XFDOPolicyMetadataRequest, XFDONewBestResponseParams, \
-    XFDOConfirmation, XFDOPolicySpecJson, XFDOPlayerAndPolicyNum, XFDOString, XFDOPlayer, XFDOPolicySpecList
+    XFDOConfirmation, XFDOPolicySpecJson, XFDOPlayerAndPolicyNum, XFDOString, XFDOPlayer, XFDOPolicySpecList, XFDOMetadata
 
 from grl.xfdo.xfdo_manager.manager import XFDOManager, SolveRestrictedGame
 
@@ -25,6 +25,10 @@ class _XFDOMangerServerServicerImpl(XFDOManagerServicer):
 
     def GetLogDir(self, request, context):
         return XFDOString(string=self._manager.get_log_dir())
+
+    def GetManagerMetaData(self, request, context):
+        metadata = self._manager.get_manager_metadata()
+        return XFDOMetadata(json_metadata=json.dumps(metadata))
 
     def ClaimNewActivePolicyForPlayer(self, request: XFDOPlayer, context):
         out = self._manager.claim_new_active_policy_for_player(
@@ -84,12 +88,15 @@ class XFDOManagerWithServer(XFDOManager):
                  solve_restricted_game: SolveRestrictedGame,
                  n_players: int = 2,
                  log_dir: str = None,
+                 manager_metadata: dict = None,
                  port: int = 4545):
 
         super(XFDOManagerWithServer, self).__init__(
             solve_restricted_game=solve_restricted_game,
             n_players=n_players,
-            log_dir=log_dir)
+            log_dir=log_dir,
+            manager_metadata=manager_metadata
+        )
         self._grpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=1))
         servicer = _XFDOMangerServerServicerImpl(manager=self, stop_server_fn=self.stop_server)
         add_XFDOManagerServicer_to_server(servicer=servicer, server=self._grpc_server)
@@ -117,6 +124,10 @@ class RemoteXFDOManagerClient(XFDOManager):
 
     def get_log_dir(self) -> str:
         return self._stub.GetLogDir(Empty()).string
+
+    def get_manager_metadata(self) -> dict:
+        response: XFDOMetadata = self._stub.GetManagerMetaData(Empty())
+        return json.loads(response.json_metadata)
 
     def claim_new_active_policy_for_player(self, player) -> Union[
         Tuple[Dict[int, PayoffTableStrategySpec], Dict[int, List[PayoffTableStrategySpec]], int],

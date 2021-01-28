@@ -36,6 +36,7 @@ from grl.nfsp_rllib.nfsp import get_store_to_avg_policy_buffer_fn
 from grl.rl_apps.nfsp.openspiel_utils import nfsp_measure_exploitability_nonlstm
 from grl.rllib_tools.space_saving_logger import SpaceSavingLogger
 from grl.rl_apps.scenarios.poker import scenarios
+from grl.rl_apps.scenarios.ray_setup import init_ray_for_scenario
 from grl.rl_apps.scenarios.stopping_conditions import StoppingCondition
 from grl.p2sro.payoff_table import PayoffTableStrategySpec
 
@@ -146,7 +147,7 @@ def train_off_policy_rl_nfsp(results_dir: str,
     checkpoint_every_n_iters: Union[int, None] = scenario["checkpoint_every_n_iters"]
     nfsp_get_stopping_condition = scenario["nfsp_get_stopping_condition"]
 
-    ray.init(log_to_driver=os.getenv("RAY_LOG_TO_DRIVER", False), address='auto', _redis_password='5241590000000000', ignore_reinit_error=False, local_mode=False)
+    init_ray_for_scenario(scenario=scenario, head_address=None, logging_level=logging.INFO)
 
     def log(message, level=logging.INFO):
         logger.log(level, message)

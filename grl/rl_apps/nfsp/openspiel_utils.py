@@ -13,7 +13,7 @@ import numpy as np
 
 import ray
 
-from open_spiel.python.policy import Policy as OpenSpielPolicy, PolicyFromCallable, TabularPolicy
+from open_spiel.python.policy import Policy as OpenSpielPolicy, TabularPolicy
 from open_spiel.python.algorithms.exploitability import nash_conv, exploitability
 from pyspiel import Game as OpenSpielGame
 

@@ -4,6 +4,7 @@ import os
 import numpy as np
 import argparse
 import deepdish
+import logging
 import ray
 from ray.rllib.env.multi_agent_env import MultiAgentEnv
 
@@ -15,6 +16,8 @@ from grl.p2sro.eval_dispatcher.remote import RemoteEvalDispatcherClient
 from grl.p2sro.payoff_table import PayoffTableStrategySpec
 
 from grl.rl_apps.scenarios.poker import scenarios
+from grl.rl_apps.scenarios.ray_setup import init_ray_for_scenario
+
 
 def load_weights(policy: Policy, pure_strat_spec: PayoffTableStrategySpec):
     pure_strat_checkpoint_path = pure_strat_spec.metadata["checkpoint_path"]
@@ -142,14 +145,14 @@ def run_poker_evaluation_loop(scenario_name: str):
                 games_played=required_games_to_play
             )
 
-def launch_evals(scenario_name: str, block=True):
+def launch_evals(scenario_name: str, block=True, ray_head_address=None):
     try:
         scenario = scenarios[scenario_name]
     except KeyError:
         raise NotImplementedError(f"Unknown scenario name: \'{scenario_name}\'. Existing scenarios are:\n"
                                   f"{list(scenarios.keys())}")
 
-    ray.init(log_to_driver=os.getenv("RAY_LOG_TO_DRIVER", False), address='auto', _redis_password='5241590000000000', ignore_reinit_error=False, local_mode=False)
+    init_ray_for_scenario(scenario=scenario, head_address=ray_head_address, logging_level=logging.INFO)
 
     num_workers = scenario["num_eval_workers"]
     evaluator_refs = [run_poker_evaluation_loop.remote(scenario_name) for _ in range(num_workers)]

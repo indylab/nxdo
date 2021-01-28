@@ -9,7 +9,7 @@ from grl.p2sro.payoff_table import PayoffTable, PayoffTableStrategySpec
 from grl.p2sro.p2sro_manager.protobuf.p2sro_manager_pb2_grpc import P2SROManagerServicer, add_P2SROManagerServicer_to_server, \
     P2SROManagerStub
 from grl.p2sro.p2sro_manager.protobuf.p2sro_manager_pb2 import NewActivePolicyRequest, PolicyMetadataRequest, P2SROStatusResponse, \
-    Confirmation, PolicySpecJson, NumPlayers, PayoffResult, EvalRequest, PlayerAndPolicyNum, PolicyNumList, String
+    Confirmation, PolicySpecJson, NumPlayers, PayoffResult, EvalRequest, PlayerAndPolicyNum, PolicyNumList, String, Metadata
 
 from grl.p2sro.p2sro_manager.p2sro_manager import P2SROManager, P2SROManagerLogger
 
@@ -27,6 +27,10 @@ class _P2SROMangerServerServicerImpl(P2SROManagerServicer):
 
     def GetLogDir(self, request, context):
         return String(string=self._manager.get_log_dir())
+
+    def GetManagerMetaData(self, request, context):
+        metadata = self._manager.get_manager_metadata()
+        return Metadata(json_metadata=json.dumps(metadata))
 
     def ClaimNewActivePolicyForPlayer(self, request: NewActivePolicyRequest, context):
         policy_spec = self._manager.claim_new_active_policy_for_player(
@@ -112,6 +116,7 @@ class P2SROManagerWithServer(P2SROManager):
                  eval_dispatcher_port: int = 4536,
                  manager_logger: P2SROManagerLogger = None,
                  log_dir: str = None,
+                 manager_metadata: dict = None,
                  payoff_table_exponential_average_coeff: float = None,
                  port=4535):
 
@@ -123,6 +128,7 @@ class P2SROManagerWithServer(P2SROManager):
             eval_dispatcher_port=eval_dispatcher_port,
             manager_logger=manager_logger,
             log_dir=log_dir,
+            manager_metadata=manager_metadata,
             payoff_table_exponential_average_coeff=payoff_table_exponential_average_coeff
         )
         self._grpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=1))
@@ -159,6 +165,10 @@ class RemoteP2SROManagerClient(P2SROManager):
 
     def get_log_dir(self) -> str:
         return self._stub.GetLogDir(Empty()).string
+
+    def get_manager_metadata(self) -> dict:
+        response: Metadata = self._stub.GetManagerMetaData(Empty())
+        return json.loads(response.json_metadata)
 
     def claim_new_active_policy_for_player(self, player, new_policy_metadata_dict) -> PayoffTableStrategySpec:
         try:

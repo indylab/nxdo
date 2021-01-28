@@ -39,8 +39,13 @@ message XFDOConfirmation {
     bool result = 1;
 }
 
+message XFDOMetadata {
+    string json_metadata = 1;
+}
+
 service XFDOManager {
     rpc GetLogDir (google.protobuf.Empty) returns (XFDOString) {}
+    rpc GetManagerMetaData (google.protobuf.Empty) returns (XFDOMetadata) {}
     rpc ClaimNewActivePolicyForPlayer (XFDOPlayer) returns (XFDONewBestResponseParams) {}
     rpc SubmitFinalBRPolicy (XFDOPolicyMetadataRequest) returns (XFDOConfirmation) {}
     rpc IsPolicyFixed (XFDOPlayerAndPolicyNum) returns (XFDOConfirmation) {}

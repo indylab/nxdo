@@ -32,6 +32,8 @@ from grl.rllib_tools.space_saving_logger import SpaceSavingLogger
 from grl.rl_apps.scenarios.poker import scenarios
 from grl.rl_apps.scenarios.stopping_conditions import StoppingCondition
 
+from grl.rl_apps.scenarios.ray_setup import init_ray_for_scenario
+
 logger = logging.getLogger(__name__)
 
 
@@ -274,6 +276,11 @@ def train_poker_best_response(player, results_dir, scenario_name, print_train_re
         else:
             raise ValueError(f"Unknown agent id: {agent_id}")
 
+    p2sro_manager = RemoteP2SROManagerClient(n_players=2, port=os.getenv("P2SRO_PORT", default_psro_port), remote_server_host="127.0.0.1")
+    manager_metadata = p2sro_manager.get_manager_metadata()
+    ray_head_address = manager_metadata["ray_head_address"]
+    init_ray_for_scenario(scenario=scenario, head_address=ray_head_address, logging_level=logging.INFO)
+
     tmp_env = env_class(env_config=env_config)
 
     trainer_config = {
@@ -298,14 +305,12 @@ def train_poker_best_response(player, results_dir, scenario_name, print_train_re
 
     # trainer_config["rollout_fragment_length"] = trainer_config["rollout_fragment_length"] // max(1, trainer_config["num_workers"] * trainer_config["num_envs_per_worker"] )
 
-    ray.init(log_to_driver=os.getenv("RAY_LOG_TO_DRIVER", False), address='auto', _redis_password='5241590000000000', ignore_reinit_error=True, local_mode=False)
     trainer = trainer_class(config=trainer_config,
                             logger_creator=get_trainer_logger_creator(base_dir=results_dir, scenario_name=scenario_name))
 
     # scenario_name logged in on_train_result_callback
     trainer.scenario_name = scenario_name
 
-    p2sro_manager = RemoteP2SROManagerClient(n_players=2, port=os.getenv("P2SRO_PORT", default_psro_port), remote_server_host="127.0.0.1")
     active_policy_spec: PayoffTableStrategySpec = p2sro_manager.claim_new_active_policy_for_player(
         player=player, new_policy_metadata_dict=create_metadata_with_new_checkpoint_for_current_best_response(
             trainer=trainer, player=player, save_dir=checkpoint_dir(trainer), timesteps_training_br=0, episodes_training_br=0,
@@ -383,6 +388,7 @@ def train_poker_best_response(player, results_dir, scenario_name, print_train_re
 
     trainer.cleanup()
     ray.shutdown()
+    time.sleep(10)
 
     # wait for both player policies to be fixed and then track exploitability.
     for player_to_wait_on in range(2):

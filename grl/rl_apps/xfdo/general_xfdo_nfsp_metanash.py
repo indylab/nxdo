@@ -43,6 +43,9 @@ from grl.xfdo.restricted_game import RestrictedGame
 from grl.xfdo.action_space_conversion import RestrictedToBaseGameActionSpaceConverter
 from grl.rl_apps.xfdo.poker_utils import xfdo_nfsp_measure_exploitability_nonlstm
 from grl.xfdo.openspiel.opnsl_restricted_game import OpenSpielRestrictedGame, AgentRestrictedGameOpenSpielObsConversions, get_restricted_game_obs_conversions
+
+from grl.rl_apps.scenarios.ray_setup import init_ray_for_scenario
+
 logger = logging.getLogger(__name__)
 
 
@@ -114,12 +117,13 @@ def create_get_pure_strat_cached(cache: dict):
         policy.policy_spec = pure_strat_spec
     return load_pure_strat_cached
 
-
 def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
                              scenario: dict,
                              player_to_base_game_action_specs: Dict[int, List[PayoffTableStrategySpec]],
                              stopping_condition: StoppingCondition,
+                             manager_metadata: dict,
                              print_train_results: bool = True):
+
 
     use_openspiel_restricted_game: bool = scenario["use_openspiel_restricted_game"]
     restricted_game_custom_model = scenario["restricted_game_custom_model"]
@@ -138,7 +142,8 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
 
     assert scenario["xfdo_metanash_method"] == "nfsp"
 
-    ray.init(log_to_driver=os.getenv("RAY_LOG_TO_DRIVER", False), address='auto', _redis_password='5241590000000000', ignore_reinit_error=True, local_mode=False)
+    ray_head_address = manager_metadata["ray_head_address"]
+    init_ray_for_scenario(scenario=scenario, head_address=ray_head_address, logging_level=logging.INFO)
 
     def log(message, level=logging.INFO):
         logger.log(level, message)
@@ -460,9 +465,14 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
             metadata={"checkpoint_path": checkpoint_path})
         avg_policy_specs.append(avg_policy_spec)
 
+    ray.kill(avg_trainer.workers.local_worker().replay_buffer_actor)
     avg_trainer.cleanup()
     br_trainer.cleanup()
-    ray.shutdown()
+    del avg_trainer
+    del br_trainer
+    del avg_br_reward_deque
+
+    time.sleep(10)
 
     assert final_train_result is not None
     return avg_policy_specs, final_train_result
