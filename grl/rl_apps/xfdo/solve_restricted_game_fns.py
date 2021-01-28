@@ -1,6 +1,6 @@
 import numpy as np
 
-from typing import List, Dict
+from typing import List, Dict, Union
 
 from grl.p2sro.payoff_table import PayoffTableStrategySpec
 from grl.rl_apps.scenarios.stopping_conditions import TwoPlayerBRRewardsBelowAmtStoppingCondition, StoppingCondition
@@ -82,7 +82,8 @@ class SolveRestrictedGameDynamicRewardThreshold1(SolveRestrictedGame):
                  starting_rew_threshold: float,
                  min_rew_threshold: float,
                  epsilon: float,
-                 min_episodes: int, required_fields: List[str]):
+                 min_episodes: int,
+                 required_fields: Union[List[str], None]):
 
         self.scenario = scenario
         self._min_episodes = min_episodes
@@ -95,7 +96,8 @@ class SolveRestrictedGameDynamicRewardThreshold1(SolveRestrictedGame):
 
         if required_fields is None:
             required_fields = []
-        if scenario["calculate_openspiel_metanash"] and "z_avg_policy_exploitability" not in required_fields:
+        if scenario["calculate_openspiel_metanash"] and (not scenario["calculate_openspiel_metanash_at_end"]) \
+                and ("z_avg_policy_exploitability" not in required_fields):
             required_fields.append("z_avg_policy_exploitability")
         self.required_fields = required_fields
 

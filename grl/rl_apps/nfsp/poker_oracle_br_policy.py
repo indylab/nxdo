@@ -77,7 +77,7 @@ def policy_to_dict(player_policy,
             include_chance_states=False)
         state_to_information_state = {
             state: str(
-                np.asarray(all_states[state].information_state_as_normalized_vector(), dtype=np.float32).tolist()) for
+                np.asarray(all_states[state].information_state_tensor(), dtype=np.float32).tolist()) for
             state in all_states
         }
     tabular_policy = dict()

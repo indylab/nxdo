@@ -13,7 +13,7 @@ import numpy as np
 
 import ray
 
-from open_spiel.python.policy import Policy as OpenSpielPolicy, PolicyFromCallable, TabularPolicy, tabular_policy_from_policy
+from open_spiel.python.policy import Policy as OpenSpielPolicy, TabularPolicy, tabular_policy_from_callable
 from open_spiel.python.algorithms.exploitability import nash_conv, exploitability
 from pyspiel import Game as OpenSpielGame
 
@@ -50,9 +50,9 @@ def openspiel_policy_from_nonlstm_rllib_xfdo_policy(openspiel_game: OpenSpielGam
 
         # assert np.array_equal(valid_actions, np.ones_like(valid_actions)) # should be always true at least for Kuhn
 
-        info_state_vector = state.information_state_as_normalized_vector()
+        info_state_vector = state.information_state_tensor()
 
-        if openspiel_game.get_type().short_name == "leduc_poker" or is_openspiel_restricted_game:
+        if openspiel_game.get_type().short_name in ["leduc_poker", "oshi_zumo", "oshi_zumo_tiny", "universal_poker"] or is_openspiel_restricted_game:
             # Observation includes both the info_state and legal actions, but agent isn't forced to take legal actions.
             # Taking an illegal action will result in a random legal action being played.
             # Allows easy compatibility with standard RL implementations for small action-space games like this one.
@@ -118,22 +118,34 @@ def openspiel_policy_from_nonlstm_rllib_xfdo_policy(openspiel_game: OpenSpielGam
 
         return {action_name: action_prob for action_name, action_prob in zip(legal_actions_list, legal_action_probs)}
 
-    callable_policy = PolicyFromCallable(game=openspiel_game, callable_policy=policy_callable)
+    # callable_policy = PolicyFromCallable(game=openspiel_game, callable_policy=policy_callable)
 
     # convert to tabular policy in case the rllib policy changes after this function is called
-    return tabular_policy_from_policy(game=openspiel_game, policy=callable_policy)
+    return tabular_policy_from_callable(game=openspiel_game, callable_policy=policy_callable)
 
 
 
 def xfdo_nfsp_measure_exploitability_nonlstm(rllib_policies: List[Policy],
                                              restricted_game_convertors: Union[List[RestrictedToBaseGameActionSpaceConverter], List[AgentRestrictedGameOpenSpielObsConversions]],
-                                             poker_game_version: str):
-    if poker_game_version in ["kuhn_poker", "leduc_poker"]:
-        open_spiel_env_config = {
-            "players": pyspiel.GameParameter(2)
-        }
-    else:
-        open_spiel_env_config = {}
+                                             poker_game_version: str,
+                                             open_spiel_env_config: dict = None):
+    if open_spiel_env_config is None:
+        if poker_game_version in ["kuhn_poker", "leduc_poker"]:
+            open_spiel_env_config = {
+                "players": pyspiel.GameParameter(2)
+            }
+        elif poker_game_version in ["oshi_zumo_tiny"]:
+            poker_game_version = "oshi_zumo"
+            open_spiel_env_config = {
+                "coins": pyspiel.GameParameter(6),
+                "size": pyspiel.GameParameter(2),
+                "horizon": pyspiel.GameParameter(8),
+            }
+        else:
+            open_spiel_env_config = {}
+
+    open_spiel_env_config = {k: pyspiel.GameParameter(v) if not isinstance(v, pyspiel.GameParameter) else v for k, v in
+                             open_spiel_env_config.items()}
 
     openspiel_game = pyspiel.load_game(poker_game_version, open_spiel_env_config)
 
@@ -149,6 +161,8 @@ def xfdo_nfsp_measure_exploitability_nonlstm(rllib_policies: List[Policy],
     nfsp_policy = JointPlayerPolicy(game=openspiel_game, policies=opnsl_policies)
 
     # Exploitability is NashConv / num_players
+    if poker_game_version == "universal_poker":
+        print("Measuring exploitability for universal_poker policy. This will take a while...")
     exploitability_result = exploitability(game=openspiel_game, policy=nfsp_policy)
     return exploitability_result
 
@@ -196,5 +210,7 @@ def xfdo_snfsp_measure_exploitability_nonlstm(br_checkpoint_path_tuple_list: Lis
     nfsp_policy = JointPlayerPolicy(game=openspiel_game, policies=avg_policies)
 
     # Exploitability is NashConv / num_players
+    if poker_game_version == "universal_poker":
+        print("Measuring exploitability for universal_poker policy. This will take a while...")
     exploitability_result = exploitability(game=openspiel_game, policy=nfsp_policy)
     return exploitability_result

@@ -251,6 +251,7 @@ def train_poker_best_response(br_player: int, scenario_name: str, print_train_re
                                            remote_server_host="127.0.0.1")
 
     manager_metadata = xfdo_manager.get_manager_metadata()
+    results_dir = xfdo_manager.get_log_dir()
 
     br_params = xfdo_manager.claim_new_active_policy_for_player(player=br_player)
     metanash_specs_for_players, delegate_specs_for_players, active_policy_num = br_params
@@ -329,7 +330,7 @@ def train_poker_best_response(br_player: int, scenario_name: str, print_train_re
     ray_head_address = manager_metadata["ray_head_address"]
     init_ray_for_scenario(scenario=scenario, head_address=ray_head_address, logging_level=logging.INFO)
 
-    trainer = trainer_class(config=trainer_config)
+    trainer = trainer_class(config=trainer_config, logger_creator=get_trainer_logger_creator(base_dir=results_dir, scenario_name=scenario_name))
 
     if use_cfp_metanash and cfp_metanash_specs_for_players:
         # metanash is uniform distribution of pure strat specs

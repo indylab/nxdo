@@ -46,9 +46,9 @@ def get_restricted_game_obs_conversions(
                 # continue
 
             valid_actions_mask = state.legal_actions_mask()
-            info_state_vector = state.information_state_as_normalized_vector()
+            info_state_vector = state.information_state_tensor()
 
-            if openspiel_game.get_type().short_name in ["leduc_poker", "oshi_zumo", "oshi_zumo_tiny"]:
+            if openspiel_game.get_type().short_name in ["leduc_poker", "oshi_zumo", "oshi_zumo_tiny", "universal_poker"]:
                 # Observation includes both the info_state and legal actions, but agent isn't forced to take legal actions.
                 # Taking an illegal action will result in a random legal action being played.
                 # Allows easy compatibility with standard RL implementations for small action-space games like this one.

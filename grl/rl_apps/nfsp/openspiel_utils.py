@@ -28,20 +28,24 @@ from grl.rl_apps.kuhn_poker_p2sro.poker_utils import openspiel_policy_from_nonls
 
 
 def nfsp_measure_exploitability_nonlstm(rllib_policies: List[Policy],
-                                   poker_game_version: str):
-    if poker_game_version in ["kuhn_poker", "leduc_poker"]:
-        open_spiel_env_config = {
-            "players": pyspiel.GameParameter(2)
-        }
-    elif poker_game_version in ["oshi_zumo_tiny"]:
-        poker_game_version = "oshi_zumo"
-        open_spiel_env_config = {
-            "coins": pyspiel.GameParameter(6),
-            "size": pyspiel.GameParameter(2),
-            "horizon": pyspiel.GameParameter(8),
-        }
-    else:
-        open_spiel_env_config = {}
+                                   poker_game_version: str,
+                                        open_spiel_env_config: dict = None):
+    if open_spiel_env_config is None:
+        if poker_game_version in ["kuhn_poker", "leduc_poker"]:
+            open_spiel_env_config = {
+                "players": pyspiel.GameParameter(2)
+            }
+        elif poker_game_version in ["oshi_zumo_tiny"]:
+            poker_game_version = "oshi_zumo"
+            open_spiel_env_config = {
+                "coins": pyspiel.GameParameter(6),
+                "size": pyspiel.GameParameter(2),
+                "horizon": pyspiel.GameParameter(8),
+            }
+        else:
+            open_spiel_env_config = {}
+
+    open_spiel_env_config = {k: pyspiel.GameParameter(v) if not isinstance(v, pyspiel.GameParameter) else v for k, v in open_spiel_env_config.items()}
 
     openspiel_game = pyspiel.load_game(poker_game_version, open_spiel_env_config)
 
@@ -54,6 +58,8 @@ def nfsp_measure_exploitability_nonlstm(rllib_policies: List[Policy],
     nfsp_policy = JointPlayerPolicy(game=openspiel_game, policies=opnsl_policies)
 
     # Exploitability is NashConv / num_players
+    if poker_game_version == "universal_poker":
+        print("Measuring exploitability for universal_poker policy. This will take a while...")
     exploitability_result = exploitability(game=openspiel_game, policy=nfsp_policy)
     return exploitability_result
 
@@ -98,5 +104,7 @@ def snfsp_measure_exploitability_nonlstm(br_checkpoint_path_tuple_list: List[Tup
     nfsp_policy = JointPlayerPolicy(game=openspiel_game, policies=avg_policies)
 
     # Exploitability is NashConv / num_players
+    if poker_game_version == "universal_poker":
+        print("Measuring exploitability for universal_poker policy. This will take a while...")
     exploitability_result = exploitability(game=openspiel_game, policy=nfsp_policy)
     return exploitability_result

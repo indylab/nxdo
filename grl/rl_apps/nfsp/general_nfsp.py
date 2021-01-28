@@ -169,6 +169,7 @@ def train_off_policy_rl_nfsp(results_dir: str,
         assert False, "This function should never be called."
 
     tmp_env = env_class(env_config=env_config)
+    open_spiel_env_config = tmp_env.open_spiel_env_config if calculate_openspiel_metanash else None
 
     avg_policy_model_config = get_trainer_config(action_space=tmp_env.action_space)["model"]
 
@@ -297,7 +298,9 @@ def train_off_policy_rl_nfsp(results_dir: str,
                 local_avg_policy_1 = trainer.workers.local_worker().policy_map["average_policy_1"]
                 exploitability = nfsp_measure_exploitability_nonlstm(
                     rllib_policies=[local_avg_policy_0, local_avg_policy_1],
-                    poker_game_version=openspiel_game_version)
+                    poker_game_version=openspiel_game_version,
+                    open_spiel_env_config=open_spiel_env_config
+                )
                 result["z_avg_policy_exploitability"] = exploitability
 
             if checkpoint_every_n_iters and training_iteration % checkpoint_every_n_iters == 0:
