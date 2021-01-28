@@ -65,14 +65,25 @@ class PokerMultiAgentEnv(MultiAgentEnv):
         self._append_valid_actions_mask_to_obs = env_config["append_valid_actions_mask_to_obs"]
 
         if self.game_version in [KUHN_POKER, LEDUC_POKER]:
-            open_spiel_env_config = {
+            self.open_spiel_env_config = {
                 "players": 2
             }
+        elif self.game_version == "universal_poker":
+            self.open_spiel_env_config = {
+                "numPlayers": 2,
+                "betting": "nolimit",
+                "numRanks": 3,
+                "numRounds": 2,
+                "numSuits": 2,
+                "stack": f"{env_config['universal_poker_stack_size']} {env_config['universal_poker_stack_size']}",
+                "blind": "1 1",
+                "bettingAbstraction": "fullgame",
+            }
         else:
-            open_spiel_env_config = {}
+            self.open_spiel_env_config = {}
 
-        self.openspiel_env = Environment(game_name=self.game_version, discount=1.0,
-                                         **open_spiel_env_config)
+        self.openspiel_env = Environment(game=self.game_version, discount=1.0,
+                                         **self.open_spiel_env_config)
 
         self.base_num_discrete_actions = self.openspiel_env.action_spec()["num_actions"]
         self.num_discrete_actions = int(self.base_num_discrete_actions * self.dummy_action_multiplier)
@@ -84,11 +95,11 @@ class PokerMultiAgentEnv(MultiAgentEnv):
             self.action_space = Discrete(self.num_discrete_actions)
 
         if self._append_valid_actions_mask_to_obs:
-            observation_length = OBS_SHAPES[self.game_version][0] + VALID_ACTIONS_SHAPES[self.game_version][0]
+            self.observation_length = self.openspiel_env.observation_spec()["info_state"][0] + self.num_discrete_actions
         else:
-            observation_length = OBS_SHAPES[self.game_version][0]
+            self.observation_length = self.openspiel_env.observation_spec()["info_state"][0]
 
-        self.observation_space = Box(low=0.0, high=1.0, shape=(observation_length,))
+        self.observation_space = Box(low=0.0, high=1.0, shape=(self.observation_length,))
 
         self.curr_time_step: TimeStep = None
         self.player_map = None
@@ -185,7 +196,12 @@ class PokerMultiAgentEnv(MultiAgentEnv):
 
         # If action is illegal, do a random legal action instead
         if player_action not in legal_actions:
-            raise ValueError("illegal actions are now not allowed")
+            legal_actions_mask = np.zeros(self.openspiel_env.action_spec()["num_actions"])
+            legal_actions_mask[legal_actions] = 1.0
+            raise ValueError(f"illegal actions are now not allowed.\n"
+                             f"Action was {player_action}.\n"
+                             f"Legal actions are {legal_actions}\n"
+                             f"Legal actions vector is {legal_actions_mask}")
             # player_action = random.choice(legal_actions)
             # if self._apply_penalty_for_invalid_actions:
             #     self._invalid_action_penalties[curr_player_id] = True

@@ -137,6 +137,7 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
     get_trainer_config = scenario["get_trainer_config_nfsp"]
     get_avg_trainer_config = scenario["get_avg_trainer_config_nfsp"]
     calculate_openspiel_metanash: bool = scenario["calculate_openspiel_metanash"]
+    calculate_openspiel_metanash_at_end: bool = scenario["calculate_openspiel_metanash_at_end"]
     calc_metanash_every_n_iters: int = scenario["calc_metanash_every_n_iters"]
     metrics_smoothing_episodes_override: int = scenario["metanash_metrics_smoothing_episodes_override"]
 
@@ -168,6 +169,7 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
         return env_class(env_config=base_env_config)
 
     tmp_base_env = _create_base_env()
+    open_spiel_env_config = tmp_base_env.open_spiel_env_config if calculate_openspiel_metanash else None
 
     restricted_env_config = {"create_env_fn": _create_base_env, }
 
@@ -305,7 +307,8 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
                 exploitability = xfdo_nfsp_measure_exploitability_nonlstm(
                     rllib_policies=[local_avg_policy_0, local_avg_policy_1],
                     poker_game_version=openspiel_game_version,
-                    restricted_game_convertors=trainer.get_local_converters()
+                    restricted_game_convertors=trainer.get_local_converters(),
+                    open_spiel_env_config=open_spiel_env_config,
                 )
                 result["z_avg_policy_exploitability"] = exploitability
 
@@ -375,6 +378,7 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
         local_delegate_policy = br_trainer.workers.local_worker().policy_map["delegate_policy"]
         player_converters = []
         for p in range(2):
+            print("Creating restricted game obs conversions...")
             convertor = get_restricted_game_obs_conversions(player=p, delegate_policy=local_delegate_policy,
                                                                   policy_specs=player_to_base_game_action_specs[p],
                                                                   load_policy_spec_fn=create_get_pure_strat_cached(cache={}),
@@ -447,6 +451,19 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
 
             if stopping_condition.should_stop_this_iter(latest_trainer_result=train_iter_results):
                 print("stopping condition met.")
+
+                if calculate_openspiel_metanash_at_end:
+                    openspiel_game_version = base_env_config["version"]
+                    local_avg_policy_0 = br_trainer.workers.local_worker().policy_map["average_policy_0"]
+                    local_avg_policy_1 = br_trainer.workers.local_worker().policy_map["average_policy_1"]
+                    exploitability = xfdo_nfsp_measure_exploitability_nonlstm(
+                        rllib_policies=[local_avg_policy_0, local_avg_policy_1],
+                        poker_game_version=openspiel_game_version,
+                        restricted_game_convertors=br_trainer.get_local_converters(),
+                        open_spiel_env_config=open_spiel_env_config,
+                    )
+                    train_iter_results["z_avg_policy_exploitability"] = exploitability
+
                 final_train_result = deepcopy(train_iter_results)
                 break
 
@@ -454,7 +471,7 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
     for player in range(2):
         strategy_id = f"avg_policy_player_{player}_{datetime_str()}"
 
-        checkpoint_path = save_nfsp_avg_policy_checkpoint(trainer=br_trainer, policy_id_to_save=f"average_policy_{player}",
+        checkpoint_path = save_nfsp_avg_policy_checkpoint(trainer=br_trainer, policy_id_to_save=f"final_average_policy_player_{player}",
                                         save_dir=checkpoint_dir(trainer=br_trainer),
                                         timesteps_training=final_train_result["timesteps_total"],
                                         episodes_training=final_train_result["episodes_total"],

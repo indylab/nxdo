@@ -101,7 +101,7 @@ class ValidActionsEpsilonGreedy(Exploration):
             # Mask out actions, whose Q-values are less than ILLEGAL_ACTION_LOGITS_PENALTY, so that we don't
             # even consider them for exploration.
             random_valid_action_logits = torch.where(
-                q_values <= ILLEGAL_ACTION_LOGITS_PENALTY,
+                q_values <= 0.1 * ILLEGAL_ACTION_LOGITS_PENALTY,
                 torch.ones_like(q_values) * 0.0, torch.ones_like(q_values))
             # A random action.
             random_actions = torch.squeeze(

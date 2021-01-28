@@ -16,7 +16,7 @@ import numpy as np
 
 import ray
 
-from open_spiel.python.policy import Policy as OpenSpielPolicy, PolicyFromCallable, tabular_policy_from_policy
+from open_spiel.python.policy import Policy as OpenSpielPolicy, tabular_policy_from_callable
 from open_spiel.python.algorithms.exploitability import exploitability
 from pyspiel import Game as OpenSpielGame
 
@@ -195,7 +195,7 @@ def tabular_policies_from_weighted_policies(game: OpenSpielGame,
         total_weights_added += weights_for_each_br
         if index == 0:
             for i in range(num_players):
-                avg_policies[i] = tabular_policy_from_policy(game=game, policy=best_responses[i])
+                avg_policies[i] = tabular_policy_from_callable(game=game, policy=best_responses[i])
         else:
             br_reach_probs = np.ones(num_players)
             avg_reach_probs = np.ones(num_players)
@@ -211,13 +211,16 @@ def tabular_policies_from_weighted_policies(game: OpenSpielGame,
                 avg_policies[i] = _callable_tabular_policy(average_policy_tables[i])
 
     for i in range(num_players):
-        avg_policies[i] = PolicyFromCallable(game=game, callable_policy=avg_policies[i])
+        avg_policies[i] = tabular_policy_from_callable(game=game, callable_policy=avg_policies[i])
 
     # print(f"avg_policies: {avg_policies}")
     return avg_policies
 
 def openspiel_policy_from_nonlstm_rllib_policy(openspiel_game: OpenSpielGame,
                                                rllib_policy: Policy):
+
+    if openspiel_game.get_type().short_name == "universal_poker":
+        print("Converting universal_poker rllib policy to tabular. This will take a while...")
 
     def policy_callable(state: pyspiel.State):
 
@@ -226,9 +229,9 @@ def openspiel_policy_from_nonlstm_rllib_policy(openspiel_game: OpenSpielGame,
 
         # assert np.array_equal(valid_actions, np.ones_like(valid_actions)) # should be always true at least for Kuhn
 
-        info_state_vector = state.information_state_as_normalized_vector()
+        info_state_vector = state.information_state_tensor()
 
-        if openspiel_game.get_type().short_name in ["leduc_poker", "oshi_zumo", "oshi_zumo_tiny"]:
+        if openspiel_game.get_type().short_name in ["leduc_poker", "oshi_zumo", "oshi_zumo_tiny", "universal_poker"]:
             # Observation includes both the info_state and legal actions, but agent isn't forced to take legal actions.
             # Taking an illegal action will result in a random legal action being played.
             # Allows easy compatibility with standard RL implementations for small action-space games like this one.
@@ -277,21 +280,27 @@ def openspiel_policy_from_nonlstm_rllib_policy(openspiel_game: OpenSpielGame,
 
         return {action_name: action_prob for action_name, action_prob in zip(legal_actions_list, legal_action_probs)}
 
-    callable_policy = PolicyFromCallable(game=openspiel_game, callable_policy=policy_callable)
+    # callable_policy = PolicyFromCallable(game=openspiel_game, callable_policy=policy_callable)
 
     # convert to tabular policy in case the rllib policy changes after this function is called
-    return tabular_policy_from_policy(game=openspiel_game, policy=callable_policy)
+    return tabular_policy_from_callable(game=openspiel_game, callable_policy=policy_callable)
 
 def measure_exploitability_nonlstm(rllib_policy: Policy,
                                    poker_game_version: str,
                                    policy_mixture_dict: Dict[PayoffTableStrategySpec, float] = None,
-                                   set_policy_weights_fn: Callable[[PayoffTableStrategySpec], None] = None):
-    if poker_game_version in ["kuhn_poker", "leduc_poker"]:
-        open_spiel_env_config = {
-            "players": pyspiel.GameParameter(2)
-        }
-    else:
-        open_spiel_env_config = {}
+                                   set_policy_weights_fn: Callable[[PayoffTableStrategySpec], None] = None,
+                                   open_spiel_env_config: dict = None):
+
+    if open_spiel_env_config is None:
+        if poker_game_version in ["kuhn_poker", "leduc_poker"]:
+            open_spiel_env_config = {
+                "players": pyspiel.GameParameter(2)
+            }
+        else:
+            open_spiel_env_config = {}
+
+    open_spiel_env_config = {k: pyspiel.GameParameter(v) if not isinstance(v, pyspiel.GameParameter) else v for k, v in open_spiel_env_config.items()}
+
 
     openspiel_game = pyspiel.load_game(poker_game_version, open_spiel_env_config)
 
@@ -333,7 +342,7 @@ class JointPlayerPolicy(OpenSpielPolicy):
 
     self._obs["current_player"] = cur_player
     self._obs["info_state"][cur_player] = (
-        state.information_state_as_normalized_vector(cur_player))
+        state.information_state_tensor(cur_player))
     self._obs["legal_actions"][cur_player] = legal_actions
 
     info_state = rl_environment.TimeStep(
@@ -379,6 +388,8 @@ def psro_measure_exploitability_nonlstm(br_checkpoint_path_tuple_list: List[Tupl
     nfsp_policy = JointPlayerPolicy(game=openspiel_game, policies=avg_policies)
 
     # Exploitability is NashConv / num_players
+    if poker_game_version == "universal_poker":
+        print("Measuring exploitability for universal_poker policy. This will take a while...")
     exploitability_result = exploitability(game=openspiel_game, policy=nfsp_policy)
     return exploitability_result
 
