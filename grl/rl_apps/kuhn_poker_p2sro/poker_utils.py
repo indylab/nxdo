@@ -50,7 +50,7 @@ def _callable_tabular_policy(tabular_policy):
     """
 
     def wrap(state):
-        infostate_key = state.information_state(state.current_player())
+        infostate_key = state.information_state_string(state.current_player())
         assert infostate_key in tabular_policy, f"tabular_policy: {tabular_policy}, key: {infostate_key}"
         ap_list = []
         for action in state.legal_actions():
@@ -119,7 +119,7 @@ def _recursively_update_average_policies(state, avg_reach_probs, br_reach_probs,
         avg_policy = _policy_dict_at_state(avg_policies[player], state)
         br_policy = _policy_dict_at_state(best_responses[player], state)
         legal_actions = state.legal_actions()
-        infostate_key = state.information_state(player)
+        infostate_key = state.information_state_string(player)
         # First traverse the subtrees.
         for action in legal_actions:
             assert action in br_policy, f"action is {action}, br policy is {br_policy}"
@@ -195,7 +195,7 @@ def tabular_policies_from_weighted_policies(game: OpenSpielGame,
         total_weights_added += weights_for_each_br
         if index == 0:
             for i in range(num_players):
-                avg_policies[i] = tabular_policy_from_callable(game=game, policy=best_responses[i])
+                avg_policies[i] = tabular_policy_from_callable(game=game, callable_policy=best_responses[i])
         else:
             br_reach_probs = np.ones(num_players)
             avg_reach_probs = np.ones(num_players)
@@ -211,7 +211,7 @@ def tabular_policies_from_weighted_policies(game: OpenSpielGame,
                 avg_policies[i] = _callable_tabular_policy(average_policy_tables[i])
 
     for i in range(num_players):
-        avg_policies[i] = tabular_policy_from_callable(game=game, callable_policy=avg_policies[i])
+        avg_policies[i] = tabular_policy_from_callable(game=game, callable_policy=avg_policies[i], players=[i])
 
     # print(f"avg_policies: {avg_policies}")
     return avg_policies
@@ -397,7 +397,7 @@ def psro_measure_exploitability_nonlstm(br_checkpoint_path_tuple_list: List[Tupl
 
 def get_stats_for_single_payoff_table(payoff_table:PayoffTable, highest_policy_num: int, poker_env_config, policy_class, policy_config):
 
-    ray.init(address='auto', _redis_password='5241590000000000', ignore_reinit_error=True, local_mode=False, num_cpus=0)
+    ray.init(address='auto', _redis_password='5241590000000000', ignore_reinit_error=True, local_mode=False)
 
     poker_game_version = poker_env_config["version"]
     temp_env = PokerMultiAgentEnv(env_config=poker_env_config)

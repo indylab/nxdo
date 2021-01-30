@@ -1,14 +1,17 @@
 import os
 import urllib.parse
 from grl.rl_apps.kuhn_poker_p2sro.config import psro_leduc_dqn_params_gpu, psro_kuhn_dqn_params_gpu, psro_oshi_zumo_dqn_params_like_leduc_gpu, psro_20x_dummy_leduc_params_gpu, \
-    psro_20x_dummy_leduc_params_gpu_v2, psro_12_no_limit_leduc_params_gpu, psro_30_no_limit_leduc_params_gpu, psro_60_no_limit_leduc_params_gpu, _30_NO_LIMIT_LEDUC_OBS_LEN, _12_NO_LIMIT_LEDUC_OBS_LEN, _60_NO_LIMIT_LEDUC_OBS_LEN
+    psro_20x_dummy_leduc_params_gpu_v2, psro_12_no_limit_leduc_params_gpu, psro_30_no_limit_leduc_params_gpu, psro_60_no_limit_leduc_params_gpu, \
+    _30_NO_LIMIT_LEDUC_OBS_LEN, _12_NO_LIMIT_LEDUC_OBS_LEN, _60_NO_LIMIT_LEDUC_OBS_LEN, psro_40x_dummy_leduc_params_gpu, psro_80x_dummy_leduc_params_gpu
 
 
 from grl.rl_apps.nfsp.config import nfsp_kuhn_dqn_params_gpu, nfsp_kuhn_avg_policy_params_gpu, \
     nfsp_leduc_avg_policy_params_gpu, nfsp_leduc_dqn_params_gpu, nfsp_oshi_zumo_avg_policy_params_like_leduc_gpu, \
     nfsp_oshi_zumo_dqn_params_like_leduc_gpu, nfsp_20x_dummy_leduc_params_gpu, nfsp_20x_dummy_leduc_avg_policy_params_gpu, \
     nfsp_20x_dummy_leduc_avg_policy_params_gpu_v2, nfsp_20x_dummy_leduc_params_gpu_v2, nfsp_12_no_limit_leduc_avg_policy_params_gpu, \
-    nfsp_12_no_limit_leduc_params_gpu, nfsp_30_no_limit_leduc_params_gpu, nfsp_30_no_limit_leduc_avg_policy_params_gpu, nfsp_60_no_limit_leduc_params_gpu, nfsp_60_no_limit_leduc_avg_policy_params_gpu
+    nfsp_12_no_limit_leduc_params_gpu, nfsp_30_no_limit_leduc_params_gpu, nfsp_30_no_limit_leduc_avg_policy_params_gpu, \
+    nfsp_60_no_limit_leduc_params_gpu, nfsp_60_no_limit_leduc_avg_policy_params_gpu, nfsp_40x_dummy_leduc_params_gpu, \
+    nfsp_40x_dummy_leduc_avg_policy_params_gpu, nfsp_80x_dummy_leduc_params_gpu, nfsp_80x_dummy_leduc_avg_policy_params_gpu
 
 from grl.rl_apps.kuhn_poker_p2sro.poker_multi_agent_env import PokerMultiAgentEnv
 from grl.rl_apps.kuhn_poker_p2sro.oshi_zumo_multi_agent_env import OshiZumoMultiAgentEnv
@@ -242,6 +245,65 @@ scenarios = {
         "checkpoint_every_n_iters": None,
     },
 
+    "40x_dummy_leduc_nfsp_dqn_gpu": {
+        "ray_cluster_cpus": _default_if_creating_ray_head(default=4),
+        "ray_cluster_gpus": _default_if_creating_ray_head(default=0),
+        "ray_object_store_memory_cap_gigabytes": 1,
+
+
+        "env_class": PokerMultiAgentEnv,
+        "env_config": {
+            'version': "leduc_poker",
+            "fixed_players": True,
+            "append_valid_actions_mask_to_obs": True,
+            "dummy_action_multiplier": 40,
+        },
+        "trainer_class": DQNTrainer,
+        "avg_trainer_class": NFSPTrainer,
+        "policy_classes": {
+            "average_policy": NFSPTorchAveragePolicy,
+            "best_response": SimpleQTorchPolicyPatched,
+        },
+        "get_trainer_config": nfsp_40x_dummy_leduc_params_gpu,
+        "get_avg_trainer_config": nfsp_40x_dummy_leduc_avg_policy_params_gpu,
+        "anticipatory_param": 0.1,
+        "nfsp_get_stopping_condition": lambda: NoStoppingCondition(),
+        "calculate_openspiel_metanash": True,
+        "calculate_openspiel_metanash_at_end": False,
+        "calc_metanash_every_n_iters": 100,
+        "checkpoint_every_n_iters": None,
+    },
+
+
+    "80x_dummy_leduc_nfsp_dqn_gpu": {
+        "ray_cluster_cpus": _default_if_creating_ray_head(default=4),
+        "ray_cluster_gpus": _default_if_creating_ray_head(default=0),
+        "ray_object_store_memory_cap_gigabytes": 1,
+
+
+        "env_class": PokerMultiAgentEnv,
+        "env_config": {
+            'version': "leduc_poker",
+            "fixed_players": True,
+            "append_valid_actions_mask_to_obs": True,
+            "dummy_action_multiplier": 80,
+        },
+        "trainer_class": DQNTrainer,
+        "avg_trainer_class": NFSPTrainer,
+        "policy_classes": {
+            "average_policy": NFSPTorchAveragePolicy,
+            "best_response": SimpleQTorchPolicyPatched,
+        },
+        "get_trainer_config": nfsp_80x_dummy_leduc_params_gpu,
+        "get_avg_trainer_config": nfsp_80x_dummy_leduc_avg_policy_params_gpu,
+        "anticipatory_param": 0.1,
+        "nfsp_get_stopping_condition": lambda: NoStoppingCondition(),
+        "calculate_openspiel_metanash": True,
+        "calculate_openspiel_metanash_at_end": False,
+        "calc_metanash_every_n_iters": 100,
+        "checkpoint_every_n_iters": None,
+    },
+
 
     "20x_dummy_leduc_nfsp_dqn_gpu_v2": {
         "ray_cluster_cpus": _default_if_creating_ray_head(default=4),
@@ -272,12 +334,10 @@ scenarios = {
         "checkpoint_every_n_iters": None,
     },
 
-
     "oshi_zumo_nfsp_dqn_gpu": {
         "ray_cluster_cpus": _default_if_creating_ray_head(default=4),
         "ray_cluster_gpus": _default_if_creating_ray_head(default=0),
         "ray_object_store_memory_cap_gigabytes": 1,
-
 
         "env_class": OshiZumoMultiAgentEnv,
         "env_config": {
@@ -298,7 +358,7 @@ scenarios = {
         "calculate_openspiel_metanash": False,
         "calculate_openspiel_metanash_at_end": False,
         "calc_metanash_every_n_iters": 100,
-        "checkpoint_every_n_iters": 200,
+        "checkpoint_every_n_iters": 400,
     },
 
 
@@ -679,40 +739,6 @@ scenarios = {
         ),
     },
 
-    # "oshi_zumo_psro_dqn_leduc_params_gpu": {
-    #     "ray_cluster_cpus": _default_if_creating_ray_head(default=8),
-    #     "ray_cluster_gpus": _default_if_creating_ray_head(default=0),
-    #     "ray_object_store_memory_cap_gigabytes": 1,
-    #
-    #
-    #     "env_class": OshiZumoMultiAgentEnv,
-    #     "env_config": {
-    #         'version': "oshi_zumo",
-    #         "fixed_players": True,
-    #         "append_valid_actions_mask_to_obs": True,
-    #     },
-    #     "mix_metanash_with_uniform_dist_coeff": 0.0,
-    #     "trainer_class": DQNTrainer,
-    #     "policy_classes": {
-    #         "metanash": SimpleQTorchPolicyPatched,
-    #         "best_response": SimpleQTorchPolicyPatched,
-    #         "eval": SimpleQTorchPolicyPatched,
-    #     },
-    #     "psro_port": 4115 + _GRL_SEED,
-    #     "eval_port": 4215 + _GRL_SEED,
-    #     "num_eval_workers": 8,
-    #     "games_per_payoff_eval": 1000,
-    #     "p2sro": False,
-    #     "get_trainer_config": psro_oshi_zumo_dqn_params_like_leduc_gpu,
-    #     "psro_get_stopping_condition": lambda: TimeStepsSingleBRRewardPlateauStoppingCondition(
-    #         br_policy_id="best_response",
-    #         dont_check_plateau_before_n_steps=int(1e5),
-    #         check_plateau_every_n_steps=int(1e5),
-    #         minimum_reward_improvement_otherwise_plateaued=0.01,
-    #         max_train_steps=int(2e6),
-    #     ),
-    # },
-
     "12_no_limit_leduc_psro_dqn_gpu": {
         "ray_cluster_cpus": _default_if_creating_ray_head(default=8),
         "ray_cluster_gpus": _default_if_creating_ray_head(default=0),
@@ -809,6 +835,110 @@ scenarios = {
         "games_per_payoff_eval": 4000,
         "p2sro": False,
         "get_trainer_config": psro_12_no_limit_leduc_params_gpu,
+        "psro_get_stopping_condition": lambda: EpisodesSingleBRRewardPlateauStoppingCondition(
+            br_policy_id="best_response",
+            dont_check_plateau_before_n_episodes=int(2e4),
+            check_plateau_every_n_episodes=int(2e4),
+            minimum_reward_improvement_otherwise_plateaued=0.01,
+            max_train_episodes=int(1e5),
+        ),
+    },
+
+    "40x_dummy_leduc_psro_dqn_gpu": {
+        "ray_cluster_cpus": _default_if_creating_ray_head(default=8),
+        "ray_cluster_gpus": _default_if_creating_ray_head(default=0),
+        "ray_object_store_memory_cap_gigabytes": 1,
+
+
+        "env_class": PokerMultiAgentEnv,
+        "env_config": {
+            'version': "leduc_poker",
+            "fixed_players": True,
+            "append_valid_actions_mask_to_obs": True,
+            "dummy_action_multiplier": 40,
+        },
+        "mix_metanash_with_uniform_dist_coeff": 0.0,
+        "trainer_class": DQNTrainer,
+        "policy_classes": {
+            "metanash": SimpleQTorchPolicyPatched,
+            "best_response": SimpleQTorchPolicyPatched,
+            "eval": SimpleQTorchPolicyPatched,
+        },
+        "psro_port": 4145 + _GRL_SEED,
+        "eval_port": 4245 + _GRL_SEED,
+        "num_eval_workers": 8,
+        "games_per_payoff_eval": 3000,
+        "p2sro": False,
+        "get_trainer_config": psro_40x_dummy_leduc_params_gpu,
+        "psro_get_stopping_condition": lambda: EpisodesSingleBRRewardPlateauStoppingCondition(
+            br_policy_id="best_response",
+            dont_check_plateau_before_n_episodes=int(2e4),
+            check_plateau_every_n_episodes=int(2e4),
+            minimum_reward_improvement_otherwise_plateaued=0.01,
+            max_train_episodes=int(1e5),
+        ),
+    },
+
+    "oshi_zumo_psro_dqn_gpu": {
+        "ray_cluster_cpus": _default_if_creating_ray_head(default=8),
+        "ray_cluster_gpus": _default_if_creating_ray_head(default=0),
+        "ray_object_store_memory_cap_gigabytes": 1,
+
+        "env_class": OshiZumoMultiAgentEnv,
+        "env_config": {
+            'version': "oshi_zumo",
+            "fixed_players": True,
+            "append_valid_actions_mask_to_obs": True,
+        },
+        "mix_metanash_with_uniform_dist_coeff": 0.0,
+        "trainer_class": DQNTrainer,
+        "policy_classes": {
+            "metanash": SimpleQTorchPolicyPatched,
+            "best_response": SimpleQTorchPolicyPatched,
+            "eval": SimpleQTorchPolicyPatched,
+        },
+        "psro_port": 4150 + _GRL_SEED,
+        "eval_port": 4250 + _GRL_SEED,
+        "num_eval_workers": 8,
+        "games_per_payoff_eval": 2000,
+        "p2sro": False,
+        "get_trainer_config": psro_oshi_zumo_dqn_params_like_leduc_gpu,
+        "psro_get_stopping_condition": lambda: EpisodesSingleBRRewardPlateauStoppingCondition(
+            br_policy_id="best_response",
+            dont_check_plateau_before_n_episodes=int(2e4),
+            check_plateau_every_n_episodes=int(2e4),
+            minimum_reward_improvement_otherwise_plateaued=0.01,
+            max_train_episodes=int(1e5),
+        ),
+    },
+
+
+    "80x_dummy_leduc_psro_dqn_gpu": {
+        "ray_cluster_cpus": _default_if_creating_ray_head(default=8),
+        "ray_cluster_gpus": _default_if_creating_ray_head(default=0),
+        "ray_object_store_memory_cap_gigabytes": 1,
+
+
+        "env_class": PokerMultiAgentEnv,
+        "env_config": {
+            'version': "leduc_poker",
+            "fixed_players": True,
+            "append_valid_actions_mask_to_obs": True,
+            "dummy_action_multiplier": 80,
+        },
+        "mix_metanash_with_uniform_dist_coeff": 0.0,
+        "trainer_class": DQNTrainer,
+        "policy_classes": {
+            "metanash": SimpleQTorchPolicyPatched,
+            "best_response": SimpleQTorchPolicyPatched,
+            "eval": SimpleQTorchPolicyPatched,
+        },
+        "psro_port": 4155 + _GRL_SEED,
+        "eval_port": 4255 + _GRL_SEED,
+        "num_eval_workers": 8,
+        "games_per_payoff_eval": 3000,
+        "p2sro": False,
+        "get_trainer_config": psro_80x_dummy_leduc_params_gpu,
         "psro_get_stopping_condition": lambda: EpisodesSingleBRRewardPlateauStoppingCondition(
             br_policy_id="best_response",
             dont_check_plateau_before_n_episodes=int(2e4),
@@ -1455,8 +1585,124 @@ scenarios = {
         "metanash_metrics_smoothing_episodes_override": 50000,
     },
 
+    # 40x dummy leduc ##########################################3
 
+    "40x_dummy_leduc_xfdo_dqn_nfsp_gpu_dynamic_threshold_1_aggressive": {
+        "ray_cluster_cpus": _default_if_creating_ray_head(default=8),
+        "ray_cluster_gpus": _default_if_creating_ray_head(default=0),
+        "ray_object_store_memory_cap_gigabytes": 1,
 
+        "xfdo_port": 4450 + _GRL_SEED,
+        "use_openspiel_restricted_game": False,
+        "restricted_game_custom_model": None,
+        "xfdo_metanash_method": "nfsp",
+        "get_restricted_game_solver": lambda scenario: SolveRestrictedGameDynamicRewardThreshold1(
+            scenario=scenario,
+            dont_solve_first_n_xfdo_iters=7,
+            starting_rew_threshold=1.0,
+            min_rew_threshold=0.1,
+            min_episodes=200000,
+            epsilon=0.05,
+            required_fields=["z_avg_policy_exploitability"],
+        ),
+
+        "env_class": PokerMultiAgentEnv,
+        "env_config": {
+            'version': "leduc_poker",
+            "fixed_players": True,
+            "append_valid_actions_mask_to_obs": True,
+            "dummy_action_multiplier": 40,
+        },
+
+        "trainer_class_br": DQNTrainer,
+        "policy_classes_br": {
+            "metanash": NFSPTorchAveragePolicy,
+            "best_response": SimpleQTorchPolicyPatched,
+        },
+
+        "get_trainer_config_br": psro_40x_dummy_leduc_params_gpu,
+        "get_stopping_condition_br": lambda: EpisodesSingleBRRewardPlateauStoppingCondition(
+            br_policy_id="best_response",
+            dont_check_plateau_before_n_episodes=int(2e4),
+            check_plateau_every_n_episodes=int(2e4),
+            minimum_reward_improvement_otherwise_plateaued=0.01,
+            max_train_episodes=int(1e5),
+        ),
+
+        "trainer_class_nfsp": DQNTrainer,
+        "avg_trainer_class_nfsp": NFSPTrainer,
+        "policy_classes_nfsp": {
+            "average_policy": NFSPTorchAveragePolicy,
+            "delegate_policy": SimpleQTorchPolicyPatched,
+            "best_response": SimpleQTorchPolicyPatched,
+        },
+        "anticipatory_param_nfsp": 0.1,
+        "get_trainer_config_nfsp": nfsp_40x_dummy_leduc_params_gpu,
+        "get_avg_trainer_config_nfsp": nfsp_40x_dummy_leduc_avg_policy_params_gpu,
+        "calculate_openspiel_metanash": True,
+        "calculate_openspiel_metanash_at_end": False,
+        "calc_metanash_every_n_iters": 50,
+        "metanash_metrics_smoothing_episodes_override": 50000,
+    },
+
+    "va_40x_dummy_leduc_xfdo_dqn_nfsp_gpu_dynamic_threshold_1_aggressive": {
+        "ray_cluster_cpus": _default_if_creating_ray_head(default=8),
+        "ray_cluster_gpus": _default_if_creating_ray_head(default=0),
+        "ray_object_store_memory_cap_gigabytes": 1,
+
+        "xfdo_port": 4455 + _GRL_SEED,
+        "use_openspiel_restricted_game": True,
+        "restricted_game_custom_model": get_valid_action_fcn_class(obs_len=_LEDUC_OBS_LEN, action_space_n=3 * 40,
+                                                                   dummy_actions_multiplier=1),
+        "xfdo_metanash_method": "nfsp",
+        "get_restricted_game_solver": lambda scenario: SolveRestrictedGameDynamicRewardThreshold1(
+            scenario=scenario,
+            dont_solve_first_n_xfdo_iters=7,
+            starting_rew_threshold=1.0,
+            min_rew_threshold=0.1,
+            min_episodes=200000,
+            epsilon=0.05,
+            required_fields=["z_avg_policy_exploitability"],
+        ),
+
+        "env_class": PokerMultiAgentEnv,
+        "env_config": {
+            'version': "leduc_poker",
+            "fixed_players": True,
+            "append_valid_actions_mask_to_obs": True,
+            "dummy_action_multiplier": 40,
+        },
+
+        "trainer_class_br": DQNTrainer,
+        "policy_classes_br": {
+            "metanash": NFSPTorchAveragePolicy,
+            "best_response": SimpleQTorchPolicyPatched,
+        },
+
+        "get_trainer_config_br": psro_40x_dummy_leduc_params_gpu,
+        "get_stopping_condition_br": lambda: EpisodesSingleBRRewardPlateauStoppingCondition(
+            br_policy_id="best_response",
+            dont_check_plateau_before_n_episodes=int(2e4),
+            check_plateau_every_n_episodes=int(2e4),
+            minimum_reward_improvement_otherwise_plateaued=0.01,
+            max_train_episodes=int(1e5),
+        ),
+
+        "trainer_class_nfsp": DQNTrainer,
+        "avg_trainer_class_nfsp": NFSPTrainer,
+        "policy_classes_nfsp": {
+            "average_policy": NFSPTorchAveragePolicy,
+            "delegate_policy": SimpleQTorchPolicyPatched,
+            "best_response": SimpleQTorchPolicyPatched,
+        },
+        "anticipatory_param_nfsp": 0.1,
+        "get_trainer_config_nfsp": nfsp_40x_dummy_leduc_params_gpu,
+        "get_avg_trainer_config_nfsp": nfsp_40x_dummy_leduc_avg_policy_params_gpu,
+        "calculate_openspiel_metanash": True,
+        "calculate_openspiel_metanash_at_end": False,
+        "calc_metanash_every_n_iters": 50,
+        "metanash_metrics_smoothing_episodes_override": 50000,
+    },
 
 
 
@@ -1470,7 +1716,7 @@ scenarios = {
         "ray_object_store_memory_cap_gigabytes": 1,
 
 
-        "xfdo_port": 4450 + _GRL_SEED,
+        "xfdo_port": 4460 + _GRL_SEED,
         "use_openspiel_restricted_game": False,
         "restricted_game_custom_model": None,
         "xfdo_metanash_method": "nfsp",
@@ -1479,7 +1725,7 @@ scenarios = {
             dont_solve_first_n_xfdo_iters=7,
             starting_rew_threshold=1.0,
             min_rew_threshold=0.1,
-            min_episodes=100000,
+            min_episodes=200000,
             epsilon=0.05,
             required_fields=None,
         ),
@@ -1529,7 +1775,7 @@ scenarios = {
         "ray_object_store_memory_cap_gigabytes": 1,
 
 
-        "xfdo_port": 4455 + _GRL_SEED,
+        "xfdo_port": 4465 + _GRL_SEED,
         "use_openspiel_restricted_game": False,
         "restricted_game_custom_model": None,
         "xfdo_metanash_method": "nfsp",
@@ -1538,7 +1784,7 @@ scenarios = {
             dont_solve_first_n_xfdo_iters=7,
             starting_rew_threshold=1.0,
             min_rew_threshold=0.1,
-            min_episodes=100000,
+            min_episodes=200000,
             epsilon=0.05,
             required_fields=None,
         ),
@@ -1588,7 +1834,7 @@ scenarios = {
         "ray_object_store_memory_cap_gigabytes": 1,
 
 
-        "xfdo_port": 4460 + _GRL_SEED,
+        "xfdo_port": 4470 + _GRL_SEED,
         "use_openspiel_restricted_game": False,
         "restricted_game_custom_model": None,
         "xfdo_metanash_method": "nfsp",
@@ -1597,7 +1843,7 @@ scenarios = {
             dont_solve_first_n_xfdo_iters=7,
             starting_rew_threshold=1.0,
             min_rew_threshold=0.1,
-            min_episodes=100000,
+            min_episodes=200000,
             epsilon=0.05,
             required_fields=None,
         ),
@@ -1648,7 +1894,7 @@ scenarios = {
         "ray_cluster_gpus": _default_if_creating_ray_head(default=0),
         "ray_object_store_memory_cap_gigabytes": 1,
 
-        "xfdo_port": 4450 + _GRL_SEED,
+        "xfdo_port": 4475 + _GRL_SEED,
         "use_openspiel_restricted_game": True,
         "restricted_game_custom_model": get_valid_action_fcn_class(obs_len=_12_NO_LIMIT_LEDUC_OBS_LEN, action_space_n=13, dummy_actions_multiplier=1),
         "xfdo_metanash_method": "nfsp",
@@ -1657,7 +1903,7 @@ scenarios = {
             dont_solve_first_n_xfdo_iters=7,
             starting_rew_threshold=1.0,
             min_rew_threshold=0.1,
-            min_episodes=100000,
+            min_episodes=200000,
             epsilon=0.05,
             required_fields=None,
         ),
@@ -1706,7 +1952,7 @@ scenarios = {
         "ray_cluster_gpus": _default_if_creating_ray_head(default=0),
         "ray_object_store_memory_cap_gigabytes": 1,
 
-        "xfdo_port": 4455 + _GRL_SEED,
+        "xfdo_port": 4480 + _GRL_SEED,
         "use_openspiel_restricted_game": True,
         "restricted_game_custom_model": get_valid_action_fcn_class(obs_len=_30_NO_LIMIT_LEDUC_OBS_LEN, action_space_n=31, dummy_actions_multiplier=1),
         "xfdo_metanash_method": "nfsp",
@@ -1715,7 +1961,7 @@ scenarios = {
             dont_solve_first_n_xfdo_iters=7,
             starting_rew_threshold=1.0,
             min_rew_threshold=0.1,
-            min_episodes=100000,
+            min_episodes=200000,
             epsilon=0.05,
             required_fields=None,
         ),
@@ -1764,7 +2010,7 @@ scenarios = {
         "ray_cluster_gpus": _default_if_creating_ray_head(default=0),
         "ray_object_store_memory_cap_gigabytes": 1,
 
-        "xfdo_port": 4460 + _GRL_SEED,
+        "xfdo_port": 4485 + _GRL_SEED,
         "use_openspiel_restricted_game": True,
         "restricted_game_custom_model": get_valid_action_fcn_class(obs_len=_60_NO_LIMIT_LEDUC_OBS_LEN, action_space_n=61, dummy_actions_multiplier=1),
         "xfdo_metanash_method": "nfsp",
@@ -1773,7 +2019,7 @@ scenarios = {
             dont_solve_first_n_xfdo_iters=7,
             starting_rew_threshold=1.0,
             min_rew_threshold=0.1,
-            min_episodes=100000,
+            min_episodes=200000,
             epsilon=0.05,
             required_fields=None,
         ),
@@ -1816,6 +2062,186 @@ scenarios = {
         "calc_metanash_every_n_iters": 50,
         "metanash_metrics_smoothing_episodes_override": 50000,
     },
+
+    #### OSHI ZUMO XFDO ######################################################
+
+    "oshi_zumo_xfdo_dqn_nfsp_gpu_dynamic_threshold_1_aggressive": {
+        "ray_cluster_cpus": _default_if_creating_ray_head(default=8),
+        "ray_cluster_gpus": _default_if_creating_ray_head(default=0),
+        "ray_object_store_memory_cap_gigabytes": 1,
+
+        "xfdo_port": 4490 + _GRL_SEED,
+        "use_openspiel_restricted_game": False,
+        "restricted_game_custom_model": None,
+        "xfdo_metanash_method": "nfsp",
+        "get_restricted_game_solver": lambda scenario: SolveRestrictedGameDynamicRewardThreshold1(
+            scenario=scenario,
+            dont_solve_first_n_xfdo_iters=7,
+            starting_rew_threshold=1.0,
+            min_rew_threshold=0.1,
+            min_episodes=100000,
+            epsilon=0.05,
+            required_fields=None,
+        ),
+
+        "env_class": OshiZumoMultiAgentEnv,
+        "env_config": {
+            'version': "oshi_zumo",
+            "fixed_players": True,
+            "append_valid_actions_mask_to_obs": True,
+        },
+
+        "trainer_class_br": DQNTrainer,
+        "policy_classes_br": {
+            "metanash": NFSPTorchAveragePolicy,
+            "best_response": SimpleQTorchPolicyPatched,
+        },
+
+        "get_trainer_config_br": psro_oshi_zumo_dqn_params_like_leduc_gpu,
+        "get_stopping_condition_br": lambda: EpisodesSingleBRRewardPlateauStoppingCondition(
+            br_policy_id="best_response",
+            dont_check_plateau_before_n_episodes=int(2e4),
+            check_plateau_every_n_episodes=int(2e4),
+            minimum_reward_improvement_otherwise_plateaued=0.01,
+            max_train_episodes=int(1e5),
+        ),
+
+        "trainer_class_nfsp": DQNTrainer,
+        "avg_trainer_class_nfsp": NFSPTrainer,
+        "policy_classes_nfsp": {
+            "average_policy": NFSPTorchAveragePolicy,
+            "delegate_policy": SimpleQTorchPolicyPatched,
+            "best_response": SimpleQTorchPolicyPatched,
+        },
+        "anticipatory_param_nfsp": 0.1,
+        "get_trainer_config_nfsp": nfsp_oshi_zumo_avg_policy_params_like_leduc_gpu,
+        "get_avg_trainer_config_nfsp": nfsp_oshi_zumo_avg_policy_params_like_leduc_gpu,
+        "calculate_openspiel_metanash": False,
+        "calculate_openspiel_metanash_at_end": False,
+        "calc_metanash_every_n_iters": 50,
+        "metanash_metrics_smoothing_episodes_override": 50000,
+    },
+
+
+    # 80x dummy leduc ##########################################3
+
+    "80x_dummy_leduc_xfdo_dqn_nfsp_gpu_dynamic_threshold_1_aggressive": {
+        "ray_cluster_cpus": _default_if_creating_ray_head(default=8),
+        "ray_cluster_gpus": _default_if_creating_ray_head(default=0),
+        "ray_object_store_memory_cap_gigabytes": 1,
+
+        "xfdo_port": 4500 + _GRL_SEED,
+        "use_openspiel_restricted_game": False,
+        "restricted_game_custom_model": None,
+        "xfdo_metanash_method": "nfsp",
+        "get_restricted_game_solver": lambda scenario: SolveRestrictedGameDynamicRewardThreshold1(
+            scenario=scenario,
+            dont_solve_first_n_xfdo_iters=7,
+            starting_rew_threshold=1.0,
+            min_rew_threshold=0.1,
+            min_episodes=200000,
+            epsilon=0.05,
+            required_fields=["z_avg_policy_exploitability"],
+        ),
+
+        "env_class": PokerMultiAgentEnv,
+        "env_config": {
+            'version': "leduc_poker",
+            "fixed_players": True,
+            "append_valid_actions_mask_to_obs": True,
+            "dummy_action_multiplier": 80,
+        },
+
+        "trainer_class_br": DQNTrainer,
+        "policy_classes_br": {
+            "metanash": NFSPTorchAveragePolicy,
+            "best_response": SimpleQTorchPolicyPatched,
+        },
+
+        "get_trainer_config_br": psro_80x_dummy_leduc_params_gpu,
+        "get_stopping_condition_br": lambda: EpisodesSingleBRRewardPlateauStoppingCondition(
+            br_policy_id="best_response",
+            dont_check_plateau_before_n_episodes=int(2e4),
+            check_plateau_every_n_episodes=int(2e4),
+            minimum_reward_improvement_otherwise_plateaued=0.01,
+            max_train_episodes=int(1e5),
+        ),
+
+        "trainer_class_nfsp": DQNTrainer,
+        "avg_trainer_class_nfsp": NFSPTrainer,
+        "policy_classes_nfsp": {
+            "average_policy": NFSPTorchAveragePolicy,
+            "delegate_policy": SimpleQTorchPolicyPatched,
+            "best_response": SimpleQTorchPolicyPatched,
+        },
+        "anticipatory_param_nfsp": 0.1,
+        "get_trainer_config_nfsp": nfsp_80x_dummy_leduc_params_gpu,
+        "get_avg_trainer_config_nfsp": nfsp_80x_dummy_leduc_avg_policy_params_gpu,
+        "calculate_openspiel_metanash": True,
+        "calculate_openspiel_metanash_at_end": False,
+        "calc_metanash_every_n_iters": 50,
+        "metanash_metrics_smoothing_episodes_override": 50000,
+    },
+
+    "va_80x_dummy_leduc_xfdo_dqn_nfsp_gpu_dynamic_threshold_1_aggressive": {
+        "ray_cluster_cpus": _default_if_creating_ray_head(default=8),
+        "ray_cluster_gpus": _default_if_creating_ray_head(default=0),
+        "ray_object_store_memory_cap_gigabytes": 1,
+
+        "xfdo_port": 4505 + _GRL_SEED,
+        "use_openspiel_restricted_game": True,
+        "restricted_game_custom_model": get_valid_action_fcn_class(obs_len=_LEDUC_OBS_LEN, action_space_n=3 * 80,
+                                                                   dummy_actions_multiplier=1),
+        "xfdo_metanash_method": "nfsp",
+        "get_restricted_game_solver": lambda scenario: SolveRestrictedGameDynamicRewardThreshold1(
+            scenario=scenario,
+            dont_solve_first_n_xfdo_iters=7,
+            starting_rew_threshold=1.0,
+            min_rew_threshold=0.1,
+            min_episodes=200000,
+            epsilon=0.05,
+            required_fields=["z_avg_policy_exploitability"],
+        ),
+
+        "env_class": PokerMultiAgentEnv,
+        "env_config": {
+            'version': "leduc_poker",
+            "fixed_players": True,
+            "append_valid_actions_mask_to_obs": True,
+            "dummy_action_multiplier": 80,
+        },
+
+        "trainer_class_br": DQNTrainer,
+        "policy_classes_br": {
+            "metanash": NFSPTorchAveragePolicy,
+            "best_response": SimpleQTorchPolicyPatched,
+        },
+
+        "get_trainer_config_br": psro_80x_dummy_leduc_params_gpu,
+        "get_stopping_condition_br": lambda: EpisodesSingleBRRewardPlateauStoppingCondition(
+            br_policy_id="best_response",
+            dont_check_plateau_before_n_episodes=int(2e4),
+            check_plateau_every_n_episodes=int(2e4),
+            minimum_reward_improvement_otherwise_plateaued=0.01,
+            max_train_episodes=int(1e5),
+        ),
+
+        "trainer_class_nfsp": DQNTrainer,
+        "avg_trainer_class_nfsp": NFSPTrainer,
+        "policy_classes_nfsp": {
+            "average_policy": NFSPTorchAveragePolicy,
+            "delegate_policy": SimpleQTorchPolicyPatched,
+            "best_response": SimpleQTorchPolicyPatched,
+        },
+        "anticipatory_param_nfsp": 0.1,
+        "get_trainer_config_nfsp": nfsp_80x_dummy_leduc_params_gpu,
+        "get_avg_trainer_config_nfsp": nfsp_80x_dummy_leduc_avg_policy_params_gpu,
+        "calculate_openspiel_metanash": True,
+        "calculate_openspiel_metanash_at_end": False,
+        "calc_metanash_every_n_iters": 50,
+        "metanash_metrics_smoothing_episodes_override": 50000,
+    },
+
 
 
 }

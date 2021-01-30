@@ -836,6 +836,27 @@ def nfsp_20x_dummy_leduc_params_gpu(action_space: Space) -> Dict:
     params["model"]["custom_model"] = get_valid_action_fcn_class(obs_len=_LEDUC_OBS_LEN, action_space_n=action_space.n, dummy_actions_multiplier=20)
     return params
 
+def nfsp_40x_dummy_leduc_avg_policy_params_gpu(action_space: Space) -> Dict:
+    params = nfsp_leduc_avg_policy_params_gpu(action_space=action_space)
+    params["model"]["custom_model"] = get_valid_action_fcn_class(obs_len=_LEDUC_OBS_LEN, action_space_n=action_space.n, dummy_actions_multiplier=40)
+    return params
+
+def nfsp_40x_dummy_leduc_params_gpu(action_space: Space) -> Dict:
+    params = nfsp_leduc_dqn_params_gpu(action_space=action_space)
+    params["model"]["custom_model"] = get_valid_action_fcn_class(obs_len=_LEDUC_OBS_LEN, action_space_n=action_space.n, dummy_actions_multiplier=40)
+    return params
+
+
+def nfsp_80x_dummy_leduc_avg_policy_params_gpu(action_space: Space) -> Dict:
+    params = nfsp_leduc_avg_policy_params_gpu(action_space=action_space)
+    params["model"]["custom_model"] = get_valid_action_fcn_class(obs_len=_LEDUC_OBS_LEN, action_space_n=action_space.n, dummy_actions_multiplier=80)
+    return params
+
+def nfsp_80x_dummy_leduc_params_gpu(action_space: Space) -> Dict:
+    params = nfsp_leduc_dqn_params_gpu(action_space=action_space)
+    params["model"]["custom_model"] = get_valid_action_fcn_class(obs_len=_LEDUC_OBS_LEN, action_space_n=action_space.n, dummy_actions_multiplier=80)
+    return params
+
 
 def nfsp_12_no_limit_leduc_avg_policy_params_gpu(action_space: Space) -> Dict:
     params = nfsp_leduc_avg_policy_params_gpu(action_space=action_space)

@@ -545,6 +545,15 @@ def psro_20x_dummy_leduc_params_gpu(action_space: Space) -> Dict:
     params["model"]["custom_model"] = get_valid_action_fcn_class(obs_len=_LEDUC_OBS_LEN, action_space_n=action_space.n, dummy_actions_multiplier=20)
     return params
 
+def psro_40x_dummy_leduc_params_gpu(action_space: Space) -> Dict:
+    params = psro_leduc_dqn_params_gpu(action_space=action_space)
+    params["model"]["custom_model"] = get_valid_action_fcn_class(obs_len=_LEDUC_OBS_LEN, action_space_n=action_space.n, dummy_actions_multiplier=40)
+    return params
+
+def psro_80x_dummy_leduc_params_gpu(action_space: Space) -> Dict:
+    params = psro_leduc_dqn_params_gpu(action_space=action_space)
+    params["model"]["custom_model"] = get_valid_action_fcn_class(obs_len=_LEDUC_OBS_LEN, action_space_n=action_space.n, dummy_actions_multiplier=80)
+    return params
 
 def psro_12_no_limit_leduc_params_gpu(action_space: Space) -> Dict:
     assert action_space.n == 13, action_space.n
