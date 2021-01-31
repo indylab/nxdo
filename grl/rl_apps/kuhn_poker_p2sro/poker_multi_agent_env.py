@@ -69,14 +69,20 @@ class PokerMultiAgentEnv(MultiAgentEnv):
                 "players": 2
             }
         elif self.game_version == "universal_poker":
+            betting_mode = env_config.get("universal_poker_betting_mode", "nolimit")
+            max_raises = str(env_config.get("universal_poker_max_raises", ""))
+            num_ranks = env_config.get("universal_poker_num_ranks", 3)
+            num_suits = env_config.get("universal_poker_num_suits", 2)
             self.open_spiel_env_config = {
                 "numPlayers": 2,
-                "betting": "nolimit",
-                "numRanks": 3,
+                "betting": betting_mode,
+                "numRanks": num_ranks,
                 "numRounds": 2,
-                "numSuits": 2,
+                "numSuits": num_suits,
                 "stack": f"{env_config['universal_poker_stack_size']} {env_config['universal_poker_stack_size']}",
                 "blind": "1 1",
+                "raiseSize": "1 1",
+                "maxRaises": max_raises,
                 "bettingAbstraction": "fullgame",
             }
         else:
@@ -95,7 +101,7 @@ class PokerMultiAgentEnv(MultiAgentEnv):
             self.action_space = Discrete(self.num_discrete_actions)
 
         if self._append_valid_actions_mask_to_obs:
-            self.observation_length = self.openspiel_env.observation_spec()["info_state"][0] + self.num_discrete_actions
+            self.observation_length = self.openspiel_env.observation_spec()["info_state"][0] + self.base_num_discrete_actions
         else:
             self.observation_length = self.openspiel_env.observation_spec()["info_state"][0]
 

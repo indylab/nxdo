@@ -424,7 +424,8 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
         final_train_result = {"episodes_total": 0, "timesteps_total": 0, "training_iteration": 0}
         tmp_callback = NFSPBestResponseCallbacks()
         tmp_callback.on_train_result(trainer=br_trainer, result=final_train_result)
-        print(f"\n\nexploitability: {final_train_result['z_avg_policy_exploitability']}\n\n")
+        if "z_avg_policy_exploitability" in final_train_result:
+            print(f"\n\nexploitability: {final_train_result['z_avg_policy_exploitability']}\n\n")
     else:
 
         avg_weights = avg_trainer.get_weights(["average_policy_0", "average_policy_1"])
@@ -471,7 +472,7 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
     for player in range(2):
         strategy_id = f"avg_policy_player_{player}_{datetime_str()}"
 
-        checkpoint_path = save_nfsp_avg_policy_checkpoint(trainer=br_trainer, policy_id_to_save=f"final_average_policy_player_{player}",
+        checkpoint_path = save_nfsp_avg_policy_checkpoint(trainer=br_trainer, policy_id_to_save=f"average_policy_{player}",
                                         save_dir=checkpoint_dir(trainer=br_trainer),
                                         timesteps_training=final_train_result["timesteps_total"],
                                         episodes_training=final_train_result["episodes_total"],

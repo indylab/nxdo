@@ -16,8 +16,9 @@ from grl.rl_apps.kuhn_poker_p2sro.oshi_zumo_multi_agent_env import OSHI_ZUMO_OBS
 
 _LEDUC_OBS_LEN = OBS_SHAPES[LEDUC_POKER][0]
 _12_NO_LIMIT_LEDUC_OBS_LEN = 50
-_30_NO_LIMIT_LEDUC_OBS_LEN = 54
-_60_NO_LIMIT_LEDUC_OBS_LEN = 58
+_30_NO_LIMIT_LEDUC_OBS_LEN = 64
+_60_NO_LIMIT_LEDUC_OBS_LEN = 68
+EXTENDED_LEDUC_OBS_LEN = 68
 
 def nfsp_kuhn_dqn_params(action_space: Space) -> Dict:
     return {
@@ -140,6 +141,7 @@ def nfsp_kuhn_dqn_params(action_space: Space) -> Dict:
 
 def nfsp_kuhn_avg_policy_params(action_space: Space) -> Dict:
     return {
+        "framework": "torch",
         "learning_starts": 2000,
         "train_batch_size": 128,
         "lr": 0.01,
@@ -151,6 +153,7 @@ def nfsp_kuhn_avg_policy_params(action_space: Space) -> Dict:
 
 def nfsp_kuhn_avg_policy_params_gpu(action_space: Space) -> Dict:
     return {
+        "framework": "torch",
         "num_gpus": float(os.getenv("WORKER_GPU_NUM", 0.0)),
         "num_workers": 0,
         "num_gpus_per_worker": float(os.getenv("WORKER_GPU_NUM", 0.0)),
@@ -168,6 +171,7 @@ def nfsp_leduc_avg_policy_params(action_space: Space) -> Dict:
     assert isinstance(action_space, Discrete)
     action_space: Discrete = action_space
     return {
+        "framework": "torch",
         "learning_starts": 2000,
         "train_batch_size": 128,
         "lr": 0.01,
@@ -182,6 +186,7 @@ def nfsp_leduc_avg_policy_params_gpu(action_space: Space) -> Dict:
     assert isinstance(action_space, Discrete)
     action_space: Discrete = action_space
     return {
+        "framework": "torch",
         "num_gpus": float(os.getenv("WORKER_GPU_NUM", 0.0)),
         "num_workers": 0,
         "num_gpus_per_worker": float(os.getenv("WORKER_GPU_NUM", 0.0)),
@@ -836,6 +841,18 @@ def nfsp_20x_dummy_leduc_params_gpu(action_space: Space) -> Dict:
     params["model"]["custom_model"] = get_valid_action_fcn_class(obs_len=_LEDUC_OBS_LEN, action_space_n=action_space.n, dummy_actions_multiplier=20)
     return params
 
+
+def nfsp_20x_dummy_leduc_avg_policy_params_gpu_more_experience(action_space: Space) -> Dict:
+    params = nfsp_leduc_avg_policy_params_gpu(action_space=action_space)
+    params["model"]["custom_model"] = get_valid_action_fcn_class(obs_len=_LEDUC_OBS_LEN, action_space_n=action_space.n, dummy_actions_multiplier=20)
+    return params
+
+def nfsp_20x_dummy_leduc_params_gpu_more_experience(action_space: Space) -> Dict:
+    params = nfsp_leduc_dqn_params_gpu(action_space=action_space)
+    params["rollout_fragment_length"] = params["rollout_fragment_length"] * 2
+    params["model"]["custom_model"] = get_valid_action_fcn_class(obs_len=_LEDUC_OBS_LEN, action_space_n=action_space.n, dummy_actions_multiplier=20)
+    return params
+
 def nfsp_40x_dummy_leduc_avg_policy_params_gpu(action_space: Space) -> Dict:
     params = nfsp_leduc_avg_policy_params_gpu(action_space=action_space)
     params["model"]["custom_model"] = get_valid_action_fcn_class(obs_len=_LEDUC_OBS_LEN, action_space_n=action_space.n, dummy_actions_multiplier=40)
@@ -844,6 +861,20 @@ def nfsp_40x_dummy_leduc_avg_policy_params_gpu(action_space: Space) -> Dict:
 def nfsp_40x_dummy_leduc_params_gpu(action_space: Space) -> Dict:
     params = nfsp_leduc_dqn_params_gpu(action_space=action_space)
     params["model"]["custom_model"] = get_valid_action_fcn_class(obs_len=_LEDUC_OBS_LEN, action_space_n=action_space.n, dummy_actions_multiplier=40)
+    return params
+
+
+def nfsp_extended_leduc_avg_policy_params_gpu(action_space: Space) -> Dict:
+    params = nfsp_leduc_avg_policy_params_gpu(action_space=action_space)
+    params["metrics_smoothing_episodes"] = 6000
+    params["model"]["custom_model"] = get_valid_action_fcn_class(obs_len=EXTENDED_LEDUC_OBS_LEN, action_space_n=action_space.n, dummy_actions_multiplier=1)
+    return params
+
+def nfsp_extended_leduc_params_gpu(action_space: Space) -> Dict:
+    print(f"\n\n\n\n\n\n\n\n Extended Leduc action space: {action_space.n}\n\n\n\n\n\n")
+    params = nfsp_leduc_dqn_params_gpu(action_space=action_space)
+    params["metrics_smoothing_episodes"] = 6000
+    params["model"]["custom_model"] = get_valid_action_fcn_class(obs_len=EXTENDED_LEDUC_OBS_LEN, action_space_n=action_space.n, dummy_actions_multiplier=1)
     return params
 
 

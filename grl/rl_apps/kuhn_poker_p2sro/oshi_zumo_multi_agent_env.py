@@ -61,7 +61,7 @@ class OshiZumoMultiAgentEnv(MultiAgentEnv):
         self.player_map = None
 
     def _get_openspiel_env(self):
-        return Environment(game_name=self.game_version, discount=1.0, horizon=100)
+        return Environment(game=self.game_version, discount=1.0, horizon=100)
 
     def _get_current_obs(self):
 

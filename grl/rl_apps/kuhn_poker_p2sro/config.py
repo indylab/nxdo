@@ -11,8 +11,9 @@ from grl.rl_apps.kuhn_poker_p2sro.oshi_zumo_multi_agent_env import OSHI_ZUMO_OBS
 
 _LEDUC_OBS_LEN = OBS_SHAPES[LEDUC_POKER][0]
 _12_NO_LIMIT_LEDUC_OBS_LEN = 50
-_30_NO_LIMIT_LEDUC_OBS_LEN = 54
-_60_NO_LIMIT_LEDUC_OBS_LEN = 58
+_30_NO_LIMIT_LEDUC_OBS_LEN = 64
+_60_NO_LIMIT_LEDUC_OBS_LEN = 68
+EXTENDED_LEDUC_OBS_LEN = 180
 
 def psro_kuhn_sac_params(action_space: Discrete):
     return {
@@ -545,9 +546,21 @@ def psro_20x_dummy_leduc_params_gpu(action_space: Space) -> Dict:
     params["model"]["custom_model"] = get_valid_action_fcn_class(obs_len=_LEDUC_OBS_LEN, action_space_n=action_space.n, dummy_actions_multiplier=20)
     return params
 
+def psro_20x_dummy_leduc_params_gpu_more_experience(action_space: Space) -> Dict:
+    params = psro_leduc_dqn_params_gpu(action_space=action_space)
+    params["rollout_fragment_length"] = params["rollout_fragment_length"] * 2
+    params["model"]["custom_model"] = get_valid_action_fcn_class(obs_len=_LEDUC_OBS_LEN, action_space_n=action_space.n, dummy_actions_multiplier=20)
+    return params
+
 def psro_40x_dummy_leduc_params_gpu(action_space: Space) -> Dict:
     params = psro_leduc_dqn_params_gpu(action_space=action_space)
     params["model"]["custom_model"] = get_valid_action_fcn_class(obs_len=_LEDUC_OBS_LEN, action_space_n=action_space.n, dummy_actions_multiplier=40)
+    return params
+
+def psro_extended_leduc_params_gpu(action_space: Space) -> Dict:
+    params = psro_leduc_dqn_params_gpu(action_space=action_space)
+    params["metrics_smoothing_episodes"] = 6000
+    params["model"]["custom_model"] = get_valid_action_fcn_class(obs_len=EXTENDED_LEDUC_OBS_LEN, action_space_n=action_space.n, dummy_actions_multiplier=1)
     return params
 
 def psro_80x_dummy_leduc_params_gpu(action_space: Space) -> Dict:

@@ -3,7 +3,7 @@ import numpy as np
 from typing import List, Dict, Union
 
 from grl.p2sro.payoff_table import PayoffTableStrategySpec
-from grl.rl_apps.scenarios.stopping_conditions import TwoPlayerBRRewardsBelowAmtStoppingCondition, StoppingCondition
+from grl.rl_apps.scenarios.stopping_conditions import TwoPlayerBRRewardsBelowAmtStoppingCondition, StoppingCondition, NoStoppingCondition
 
 from grl.xfdo.xfdo_manager.manager import SolveRestrictedGame, RestrictedGameSolveResult
 
@@ -131,6 +131,51 @@ class SolveRestrictedGameDynamicRewardThreshold1(SolveRestrictedGame):
                 min_episodes=self._min_episodes,
                 required_fields_in_last_train_iter=self.required_fields
             )
+
+        self._current_xfdo_iter += 1
+
+        return _solve_game(scenario=self.scenario,
+                           log_dir=log_dir,
+                           br_spec_lists_for_each_player=br_spec_lists_for_each_player,
+                           stopping_condition=stopping_condition,
+                           manager_metadata=manager_metadata)
+
+
+
+class SolveRestrictedGameDynamicRewardThresholdBinary(SolveRestrictedGame):
+
+    def __init__(self,
+                 scenario: dict,
+                 dont_solve_first_n_xfdo_iters: int,
+                 required_fields: Union[List[str], None]):
+
+        self.scenario = scenario
+
+        self._current_xfdo_iter = 0
+        self._dont_solve_first_n_xfdo_iters = dont_solve_first_n_xfdo_iters
+
+        if required_fields is None:
+            required_fields = []
+        if scenario["calculate_openspiel_metanash"] and (not scenario["calculate_openspiel_metanash_at_end"]) \
+                and ("z_avg_policy_exploitability" not in required_fields):
+            required_fields.append("z_avg_policy_exploitability")
+        self.required_fields = required_fields
+
+    def __call__(self,
+                 log_dir: str,
+                 br_spec_lists_for_each_player: Dict[int, List[PayoffTableStrategySpec]],
+                 manager_metadata: dict = None) -> RestrictedGameSolveResult:
+        # This method is called each time we need to solve the metanash for XFDO
+
+        if self._current_xfdo_iter < self._dont_solve_first_n_xfdo_iters:
+            # Instantly get back an untrained metanash (an untrained avg policy network in the case of NFSP)
+            stopping_condition = TwoPlayerBRRewardsBelowAmtStoppingCondition(
+                stop_if_br_avg_rew_falls_below=100000.0,
+                min_episodes=0,
+                required_fields_in_last_train_iter=self.required_fields
+            )
+        else:
+            stopping_condition = NoStoppingCondition()
 
         self._current_xfdo_iter += 1
 
