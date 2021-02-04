@@ -57,7 +57,7 @@ def get_trainer_logger_creator(base_dir: str, scenario_name: str):
         def _should_log(result: dict) -> bool:
             return result["training_iteration"] % 100 == 0
 
-        return SpaceSavingLogger(config=config, logdir=logdir, should_log_result_fn=_should_log)
+        return SpaceSavingLogger(config=config, logdir=logdir, should_log_result_fn=_should_log, print_log_dir=False)
 
     return trainer_logger_creator
 
@@ -159,18 +159,15 @@ def set_restricted_game_conversions_for_all_workers_openspiel(
 
 
 def train_poker_approx_best_response_xdfo(br_player: int,
-                              scenario_name: str,
-                              br_config_overrides: dict,
-                              get_stopping_condition: Callable[[], StoppingCondition],
-                              metanash_specs_for_players: Dict[int, PayoffTableStrategySpec],
-                              delegate_specs_for_players: Dict[int, List[PayoffTableStrategySpec]],
-                              results_dir: str,
-                              print_train_results: bool = True):
-    try:
-        scenario = scenarios[scenario_name]
-    except KeyError:
-        raise NotImplementedError(f"Unknown scenario name: \'{scenario_name}\'. Existing scenarios are:\n"
-                                  f"{list(scenarios.keys())}")
+                                          ray_head_address,
+                                          scenario,
+                                          general_trainer_config_overrrides,
+                                          br_policy_config_overrides: dict,
+                                          get_stopping_condition: Callable[[], StoppingCondition],
+                                          metanash_specs_for_players: Dict[int, PayoffTableStrategySpec],
+                                          delegate_specs_for_players: Dict[int, List[PayoffTableStrategySpec]],
+                                          results_dir: str,
+                                          print_train_results: bool = True):
 
     use_openspiel_restricted_game: bool = scenario["use_openspiel_restricted_game"]
     restricted_game_custom_model = scenario["restricted_game_custom_model"]
@@ -242,7 +239,7 @@ def train_poker_approx_best_response_xdfo(br_player: int,
             "policies": {
                 f"metanash": (policy_classes["metanash"], other_player_restricted_obs_space, other_player_restricted_action_space, {"explore": False}),
                 f"metanash_delegate": (policy_classes["best_response"], tmp_env.base_observation_space, tmp_env.base_action_space, {"explore": False}),
-                f"best_response": (policy_classes["best_response"], tmp_env.base_observation_space, tmp_env.base_action_space, {}),
+                f"best_response": (policy_classes["best_response"], tmp_env.base_observation_space, tmp_env.base_action_space, br_policy_config_overrides),
             },
             "policy_mapping_fn": select_policy,
         },
@@ -253,11 +250,11 @@ def train_poker_approx_best_response_xdfo(br_player: int,
 
     trainer_config = merge_dicts(trainer_config, get_trainer_config(action_space=tmp_env.base_action_space))
 
-    trainer_config = merge_dicts(trainer_config, br_config_overrides)
+    trainer_config = merge_dicts(trainer_config, general_trainer_config_overrrides)
 
-    init_ray_for_scenario(scenario=scenario, head_address=None, logging_level=logging.INFO)
+    init_ray_for_scenario(scenario=scenario, head_address=ray_head_address, logging_level=logging.INFO)
 
-    trainer = trainer_class(config=trainer_config, logger_creator=get_trainer_logger_creator(base_dir=results_dir, scenario_name=scenario_name))
+    trainer = trainer_class(config=trainer_config, logger_creator=get_trainer_logger_creator(base_dir=results_dir, scenario_name="approx_br"))
 
     if use_cfp_metanash and cfp_metanash_specs_for_players:
         # metanash is uniform distribution of pure strat specs
@@ -307,7 +304,7 @@ def train_poker_approx_best_response_xdfo(br_player: int,
             if "td_error" in train_iter_results["info"]["learner"][f"best_response"]:
                 del train_iter_results["info"]["learner"][f"best_response"]["td_error"]
             log(f"Trainer log dir is {trainer.logdir}")
-            log(pretty_dict_str(train_iter_results))
+            print(pretty_dict_str(train_iter_results))
 
         total_timesteps_training_br = train_iter_results["timesteps_total"]
         total_episodes_training_br = train_iter_results["episodes_total"]

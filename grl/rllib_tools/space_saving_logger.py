@@ -27,18 +27,20 @@ class SpaceSavingLogger(UnifiedLogger):
                  trial=None,
                  loggers=None,
                  sync_function=None,
-                 should_log_result_fn: Callable[[Dict], bool] = None):
+                 should_log_result_fn: Callable[[Dict], bool] = None,
+                 print_log_dir=True):
 
         super(SpaceSavingLogger, self).__init__(config=config,
                                                 logdir=logdir,
                                                 trial=trial,
                                                 loggers=loggers,
                                                 sync_function=sync_function)
-
+        self.print_log_dir = print_log_dir
         self.should_log_result_fn = should_log_result_fn
 
     def on_result(self, result):
-        print(f"log dir is {self.logdir}")
+        if self.print_log_dir:
+            print(f"log dir is {self.logdir}")
         should_log_result = True
         if self.should_log_result_fn is not None:
             should_log_result = self.should_log_result_fn(result)

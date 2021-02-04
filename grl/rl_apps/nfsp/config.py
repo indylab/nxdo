@@ -15,7 +15,7 @@ from grl.rl_apps.kuhn_poker_p2sro.oshi_zumo_multi_agent_env import OSHI_ZUMO_OBS
 #     return x
 
 _LEDUC_OBS_LEN = OBS_SHAPES[LEDUC_POKER][0]
-_12_NO_LIMIT_LEDUC_OBS_LEN = 50
+_12_NO_LIMIT_LEDUC_OBS_LEN = 60
 _30_NO_LIMIT_LEDUC_OBS_LEN = 64
 _60_NO_LIMIT_LEDUC_OBS_LEN = 68
 EXTENDED_LEDUC_OBS_LEN = 68

@@ -156,7 +156,7 @@ class OpenSpielRestrictedGame(MultiAgentEnv):
                     try:
                         restricted_game_obs = self.agent_conversions[agent_id].orig_obs_to_restricted_game_obs[
                             base_game_obs_as_tuple]
-                        assert len(restricted_game_obs) == 90, "only needs to be true for 20x dummy leduc"
+                        # assert len(restricted_game_obs) == 90, "only needs to be true for 20x dummy leduc"
                     except KeyError:
                         assert isinstance(base_game_obs_as_tuple, tuple)
                         assert base_game_obs_as_tuple[0] == list(self.agent_conversions[agent_id].orig_obs_to_restricted_game_obs.keys())[0][0], f"key provided is {base_game_obs_as_tuple}\n agent id is {agent_id} \n example key is {list(self.agent_conversions[agent_id].orig_obs_to_restricted_game_obs.keys())[0]}"

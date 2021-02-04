@@ -4,18 +4,15 @@ from ray.rllib.models.action_dist import ActionDistribution
 
 import deepdish
 
-from typing import Dict, Callable, List, Tuple
+from typing import Dict, Callable, List, Tuple, Union
 from open_spiel.python import rl_environment
-
-def _calculate_metanash_and_exploitability_of_fixed_policies(payoff_table: PayoffTable, player_policy_nums: dict):
-    pass
 
 
 import numpy as np
 
-
+from grl.utils import ensure_dir
 import ray
-
+import os
 from open_spiel.python.policy import Policy as OpenSpielPolicy, tabular_policy_from_callable
 from open_spiel.python.algorithms.exploitability import exploitability
 from pyspiel import Game as OpenSpielGame
@@ -357,13 +354,24 @@ def psro_measure_exploitability_nonlstm(br_checkpoint_path_tuple_list: List[Tupl
                                         metanash_weights: List[Tuple[float, float]],
                                          set_policy_weights_fn: Callable,
                                         rllib_policies: List[Policy],
-                                        poker_game_version: str):
-    if poker_game_version in ["kuhn_poker", "leduc_poker"]:
-        open_spiel_env_config = {
-            "players": pyspiel.GameParameter(2)
-        }
-    else:
-        open_spiel_env_config = {}
+                                        poker_game_version: str,
+                                        open_spiel_env_config: dict = None):
+    if open_spiel_env_config is None:
+        if poker_game_version in ["kuhn_poker", "leduc_poker"]:
+            open_spiel_env_config = {
+                "players": pyspiel.GameParameter(2)
+            }
+        elif poker_game_version in ["oshi_zumo_tiny"]:
+            poker_game_version = "oshi_zumo"
+            open_spiel_env_config = {
+                "coins": pyspiel.GameParameter(6),
+                "size": pyspiel.GameParameter(2),
+                "horizon": pyspiel.GameParameter(8),
+            }
+        else:
+            open_spiel_env_config = {}
+
+    open_spiel_env_config = {k: pyspiel.GameParameter(v) if not isinstance(v, pyspiel.GameParameter) else v for k, v in open_spiel_env_config.items()}
 
     openspiel_game = pyspiel.load_game(poker_game_version, open_spiel_env_config)
 
@@ -395,13 +403,26 @@ def psro_measure_exploitability_nonlstm(br_checkpoint_path_tuple_list: List[Tupl
 
 
 
-def get_stats_for_single_payoff_table(payoff_table:PayoffTable, highest_policy_num: int, poker_env_config, policy_class, policy_config):
+def get_exploitability_from_cache(cache_dir: str, policy_num: int) -> Union[float, None]:
+    cache_file_path = os.path.join(cache_dir, f"policy_{policy_num}_exploitability.txt")
+    if os.path.exists(cache_file_path):
+        with open(cache_file_path, "r") as f:
+            return float(f.readline())
+    return None
 
-    ray.init(address='auto', _redis_password='5241590000000000', ignore_reinit_error=True, local_mode=False)
+def write_exploitability_to_cache(cache_dir: str, policy_num: int, exploitability: float):
+    cache_file_path = os.path.join(cache_dir, f"policy_{policy_num}_exploitability.txt")
+    with open(cache_file_path, "w+") as f:
+        f.write(str(exploitability))
+
+
+def get_stats_for_single_payoff_table(payoff_table:PayoffTable, highest_policy_num: int, poker_env_config, policy_class, policy_config, cache_dir: str, eval_every_nth_entry=1):
+
+    ray.init(ignore_reinit_error=True, local_mode=True, num_cpus=1, num_gpus=0)
 
     poker_game_version = poker_env_config["version"]
     temp_env = PokerMultiAgentEnv(env_config=poker_env_config)
-
+    openspiel_env_config = temp_env.open_spiel_env_config
     # def fetch_logits(policy):
     #     return {
     #         "behaviour_logits": policy.model.last_output(),
@@ -452,56 +473,63 @@ def get_stats_for_single_payoff_table(payoff_table:PayoffTable, highest_policy_n
 
     for i, n_policies in enumerate(range(1, highest_policy_num + 1)):
 
-        metanash_probs_0 = get_latest_metanash_strategies(payoff_table=payoff_table,
-                                                        as_player=1,
-                                                        as_policy_num=n_policies,
-                                                        fictitious_play_iters=2000,
-                                                        mix_with_uniform_dist_coeff=0.0,
-                                                        print_matrix=False)[0].probabilities_for_each_strategy()
+        exploitability_cached = get_exploitability_from_cache(cache_dir=cache_dir, policy_num=i)
+        if exploitability_cached is None and i % eval_every_nth_entry == 0:
 
-        metanash_probs_1 = get_latest_metanash_strategies(payoff_table=payoff_table,
-                                                          as_player=0,
-                                                          as_policy_num=n_policies,
-                                                          fictitious_play_iters=2000,
-                                                          mix_with_uniform_dist_coeff=0.0,
-                                                          print_matrix=False)[1].probabilities_for_each_strategy()
+            metanash_probs_0 = get_latest_metanash_strategies(payoff_table=payoff_table,
+                                                            as_player=1,
+                                                            as_policy_num=n_policies,
+                                                            fictitious_play_iters=2000,
+                                                            mix_with_uniform_dist_coeff=0.0,
+                                                            print_matrix=False)[0].probabilities_for_each_strategy()
 
-        pure_strat_index = get_latest_metanash_strategies(payoff_table=payoff_table,
-                                       as_player=0,
-                                       as_policy_num=n_policies,
-                                       fictitious_play_iters=2000,
-                                       mix_with_uniform_dist_coeff=0.0,
-                                       print_matrix=False)[1].sample_policy_spec().get_pure_strat_indexes()
-        # print(f"pure strat index: {pure_strat_index}")
+            metanash_probs_1 = get_latest_metanash_strategies(payoff_table=payoff_table,
+                                                              as_player=0,
+                                                              as_policy_num=n_policies,
+                                                              fictitious_play_iters=2000,
+                                                              mix_with_uniform_dist_coeff=0.0,
+                                                              print_matrix=False)[1].probabilities_for_each_strategy()
+
+            pure_strat_index = get_latest_metanash_strategies(payoff_table=payoff_table,
+                                           as_player=0,
+                                           as_policy_num=n_policies,
+                                           fictitious_play_iters=2000,
+                                           mix_with_uniform_dist_coeff=0.0,
+                                           print_matrix=False)[1].sample_policy_spec().get_pure_strat_indexes()
+            # print(f"pure strat index: {pure_strat_index}")
 
 
-        policy_specs_0 = payoff_table.get_ordered_spec_list_for_player(player=0)[:n_policies]
+            policy_specs_0 = payoff_table.get_ordered_spec_list_for_player(player=0)[:n_policies]
 
-        policy_specs_1 = payoff_table.get_ordered_spec_list_for_player(player=1)[:n_policies]
+            policy_specs_1 = payoff_table.get_ordered_spec_list_for_player(player=1)[:n_policies]
 
-        assert len(metanash_probs_1) == len(policy_specs_1), f"len(metanash_probs_1): {len(metanash_probs_1)}, len(policy_specs_1): {len(policy_specs_1)}"
-        assert len(metanash_probs_0) == len(policy_specs_0)
-        assert len(policy_specs_0) == len(policy_specs_1)
+            assert len(metanash_probs_1) == len(policy_specs_1), f"len(metanash_probs_1): {len(metanash_probs_1)}, len(policy_specs_1): {len(policy_specs_1)}"
+            assert len(metanash_probs_0) == len(policy_specs_0)
+            assert len(policy_specs_0) == len(policy_specs_1)
 
-        br_checkpoint_paths = []
-        metanash_weights = []
+            br_checkpoint_paths = []
+            metanash_weights = []
 
-        # print(policy_specs_0)
-        # print(metanash_probs_0)
-        # print(policy_specs_1)
-        # print(metanash_probs_1)
+            # print(policy_specs_0)
+            # print(metanash_probs_0)
+            # print(policy_specs_1)
+            # print(metanash_probs_1)
 
-        for spec_0, prob_0, spec_1, prob_1 in zip(policy_specs_0, metanash_probs_0, policy_specs_1, metanash_probs_1):
-            br_checkpoint_paths.append((spec_0.metadata["checkpoint_path"], spec_1.metadata["checkpoint_path"]))
-            metanash_weights.append((prob_0, prob_1))
+            for spec_0, prob_0, spec_1, prob_1 in zip(policy_specs_0, metanash_probs_0, policy_specs_1, metanash_probs_1):
+                br_checkpoint_paths.append((spec_0.metadata["checkpoint_path"], spec_1.metadata["checkpoint_path"]))
+                metanash_weights.append((prob_0, prob_1))
 
-        exploitability_this_gen = psro_measure_exploitability_nonlstm(
-            br_checkpoint_path_tuple_list=br_checkpoint_paths,
-            metanash_weights=metanash_weights,
-            set_policy_weights_fn=set_policy_weights,
-            rllib_policies=policies,
-            poker_game_version=poker_game_version
-        )
+            exploitability_this_gen = psro_measure_exploitability_nonlstm(
+                br_checkpoint_path_tuple_list=br_checkpoint_paths,
+                metanash_weights=metanash_weights,
+                set_policy_weights_fn=set_policy_weights,
+                rllib_policies=policies,
+                poker_game_version=poker_game_version,
+                open_spiel_env_config=openspiel_env_config
+            )
+            write_exploitability_to_cache(cache_dir=cache_dir, policy_num=i, exploitability=exploitability_this_gen)
+        else:
+            exploitability_this_gen = exploitability_cached
 
         print(f"{n_policies} policies, {exploitability_this_gen} exploitability")
 
