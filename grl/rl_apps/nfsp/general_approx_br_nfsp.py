@@ -51,6 +51,9 @@ def load_pure_strat(policy: Policy, pure_strat_spec, checkpoint_path: str = None
         pure_strat_checkpoint_path = pure_strat_spec.metadata["checkpoint_path"]
     else:
         pure_strat_checkpoint_path = checkpoint_path
+
+    pure_strat_checkpoint_path = pure_strat_checkpoint_path.replace("/home/jb/git/grl/grl/data/12_no_limit_leduc_nfsp_dqn_gpu_sparse_10.44.52PM_Feb-02-20213spj98kj/", "/home/jblanier/gokuleduc/nfsp/12_no_limit_leduc_nfsp_dqn_gpu_sparse_10.44.52PM_Feb-02-20213spj98kj/")
+
     checkpoint_data = deepdish.io.load(path=pure_strat_checkpoint_path)
     weights = checkpoint_data["weights"]
     weights = {k.replace("_dot_", "."): v for k, v in weights.items()}
@@ -170,8 +173,13 @@ def train_poker_approx_best_response_nfsp(br_player,
 
     stopping_condition: StoppingCondition = get_stopping_condition()
 
+    max_reward = None
     while True:
         train_iter_results = br_trainer.train()  # do a step (or several) in the main RL loop
+        br_reward_this_iter = train_iter_results["policy_reward_mean"][f"best_response"]
+
+        if max_reward is None or br_reward_this_iter > max_reward:
+            max_reward = br_reward_this_iter
 
         train_iter_count += 1
         if print_train_results:
@@ -187,5 +195,4 @@ def train_poker_approx_best_response_nfsp(br_player,
             print("stopping condition met.")
             break
 
-    br_reward_this_iter = train_iter_results["policy_reward_mean"][f"best_response"]
-    return br_reward_this_iter
+    return max_reward

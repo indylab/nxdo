@@ -70,6 +70,9 @@ def load_pure_strat(policy: Policy, pure_strat_spec, checkpoint_path: str = None
         pure_strat_checkpoint_path = pure_strat_spec.metadata["checkpoint_path"]
     else:
         pure_strat_checkpoint_path = checkpoint_path
+
+    pure_strat_checkpoint_path = pure_strat_checkpoint_path.replace("/home/jb/git/grl/grl/data/12_no_limit_leduc_xfdo_dqn_nfsp_gpu_dynamic_threshold_1_aggressive/manager_01.04.42AM_Feb-03-2021/", "/home/jblanier/gokuleduc/xfdo/manager_01.04.42AM_Feb-03-2021/")
+
     checkpoint_data = deepdish.io.load(path=pure_strat_checkpoint_path)
     weights = checkpoint_data["weights"]
     weights = {k.replace("_dot_", "."): v for k, v in weights.items()}
@@ -81,6 +84,9 @@ def create_get_pure_strat_cached(cache: dict):
     def load_pure_strat_cached(policy: Policy, pure_strat_spec):
 
         pure_strat_checkpoint_path = pure_strat_spec.metadata["checkpoint_path"]
+        pure_strat_checkpoint_path = pure_strat_checkpoint_path.replace(
+            "/home/jb/git/grl/grl/data/12_no_limit_leduc_xfdo_dqn_nfsp_gpu_dynamic_threshold_1_aggressive/manager_01.04.42AM_Feb-03-2021/",
+            "/home/jblanier/gokuleduc/xfdo/manager_01.04.42AM_Feb-03-2021/")
 
         if pure_strat_checkpoint_path in cache:
             weights = cache[pure_strat_checkpoint_path]
@@ -292,6 +298,7 @@ def train_poker_approx_best_response_xdfo(br_player: int,
 
     stopping_condition: StoppingCondition = get_stopping_condition()
 
+    max_reward = None
     while True:
         train_iter_results = trainer.train()  # do a step (or several) in the main RL loop
         train_iter_count += 1
@@ -309,7 +316,8 @@ def train_poker_approx_best_response_xdfo(br_player: int,
         total_timesteps_training_br = train_iter_results["timesteps_total"]
         total_episodes_training_br = train_iter_results["episodes_total"]
         br_reward_this_iter = train_iter_results["policy_reward_mean"][f"best_response"]
-
+        if max_reward is None or br_reward_this_iter > max_reward:
+            max_reward = br_reward_this_iter
         if stopping_condition.should_stop_this_iter(latest_trainer_result=train_iter_results):
             log("Stopping condition met.")
             break
@@ -322,6 +330,6 @@ def train_poker_approx_best_response_xdfo(br_player: int,
     ray.shutdown()
     time.sleep(10)
 
-    return br_reward_this_iter
+    return max_reward
 
 

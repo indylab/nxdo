@@ -96,6 +96,9 @@ def save_best_response_checkpoint(trainer: DQNTrainer,
 
 def load_metanash_pure_strat(policy: Policy, pure_strat_spec: PayoffTableStrategySpec):
     pure_strat_checkpoint_path = pure_strat_spec.metadata["checkpoint_path"]
+
+    pure_strat_checkpoint_path = pure_strat_checkpoint_path.replace("/home/jb/git/grl/grl/data/12_no_limit_leduc_psro_dqn_gpu/manager_10.41.42PM_Feb-02-2021/", "/home/jblanier/gokuleduc/psro/manager_10.41.42PM_Feb-02-2021/")
+
     checkpoint_data = deepdish.io.load(path=pure_strat_checkpoint_path)
     weights = checkpoint_data["weights"]
     weights = {k.replace("_dot_", "."): v for k, v in weights.items()}
@@ -215,7 +218,7 @@ def train_poker_approx_best_response_psro(br_player,
 
 
     stopping_condition: StoppingCondition = get_stopping_condition()
-
+    max_reward = None
     while True:
         train_iter_results = trainer.train()  # do a step (or several) in the main RL loop
         train_iter_count += 1
@@ -231,8 +234,9 @@ def train_poker_approx_best_response_psro(br_player,
 
         total_timesteps_training_br = train_iter_results["timesteps_total"]
         total_episodes_training_br = train_iter_results["episodes_total"]
-
-
+        br_reward_this_iter = train_iter_results["policy_reward_mean"][f"best_response"]
+        if max_reward is None or br_reward_this_iter > max_reward:
+            max_reward = br_reward_this_iter
         if stopping_condition.should_stop_this_iter(latest_trainer_result=train_iter_results):
             break
 
@@ -240,8 +244,7 @@ def train_poker_approx_best_response_psro(br_player,
     ray.shutdown()
     time.sleep(10)
 
-    br_reward_this_iter = train_iter_results["policy_reward_mean"][f"best_response"]
-    return br_reward_this_iter
+    return max_reward
 
 
 
