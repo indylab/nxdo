@@ -480,7 +480,9 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
 
         avg_policy_spec = PayoffTableStrategySpec(
             strategy_id=strategy_id,
-            metadata={"checkpoint_path": checkpoint_path})
+            metadata={"checkpoint_path": checkpoint_path,
+                      "delegate_policy_specs": [spec.to_json() for spec in player_to_base_game_action_specs[player]]
+                      })
         avg_policy_specs.append(avg_policy_spec)
 
     ray.kill(avg_trainer.workers.local_worker().replay_buffer_actor)

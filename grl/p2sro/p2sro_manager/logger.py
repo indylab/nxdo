@@ -63,33 +63,44 @@ class SimpleP2SROManagerLogger(P2SROManagerLogger):
         # save a checkpoint of the payoff table
         data = self._manager.get_copy_of_latest_data()
         latest_payoff_table, active_policy_nums_per_player, fixed_policy_nums_per_player = data
-        # pt_checkpoint_path = os.path.join(self._payoff_table_checkpoint_dir,
-        #                                   f"payoff_table_checkpoint_{self._payoff_table_checkpoint_count}.json")
-        # policy_nums_path = os.path.join(self._payoff_table_checkpoint_dir,
-        #                                 f"policy_nums_checkpoint_{self._payoff_table_checkpoint_count}.json")
 
-        pt_checkpoint_path = os.path.join(self._payoff_table_checkpoint_dir,
-                                          f"payoff_table_checkpoint_latest.json")
-        policy_nums_path = os.path.join(self._payoff_table_checkpoint_dir,
-                                        f"policy_nums_checkpoint_latest.json")
+        numbered_pt_checkpoint_path = os.path.join(self._payoff_table_checkpoint_dir, f"payoff_table_checkpoint_{self._payoff_table_checkpoint_count}.json")
+        numbered_policy_nums_path = os.path.join(self._payoff_table_checkpoint_dir, f"policy_nums_checkpoint_{self._payoff_table_checkpoint_count}.json")
 
-        ensure_dir(file_path=pt_checkpoint_path)
-        ensure_dir(file_path=policy_nums_path)
+        pt_checkpoint_paths = [os.path.join(self._payoff_table_checkpoint_dir, f"payoff_table_checkpoint_latest.json"),
+                               numbered_pt_checkpoint_path]
+        policy_nums_paths = [os.path.join(self._payoff_table_checkpoint_dir, f"policy_nums_checkpoint_latest.json"),
+                             numbered_policy_nums_path]
 
-        latest_payoff_table.to_json_file(file_path=pt_checkpoint_path)
-        print(f"\n\n\nSaved payoff table checkpoint to {pt_checkpoint_path}")
+        for pt_checkpoint_path, policy_nums_path in zip(pt_checkpoint_paths, policy_nums_paths):
+            ensure_dir(file_path=pt_checkpoint_path)
+            ensure_dir(file_path=policy_nums_path)
 
-        player_policy_nums = {}
-        for player_i, (active_policy_nums, fixed_policy_nums) in enumerate(
-                zip(active_policy_nums_per_player, fixed_policy_nums_per_player)):
-            player_policy_nums[player_i] = {
-                "active_policies": active_policy_nums,
-                "fixed_policies": fixed_policy_nums
-            }
+            latest_payoff_table.to_json_file(file_path=pt_checkpoint_path)
+            print(f"\n\n\nSaved payoff table checkpoint to {pt_checkpoint_path}")
 
-        with open(policy_nums_path, "w+") as policy_nums_file:
-            json.dump(obj=player_policy_nums, fp=policy_nums_file)
-        print(f"Saved policy nums checkpoint to {policy_nums_path}\n\n\n")
+            player_policy_nums = {}
+            for player_i, (active_policy_nums, fixed_policy_nums) in enumerate(
+                    zip(active_policy_nums_per_player, fixed_policy_nums_per_player)):
+                player_policy_nums[player_i] = {
+                    "active_policies": active_policy_nums,
+                    "fixed_policies": fixed_policy_nums
+                }
+
+            with open(policy_nums_path, "w+") as policy_nums_file:
+                json.dump(obj=player_policy_nums, fp=policy_nums_file)
+            print(f"Saved policy nums checkpoint to {policy_nums_path}\n\n\n")
+
+        # append checkpoints metadata to checkpoints_manifest.txt
+        checkpoints_manifest_path = os.path.join(self._payoff_table_checkpoint_dir, "checkpoints_manifest.json")
+        ensure_dir(file_path=checkpoints_manifest_path)
+        with open(checkpoints_manifest_path, "a+") as manifest_file:
+            fixed_policies_for_all_players = min(max(fixed_policy_nums) for fixed_policy_nums in fixed_policy_nums_per_player)
+            manifest_json_line = json.dumps({"payoff_table_checkpoint_num": self._payoff_table_checkpoint_count,
+                                             "fixed_policies_for_all_players": fixed_policies_for_all_players,
+                                             "payoff_table_json_path": numbered_pt_checkpoint_path,
+                                             "policy_nums_json_path": numbered_policy_nums_path})
+            manifest_file.write(f"{manifest_json_line}\n")
 
         self._payoff_table_checkpoint_count += 1
 

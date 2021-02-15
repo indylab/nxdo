@@ -142,6 +142,7 @@ class XFDOManager(object):
                 data_to_log = {
                         "episodes_total": self._episodes_count,
                         "timesteps_total": self._timesteps_count,
+                        "metanash_specs": [spec.to_json() for spec in self._latest_metanash_spec_for_each_player]
                     }
                 assert "episodes_total" not in game_solve_result.extra_data_to_log
                 assert "timesteps_total" not in game_solve_result.extra_data_to_log
