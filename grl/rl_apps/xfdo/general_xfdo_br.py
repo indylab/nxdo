@@ -295,8 +295,12 @@ def train_poker_best_response(br_player: int, scenario_name: str, print_train_re
 
     if metanash_specs_for_players is None or use_openspiel_restricted_game:
         other_player_restricted_action_space = tmp_env.base_action_space
+        metanash_class = policy_classes["best_response"]
     else:
         other_player_restricted_action_space = Discrete(n=len(delegate_specs_for_players[other_player]))
+        metanash_class = policy_classes["metanash"]
+        print(f"metanash class: {metanash_class}, other_player_restricted_action_space: {other_player_restricted_action_space}")
+
 
     if metanash_specs_for_players is None and use_openspiel_restricted_game:
         other_player_restricted_obs_space = tmp_env.base_observation_space
@@ -314,7 +318,7 @@ def train_poker_best_response(br_player: int, scenario_name: str, print_train_re
         "multiagent": {
             "policies_to_train": [f"best_response"],
             "policies": {
-                f"metanash": (policy_classes["metanash"], other_player_restricted_obs_space, other_player_restricted_action_space, {"explore": False}),
+                f"metanash": (metanash_class, other_player_restricted_obs_space, other_player_restricted_action_space, {"explore": False}),
                 f"metanash_delegate": (policy_classes["best_response"], tmp_env.base_observation_space, tmp_env.base_action_space, {"explore": False}),
                 f"best_response": (policy_classes["best_response"], tmp_env.base_observation_space, tmp_env.base_action_space, {}),
             },

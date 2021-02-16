@@ -172,7 +172,8 @@ def action_sampler(policy, model, input_dict, state, explore, timestep):
         actions.append(action)
         logps.append(logp)
     state_out = state
-    return np.asarray(actions, dtype=np.int32), np.asarray(logps, dtype=np.float32), state_out
+    return np.asarray(actions, dtype=np.int32), None, state_out
+    # return np.asarray(actions, dtype=np.int32), np.asarray(logps, dtype=np.float32), state_out
 
 def sgd_optimizer(policy: Policy,
                    config: TrainerConfigDict) -> "torch.optim.Optimizer":

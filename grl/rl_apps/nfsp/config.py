@@ -168,7 +168,6 @@ def nfsp_kuhn_avg_policy_params_gpu(action_space: Space) -> Dict:
     }
 
 def nfsp_leduc_avg_policy_params(action_space: Space) -> Dict:
-    assert isinstance(action_space, Discrete)
     action_space: Discrete = action_space
     return {
         "framework": "torch",
@@ -183,8 +182,10 @@ def nfsp_leduc_avg_policy_params(action_space: Space) -> Dict:
     }
 
 def nfsp_leduc_avg_policy_params_gpu(action_space: Space) -> Dict:
-    assert isinstance(action_space, Discrete)
-    action_space: Discrete = action_space
+    if isinstance(action_space, Discrete):
+        custom_model = get_valid_action_fcn_class(obs_len=_LEDUC_OBS_LEN, action_space_n=action_space.n)
+    else:
+        custom_model = None
     return {
         "framework": "torch",
         "num_gpus": float(os.getenv("WORKER_GPU_NUM", 0.0)),
@@ -197,7 +198,7 @@ def nfsp_leduc_avg_policy_params_gpu(action_space: Space) -> Dict:
         "model": merge_dicts(MODEL_DEFAULTS, {
             "fcnet_activation": "relu",
             "fcnet_hiddens": [128],
-            "custom_model": get_valid_action_fcn_class(obs_len=_LEDUC_OBS_LEN, action_space_n=action_space.n),
+            "custom_model": custom_model,
         }),
     }
 
@@ -569,6 +570,10 @@ def leduc_dqn_params_lowered(action_space: Space) -> Dict:
 
 
 def nfsp_leduc_dqn_params_gpu(action_space: Space) -> Dict:
+    if isinstance(action_space, Discrete):
+        custom_model = get_valid_action_fcn_class(obs_len=_LEDUC_OBS_LEN, action_space_n=action_space.n)
+    else:
+        custom_model = None
     return {
         "framework": "torch",
         # Smooth metrics over this many episodes.
@@ -689,7 +694,7 @@ def nfsp_leduc_dqn_params_gpu(action_space: Space) -> Dict:
         "model": merge_dicts(MODEL_DEFAULTS, {
             "fcnet_activation": "relu",
             "fcnet_hiddens": [128],
-            "custom_model": get_valid_action_fcn_class(obs_len=_LEDUC_OBS_LEN, action_space_n=action_space.n),
+            "custom_model": custom_model,
         }),
     }
 

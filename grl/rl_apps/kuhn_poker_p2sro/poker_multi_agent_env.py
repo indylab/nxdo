@@ -46,6 +46,15 @@ POKER_ENV = 'poker_env'
 PARTIAL_OBSERVATION = 'partial_observation'
 VALID_ACTIONS_MASK = 'valid_actions_mask'
 
+def parse_discrete_poker_action_from_continuous_space(continuous_action, legal_actions_list, total_num_discrete_actions_including_dummy):
+    # player action is between -1 and 1, normalize to 0 and 1 and then quantize to a discrete action
+    player_action = (np.clip(continuous_action, a_min=-1.0, a_max=1.0) + 1.0) / 2.0
+    assert 0.0 - 1e-9 <= player_action <= 1.0 + 1e-9, f"action was: {player_action} before normalization: {continuous_action}"
+    # place discrete actions in [0, 1] and find closest corresponding discrete action to player action
+    nearest_legal_discrete_action = min(legal_actions_list,
+                                        key=lambda x: abs(x / (total_num_discrete_actions_including_dummy - 1) - player_action))
+    # player action is now a discrete action
+    return nearest_legal_discrete_action
 
 class PokerMultiAgentEnv(MultiAgentEnv):
 
@@ -96,7 +105,7 @@ class PokerMultiAgentEnv(MultiAgentEnv):
         self._base_action_space = Discrete(self.base_num_discrete_actions)
 
         if self._continuous_action_space:
-            self.action_space = Box(low=-1, high=1, shape=1)
+            self.action_space = Box(low=-1, high=1, shape=(1,))
         else:
             self.action_space = Discrete(self.num_discrete_actions)
 
@@ -179,14 +188,9 @@ class PokerMultiAgentEnv(MultiAgentEnv):
         orig_player_action = player_action
 
         if self._continuous_action_space:
-            # player action is between -1 and 1, normalize to 0 and 1 and then quantize to a discrete action
-            player_action = (player_action / 2.0) + 1.0
-            assert 0.0 - 1e-9 <= player_action <= 1.0 + 1e-9
-            # place discrete actions in [0, 1] and find closest corresponding discrete action to player action
-            nearest_discrete_action = min(range(0, self.num_discrete_actions),
-                                          key=lambda x: abs(x/(self.num_discrete_actions - 1) - player_action))
-            # player action is now a discrete action
-            player_action = nearest_discrete_action
+            player_action = parse_discrete_poker_action_from_continuous_space(
+                continuous_action=player_action, legal_actions_list=legal_actions,
+                total_num_discrete_actions_including_dummy=self.num_discrete_actions)
 
         if self.dummy_action_multiplier != 1:
             # extended dummy action space is just the base discrete actions repeated multiple times

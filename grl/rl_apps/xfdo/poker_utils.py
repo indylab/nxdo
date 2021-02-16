@@ -24,16 +24,26 @@ from grl.rl_apps.kuhn_poker_p2sro.poker_multi_agent_env import PokerMultiAgentEn
 from grl.rl_apps.kuhn_poker_p2sro.poker_utils import tabular_policies_from_weighted_policies, JointPlayerPolicy, softmax
 from grl.xfdo.action_space_conversion import RestrictedToBaseGameActionSpaceConverter
 from grl.xfdo.openspiel.opnsl_restricted_game import AgentRestrictedGameOpenSpielObsConversions
+from grl.rl_apps.kuhn_poker_p2sro.poker_multi_agent_env import parse_discrete_poker_action_from_continuous_space
 
-def _parse_action_probs_from_action_info(action_info):
+def _parse_action_probs_from_action_info(action, action_info, legal_actions_list, total_num_discrete_actions):
     action_probs = None
     for key in ['policy_targets', 'action_probs']:
         if key in action_info:
             action_probs = action_info[key]
             break
     if action_probs is None:
-        action_logits = action_info['behaviour_logits']
-        action_probs = softmax(action_logits)
+        if "behaviour_logits" in action_info:
+            action_logits = action_info['behaviour_logits']
+            action_probs = softmax(action_logits)
+        else:
+            # assume action is continuous and is to be quntized to nearest legal action
+            discrete_action = parse_discrete_poker_action_from_continuous_space(continuous_action=action,
+                                                                                legal_actions_list=legal_actions_list,
+                                                                                total_num_discrete_actions_including_dummy=total_num_discrete_actions)
+            action_probs = np.zeros(shape=total_num_discrete_actions, dtype=np.float32)
+            action_probs[discrete_action] = 1.0
+
     return action_probs
 
 
@@ -69,8 +79,8 @@ def openspiel_policy_from_nonlstm_rllib_xfdo_policy(openspiel_game: OpenSpielGam
             except KeyError:
                 print(f"missing key: {tuple(obs)}\nexample key: {list(os_restricted_game_convertor.orig_obs_to_restricted_game_obs.keys())[0]}")
                 raise
-        _, _, restricted_action_info = rllib_policy.compute_single_action(obs=obs, state=[], explore=False)
-        restricted_game_action_probs = _parse_action_probs_from_action_info(action_info=restricted_action_info)
+        action, _, restricted_action_info = rllib_policy.compute_single_action(obs=obs, state=[], explore=False)
+        restricted_game_action_probs = _parse_action_probs_from_action_info(action=action, action_info=restricted_action_info, legal_actions_list=legal_actions_list, total_num_discrete_actions=len(valid_actions_mask))
 
         if is_openspiel_restricted_game:
             action_probs = restricted_game_action_probs
@@ -81,7 +91,7 @@ def openspiel_policy_from_nonlstm_rllib_xfdo_policy(openspiel_game: OpenSpielGam
                     obs=obs, restricted_game_action=restricted_game_action, use_delegate_policy_exploration=False,
                     clip_base_game_actions=False, delegate_policy_state=None
                 )
-                base_game_action_probs_for_rstr_action = _parse_action_probs_from_action_info(action_info=action_info)
+                base_game_action_probs_for_rstr_action = _parse_action_probs_from_action_info(action=action, action_info=action_info, legal_actions_list=legal_actions_list, total_num_discrete_actions=len(valid_actions_mask))
                 base_action_probs_for_each_restricted_game_action.append(base_game_action_probs_for_rstr_action)
 
             action_probs = np.zeros_like(base_action_probs_for_each_restricted_game_action[0])

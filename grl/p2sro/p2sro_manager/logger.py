@@ -95,9 +95,12 @@ class SimpleP2SROManagerLogger(P2SROManagerLogger):
         checkpoints_manifest_path = os.path.join(self._payoff_table_checkpoint_dir, "checkpoints_manifest.json")
         ensure_dir(file_path=checkpoints_manifest_path)
         with open(checkpoints_manifest_path, "a+") as manifest_file:
-            fixed_policies_for_all_players = min(max(fixed_policy_nums) for fixed_policy_nums in fixed_policy_nums_per_player)
+            if all(len(fixed_policy_nums) > 0 for fixed_policy_nums in fixed_policy_nums_per_player):
+                highest_fixed_policies_for_all_players = min(max(fixed_policy_nums) for fixed_policy_nums in fixed_policy_nums_per_player)
+            else:
+                highest_fixed_policies_for_all_players = None
             manifest_json_line = json.dumps({"payoff_table_checkpoint_num": self._payoff_table_checkpoint_count,
-                                             "fixed_policies_for_all_players": fixed_policies_for_all_players,
+                                             "highest_fixed_policies_for_all_players": highest_fixed_policies_for_all_players,
                                              "payoff_table_json_path": numbered_pt_checkpoint_path,
                                              "policy_nums_json_path": numbered_policy_nums_path})
             manifest_file.write(f"{manifest_json_line}\n")
