@@ -1,16 +1,15 @@
 import logging
-import numpy as np
-from typing import Type
+from typing import Type, Union
 
-from gym.spaces import Box
+from gym.spaces import Box, Discrete
 
-from ray.rllib.models.torch.torch_modelv2 import TorchModelV2
-from ray.rllib.models.torch.misc import SlimFC, AppendBiasLayer, \
-    normc_initializer
 from ray.rllib.utils.annotations import override
 from ray.rllib.utils.framework import try_import_torch
 
 from ray.rllib.models.torch.fcnet import FullyConnectedNetwork
+from ray.rllib.env import MultiAgentEnv
+from ray.rllib.models import ModelV2
+from grl.envs.valid_actions_multi_agent_env import ValidActionsMultiAgentEnv
 
 torch, nn = try_import_torch()
 
@@ -19,8 +18,8 @@ logger = logging.getLogger(__name__)
 ILLEGAL_ACTION_LOGITS_PENALTY = -1e9
 
 
-def get_valid_action_fcn_class(obs_len: int, action_space_n: int, dummy_actions_multiplier: int = 1) -> Type[FullyConnectedNetwork]:
-
+def get_valid_action_fcn_class(obs_len: int, action_space_n: int, dummy_actions_multiplier: int = 1) -> Type[
+    FullyConnectedNetwork]:
     class ValidActionFullyConnectedNetwork(FullyConnectedNetwork, nn.Module):
 
         @override(FullyConnectedNetwork)
@@ -45,7 +44,8 @@ def get_valid_action_fcn_class(obs_len: int, action_space_n: int, dummy_actions_
 
             # print(f"torch obs: {obs}")
             obs = obs[:, :-non_dummy_action_space_n]
-            self.valid_actions_mask = input_dict['obs_flat'][:, -non_dummy_action_space_n:].repeat(1, dummy_actions_multiplier)
+            self.valid_actions_mask = input_dict['obs_flat'][:, -non_dummy_action_space_n:].repeat(1,
+                                                                                                   dummy_actions_multiplier)
             # print(f"amt: {-VALID_ACTIONS_SHAPES[LEDUC_POKER][0]}")
 
             self._last_flat_in = obs.reshape(obs.shape[0], -1)
@@ -73,3 +73,31 @@ def get_valid_action_fcn_class(obs_len: int, action_space_n: int, dummy_actions_
             raise NotImplementedError
 
     return ValidActionFullyConnectedNetwork
+
+
+def get_valid_action_fcn_class_for_env(
+        env: MultiAgentEnv, policy_role: str = None) -> Union[None, Type[FullyConnectedNetwork]]:
+    if not isinstance(env, ValidActionsMultiAgentEnv):
+        raise TypeError("Valid actions fcns are made only to work with subclasses of ValidActionsMultiAgentEnv. "
+                        f"This env is a {type(env)}.")
+    if policy_role is None:
+        action_space = env.action_space
+        observation_length = env.observation_space.shape[0]
+    else:
+        # In some multiagent settings, different spaces may be defined for different policies in a dictionary.
+        action_space = env.action_space[policy_role]
+        observation_length = env.observation_space[policy_role].shape[0]
+    if len(env.observation_space.shape) != 1:
+        raise ValueError(f"Valid action fcn models require a 1D observation space (len(observation_space.shape) == 1). "
+                         f"The shape of this observation space is {env.observation_space.shape}")
+    if isinstance(action_space, Discrete):
+        if hasattr(env, "dummy_action_multiplier"):
+            dummy_action_multiplier = env.dummy_action_multiplier
+        else:
+            dummy_action_multiplier = 1
+        custom_model = get_valid_action_fcn_class(obs_len=observation_length,
+                                                  action_space_n=action_space.n,
+                                                  dummy_actions_multiplier=dummy_action_multiplier)
+    else:
+        custom_model = None
+    return custom_model

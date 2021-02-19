@@ -1,17 +1,21 @@
 import json
-import grpc
 import logging
-from typing import Tuple, List
 from concurrent import futures
+from typing import Tuple, List
+
+import grpc
 from google.protobuf.empty_pb2 import Empty
 
-from grl.p2sro.payoff_table import PayoffTable, PayoffTableStrategySpec
-from grl.p2sro.p2sro_manager.protobuf.p2sro_manager_pb2_grpc import P2SROManagerServicer, add_P2SROManagerServicer_to_server, \
-    P2SROManagerStub
-from grl.p2sro.p2sro_manager.protobuf.p2sro_manager_pb2 import NewActivePolicyRequest, PolicyMetadataRequest, P2SROStatusResponse, \
-    Confirmation, PolicySpecJson, NumPlayers, PayoffResult, EvalRequest, PlayerAndPolicyNum, PolicyNumList, String, Metadata
-
 from grl.p2sro.p2sro_manager.p2sro_manager import P2SROManager, P2SROManagerLogger
+from grl.p2sro.p2sro_manager.protobuf.p2sro_manager_pb2 import NewActivePolicyRequest, PolicyMetadataRequest, \
+    P2SROStatusResponse, \
+    Confirmation, PolicySpecJson, NumPlayers, PayoffResult, EvalRequest, PlayerAndPolicyNum, PolicyNumList, String, \
+    Metadata
+from grl.p2sro.p2sro_manager.protobuf.p2sro_manager_pb2_grpc import P2SROManagerServicer, \
+    add_P2SROManagerServicer_to_server, \
+    P2SROManagerStub
+from grl.p2sro.payoff_table import PayoffTable
+from grl.utils.strategy_spec import StrategySpec
 
 logger = logging.getLogger(__name__)
 
@@ -49,8 +53,8 @@ class _P2SROMangerServerServicerImpl(P2SROManagerServicer):
 
     def CanActivePolicyBeSetAsFixedNow(self, request: PlayerAndPolicyNum, context):
         can_be_fixed_now = self._manager.can_active_policy_be_set_as_fixed_now(
-         player=request.player,
-         policy_num=request.policy_num
+            player=request.player,
+            policy_num=request.policy_num
         )
         return Confirmation(result=can_be_fixed_now)
 
@@ -66,7 +70,8 @@ class _P2SROMangerServerServicerImpl(P2SROManagerServicer):
         payoff_able, active_policies_per_player, fixed_policies_per_player = self._manager.get_copy_of_latest_data()
         response = P2SROStatusResponse(payoff_table_json=payoff_able.to_json_string())
 
-        for player_active_polices, player_fixed_policies in (zip(active_policies_per_player, fixed_policies_per_player)):
+        for player_active_polices, player_fixed_policies in (
+        zip(active_policies_per_player, fixed_policies_per_player)):
             active_list = PolicyNumList()
             fixed_list = PolicyNumList()
             active_list.policies.extend(player_active_polices)
@@ -77,8 +82,8 @@ class _P2SROMangerServerServicerImpl(P2SROManagerServicer):
         return response
 
     def SubmitEmpiricalPayoffResult(self, request: PayoffResult, context):
-        policy_specs_for_each_player = tuple(PayoffTableStrategySpec.from_json(json_string=json_string)
-                                        for json_string in request.json_policy_specs_for_each_player)
+        policy_specs_for_each_player = tuple(StrategySpec.from_json(json_string=json_string)
+                                             for json_string in request.json_policy_specs_for_each_player)
         # noinspection PyTypeChecker
         self._manager.submit_empirical_payoff_result(
             policy_specs_for_each_player=policy_specs_for_each_player,
@@ -87,10 +92,10 @@ class _P2SROMangerServerServicerImpl(P2SROManagerServicer):
             override_all_previous_results=request.override_all_previous_results
         )
         return Confirmation(result=True)
-        
+
     def RequestExternalEval(self, request: EvalRequest, context):
-        policy_specs_for_each_player = tuple(PayoffTableStrategySpec.from_json(json_string=json_string)
-                                        for json_string in request.json_policy_specs_for_each_player)
+        policy_specs_for_each_player = tuple(StrategySpec.from_json(json_string=json_string)
+                                             for json_string in request.json_policy_specs_for_each_player)
         self._manager.request_external_eval(policy_specs_for_each_player=policy_specs_for_each_player)
         return Confirmation(result=True)
 
@@ -108,6 +113,7 @@ class P2SROManagerWithServer(P2SROManager):
     P2SROManager's methods. Interacting with the P2SRPManager as a local instance while the server is handling requests
     is thread safe.
     """
+
     def __init__(self,
                  n_players,
                  is_two_player_symmetric_zero_sum: bool,
@@ -119,7 +125,6 @@ class P2SROManagerWithServer(P2SROManager):
                  manager_metadata: dict = None,
                  payoff_table_exponential_average_coeff: float = None,
                  port=4535):
-
         super(P2SROManagerWithServer, self).__init__(
             n_players=n_players,
             is_two_player_symmetric_zero_sum=is_two_player_symmetric_zero_sum,
@@ -152,6 +157,7 @@ class RemoteP2SROManagerClient(P2SROManager):
     Behaves exactly like a local P2SROManager but actually is connecting to a remote P2SRO Manager on another
     process or computer.
     """
+
     # noinspection PyMissingConstructor
     def __init__(self, n_players, port=4535, remote_server_host="127.0.0.1"):
         self._stub = P2SROManagerStub(channel=grpc.insecure_channel(target=f"{remote_server_host}:{port}"))
@@ -170,7 +176,7 @@ class RemoteP2SROManagerClient(P2SROManager):
         response: Metadata = self._stub.GetManagerMetaData(Empty())
         return json.loads(response.json_metadata)
 
-    def claim_new_active_policy_for_player(self, player, new_policy_metadata_dict) -> PayoffTableStrategySpec:
+    def claim_new_active_policy_for_player(self, player, new_policy_metadata_dict) -> StrategySpec:
         try:
             metadata_json = json.dumps(obj=new_policy_metadata_dict)
         except (TypeError, OverflowError) as json_err:
@@ -181,9 +187,9 @@ class RemoteP2SROManagerClient(P2SROManager):
             metadata_json=metadata_json
         )
         response: PolicySpecJson = self._stub.ClaimNewActivePolicyForPlayer(request)
-        return PayoffTableStrategySpec.from_json(response.policy_spec_json)
+        return StrategySpec.from_json(response.policy_spec_json)
 
-    def submit_new_active_policy_metadata(self, player, policy_num, metadata_dict) -> PayoffTableStrategySpec:
+    def submit_new_active_policy_metadata(self, player, policy_num, metadata_dict) -> StrategySpec:
         try:
             metadata_json = json.dumps(obj=metadata_dict)
         except (TypeError, OverflowError) as json_err:
@@ -195,14 +201,14 @@ class RemoteP2SROManagerClient(P2SROManager):
             metadata_json=metadata_json
         )
         response: PolicySpecJson = self._stub.SubmitNewActivePolicyMetadata(request)
-        return PayoffTableStrategySpec.from_json(response.policy_spec_json)
+        return StrategySpec.from_json(response.policy_spec_json)
 
     def can_active_policy_be_set_as_fixed_now(self, player, policy_num) -> bool:
         response: Confirmation = self._stub.CanActivePolicyBeSetAsFixedNow(PlayerAndPolicyNum(player=player,
                                                                                               policy_num=policy_num))
         return response.result
 
-    def set_active_policy_as_fixed(self, player, policy_num, final_metadata_dict) -> PayoffTableStrategySpec:
+    def set_active_policy_as_fixed(self, player, policy_num, final_metadata_dict) -> StrategySpec:
         try:
             metadata_json = json.dumps(obj=final_metadata_dict)
         except (TypeError, OverflowError) as json_err:
@@ -214,7 +220,7 @@ class RemoteP2SROManagerClient(P2SROManager):
             metadata_json=metadata_json
         )
         response: PolicySpecJson = self._stub.SetActivePolicyAsFixed(request)
-        return PayoffTableStrategySpec.from_json(response.policy_spec_json)
+        return StrategySpec.from_json(response.policy_spec_json)
 
     def get_copy_of_latest_data(self) -> (PayoffTable, List[List[int]], List[List[int]]):
         request = Empty()
@@ -230,7 +236,7 @@ class RemoteP2SROManagerClient(P2SROManager):
         return payoff_table, active_policies_per_player, fixed_policies_per_player
 
     def submit_empirical_payoff_result(self,
-                                       policy_specs_for_each_player: Tuple[PayoffTableStrategySpec],
+                                       policy_specs_for_each_player: Tuple[StrategySpec],
                                        payoffs_for_each_player: Tuple[float],
                                        games_played: int,
                                        override_all_previous_results: bool):
@@ -269,4 +275,3 @@ if __name__ == '__main__':
     )
     print(f"Launched P2SRO Manager with server.")
     manager.wait_for_server_termination()
-

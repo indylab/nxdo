@@ -1,6 +1,6 @@
-
 import logging
 from typing import Optional, Type, Callable
+
 import ray
 from ray.rllib.agents.trainer import with_common_config
 from ray.rllib.agents.trainer_template import build_trainer
@@ -9,13 +9,14 @@ from ray.rllib.execution.metric_ops import StandardMetricsReporting
 from ray.rllib.execution.replay_ops import StoreToReplayBuffer
 from ray.rllib.execution.train_ops import TrainOneStep
 from ray.rllib.policy.policy import Policy
-from ray.rllib.utils.typing import TrainerConfigDict
 from ray.rllib.utils.typing import SampleBatchType
-from ray.util.iter_metrics import SharedMetrics
+from ray.rllib.utils.typing import TrainerConfigDict
 from ray.util.iter import LocalIterator, _NextValueNotReady
+from ray.util.iter_metrics import SharedMetrics
 
-from grl.nfsp_rllib.reservoir_replay_buffer import ReservoirReplayActor
 from grl.nfsp_rllib.nfsp_torch_avg_policy import NFSPTorchAveragePolicy
+from grl.nfsp_rllib.reservoir_replay_buffer import ReservoirReplayActor
+
 logger = logging.getLogger(__name__)
 
 # yapf: disable
@@ -72,6 +73,8 @@ DEFAULT_CONFIG = with_common_config({
     # Prevent iterations from going lower than this time span
     "min_iter_time_s": 0,
 })
+
+
 # __sphinx_doc_end__
 # yapf: enable
 
@@ -105,7 +108,7 @@ def execution_plan(workers: WorkerSet,
         replay_batch_size=config["train_batch_size"],
         replay_mode=config["multiagent"]["replay_mode"],
         replay_sequence_length=config["replay_sequence_length"],
-        )
+    )
 
     # Store a handle for the replay buffer actor in the local worker
     workers.local_worker().replay_buffer_actor = replay_buffer_actor
@@ -125,8 +128,8 @@ def execution_plan(workers: WorkerSet,
             else:
                 yield item
 
-    replay_op = LocalIterator(gen_replay, SharedMetrics())\
-        .for_each(lambda x: post_fn(x, workers, config))\
+    replay_op = LocalIterator(gen_replay, SharedMetrics()) \
+        .for_each(lambda x: post_fn(x, workers, config)) \
         .for_each(TrainOneStep(workers))
 
     replay_op = StandardMetricsReporting(replay_op, workers, config)
@@ -134,6 +137,7 @@ def execution_plan(workers: WorkerSet,
     replay_op = map(lambda x: x if not isinstance(x, _NextValueNotReady) else {}, replay_op)
 
     return replay_op
+
 
 def get_policy_class(config: TrainerConfigDict) -> Optional[Type[Policy]]:
     """Policy class picker function. Class is chosen based on DL-framework.
@@ -150,6 +154,7 @@ def get_policy_class(config: TrainerConfigDict) -> Optional[Type[Policy]]:
     else:
         raise NotImplementedError(f"NFSP average policy for framework: {config['framework']} not implemented.")
 
+
 NFSPTrainer = build_trainer(
     name="NFSPTrainer",
     default_policy=NFSPTorchAveragePolicy,
@@ -163,4 +168,3 @@ NFSPTrainer = build_trainer(
 def get_store_to_avg_policy_buffer_fn(nfsp_trainer: NFSPTrainer) -> Callable[[SampleBatchType], SampleBatchType]:
     replay_buffer_actor = nfsp_trainer.workers.local_worker().replay_buffer_actor
     return StoreToReplayBuffer(actors=[replay_buffer_actor])
-

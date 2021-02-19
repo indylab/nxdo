@@ -1,6 +1,5 @@
-from abc import ABC, abstractmethod
-
 import logging
+from abc import ABC, abstractmethod
 
 from ray.rllib.utils.typing import PolicyID
 
@@ -24,6 +23,7 @@ class StopImmediately(StoppingCondition):
 
     def should_stop_this_iter(self, latest_trainer_result: dict, *args, **kwargs) -> bool:
         return True
+
 
 class SingleBRRewardPlateauStoppingCondition(StoppingCondition):
 
@@ -59,8 +59,9 @@ class SingleBRRewardPlateauStoppingCondition(StoppingCondition):
             if self._iters_since_saturation_checks_began % self.check_plateau_every_n_iters == 0:
                 if self._last_saturation_check_reward is not None:
                     improvement_since_last_check = br_reward_this_iter - self._last_saturation_check_reward
-                    logger.info(f"Improvement since last saturation check: {improvement_since_last_check}, minimum target is "
-                          f"{self.minimum_reward_improvement_otherwise_saturated}.")
+                    logger.info(
+                        f"Improvement since last saturation check: {improvement_since_last_check}, minimum target is "
+                        f"{self.minimum_reward_improvement_otherwise_saturated}.")
                     if improvement_since_last_check < self.minimum_reward_improvement_otherwise_saturated:
                         # We're no longer improving. Assume we have saturated, and stop training.
                         logger.info(f"Improvement target not reached, stopping training if allowed.")
@@ -107,8 +108,9 @@ class EpisodesSingleBRRewardPlateauStoppingCondition(StoppingCondition):
             if episodes >= self._next_check_after_n_episodes:
                 if self._last_saturation_check_reward is not None:
                     improvement_since_last_check = br_reward_this_iter - self._last_saturation_check_reward
-                    logger.info(f"Improvement since last saturation check: {improvement_since_last_check}, minimum target is "
-                          f"{self.minimum_reward_improvement_otherwise_saturated}.")
+                    logger.info(
+                        f"Improvement since last saturation check: {improvement_since_last_check}, minimum target is "
+                        f"{self.minimum_reward_improvement_otherwise_saturated}.")
                     if improvement_since_last_check < self.minimum_reward_improvement_otherwise_saturated:
                         # We're no longer improving. Assume we have saturated, and stop training.
                         logger.info(f"Improvement target not reached, stopping training if allowed.")
@@ -122,7 +124,6 @@ class EpisodesSingleBRRewardPlateauStoppingCondition(StoppingCondition):
             should_stop = True
 
         return should_stop
-
 
 
 class TimeStepsSingleBRRewardPlateauStoppingCondition(StoppingCondition):
@@ -156,8 +157,9 @@ class TimeStepsSingleBRRewardPlateauStoppingCondition(StoppingCondition):
             if steps >= self._next_check_after_n_steps:
                 if self._last_saturation_check_reward is not None:
                     improvement_since_last_check = br_reward_this_iter - self._last_saturation_check_reward
-                    logger.info(f"Improvement since last saturation check: {improvement_since_last_check}, minimum target is "
-                          f"{self.minimum_reward_improvement_otherwise_saturated}.")
+                    logger.info(
+                        f"Improvement since last saturation check: {improvement_since_last_check}, minimum target is "
+                        f"{self.minimum_reward_improvement_otherwise_saturated}.")
                     if improvement_since_last_check < self.minimum_reward_improvement_otherwise_saturated:
                         # We're no longer improving. Assume we have saturated, and stop training.
                         logger.info(f"Improvement target not reached, stopping training if allowed.")
@@ -178,7 +180,7 @@ class TwoPlayerBRRewardsBelowAmtStoppingCondition(StoppingCondition):
     def __init__(self,
                  stop_if_br_avg_rew_falls_below: float,
                  min_episodes: int = None,
-                 required_fields_in_last_train_iter = None):
+                 required_fields_in_last_train_iter=None):
         self.stop_if_br_avg_rew_falls_below = stop_if_br_avg_rew_falls_below
         self.min_episodes = int(min_episodes)
         self.required_fields_in_last_train_iter = required_fields_in_last_train_iter or []
@@ -186,13 +188,7 @@ class TwoPlayerBRRewardsBelowAmtStoppingCondition(StoppingCondition):
     def should_stop_this_iter(self, latest_trainer_result: dict, *args, **kwargs) -> bool:
         print(f"Stopping Condition Reward threshold is {self.stop_if_br_avg_rew_falls_below}")
         return bool(
-                (self.min_episodes is None or latest_trainer_result["episodes_total"] >= self.min_episodes) and
-                all(field in latest_trainer_result for field in self.required_fields_in_last_train_iter) and
-                latest_trainer_result["avg_br_reward_both_players"] < self.stop_if_br_avg_rew_falls_below
+            (self.min_episodes is None or latest_trainer_result["episodes_total"] >= self.min_episodes) and
+            all(field in latest_trainer_result for field in self.required_fields_in_last_train_iter) and
+            latest_trainer_result["avg_br_reward_both_players"] < self.stop_if_br_avg_rew_falls_below
         )
-
-
-
-
-
-

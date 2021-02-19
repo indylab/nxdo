@@ -1,48 +1,38 @@
 import ray
 from ray.rllib.utils import merge_dicts, try_import_torch
+
 torch, _ = try_import_torch()
 
 import os
 import time
 import logging
 import numpy as np
-from typing import Dict, List, Any, Tuple, Callable, Type, Dict
+from typing import List, Any, Tuple, Type, Dict
 import tempfile
-import argparse
 from copy import deepcopy
 
-from gym.spaces import Space, Discrete, Box
+from gym.spaces import Discrete
 import copy
 import deepdish
 
-from ray.rllib import SampleBatch, Policy
 from ray.rllib.agents import Trainer
 
-from ray.rllib.utils.torch_ops import convert_to_non_torch_type, \
-    convert_to_torch_tensor
-from ray.rllib.utils.typing import ModelGradients, ModelWeights, \
-    TensorType, TrainerConfigDict, AgentID, PolicyID
-from ray.rllib.evaluation.rollout_worker import RolloutWorker
+from ray.rllib.utils.typing import AgentID, PolicyID
 from ray.rllib.agents.callbacks import DefaultCallbacks
 from ray.rllib.evaluation import MultiAgentEpisode, RolloutWorker
 from ray.rllib.env import BaseEnv
 from ray.rllib.policy import Policy
-from ray.tune.logger import Logger, UnifiedLogger
-from ray.rllib.policy.sample_batch import SampleBatch, DEFAULT_POLICY_ID, \
-    MultiAgentBatch
-from ray.rllib.agents.dqn.dqn_tf_policy import PRIO_WEIGHTS
-import grl
-from grl.utils import pretty_dict_str, datetime_str, ensure_dir, copy_attributes
+from ray.rllib.policy.sample_batch import SampleBatch, MultiAgentBatch
+from grl.utils.common import pretty_dict_str, datetime_str, ensure_dir, copy_attributes
 from grl.rllib_tools.stat_deque import StatDeque
 from grl.nfsp_rllib.nfsp import get_store_to_avg_policy_buffer_fn
-from grl.rl_apps.nfsp.openspiel_utils import nfsp_measure_exploitability_nonlstm
 from grl.rllib_tools.space_saving_logger import SpaceSavingLogger
 from grl.rl_apps.scenarios.stopping_conditions import StoppingCondition
-from grl.p2sro.payoff_table import PayoffTableStrategySpec
+from grl.utils.strategy_spec import StrategySpec
 from grl.xfdo.restricted_game import RestrictedGame
 from grl.xfdo.action_space_conversion import RestrictedToBaseGameActionSpaceConverter
 from grl.rl_apps.xfdo.poker_utils import xfdo_nfsp_measure_exploitability_nonlstm
-from grl.xfdo.openspiel.opnsl_restricted_game import OpenSpielRestrictedGame, AgentRestrictedGameOpenSpielObsConversions, get_restricted_game_obs_conversions
+from grl.xfdo.opnsl_restricted_game import OpenSpielRestrictedGame, get_restricted_game_obs_conversions
 
 from grl.rl_apps.scenarios.ray_setup import init_ray_for_scenario
 
@@ -75,18 +65,19 @@ def checkpoint_dir(trainer: Trainer):
 
 
 def save_nfsp_avg_policy_checkpoint(trainer: Trainer,
-                                        policy_id_to_save: str,
-                                      save_dir: str,
-                                      timesteps_training: int,
-                                      episodes_training: int,
-                                      checkpoint_name=None):
+                                    policy_id_to_save: str,
+                                    save_dir: str,
+                                    timesteps_training: int,
+                                    episodes_training: int,
+                                    checkpoint_name=None):
     policy_name = policy_id_to_save
     date_time = datetime_str()
     if checkpoint_name is None:
         checkpoint_name = f"policy_{policy_name}_{date_time}.h5"
     checkpoint_path = os.path.join(save_dir, checkpoint_name)
     br_weights = trainer.get_weights([policy_id_to_save])[policy_id_to_save]
-    br_weights = {k.replace(".", "_dot_"): v for k, v in br_weights.items()} # periods cause HDF5 NaturalNaming warnings
+    br_weights = {k.replace(".", "_dot_"): v for k, v in
+                  br_weights.items()}  # periods cause HDF5 NaturalNaming warnings
     ensure_dir(file_path=checkpoint_path)
     deepdish.io.save(path=checkpoint_path, data={
         "weights": br_weights,
@@ -96,6 +87,7 @@ def save_nfsp_avg_policy_checkpoint(trainer: Trainer,
         "episodes_training": episodes_training
     }, )
     return checkpoint_path
+
 
 def create_get_pure_strat_cached(cache: dict):
     def load_pure_strat_cached(policy: Policy, pure_strat_spec):
@@ -109,22 +101,22 @@ def create_get_pure_strat_cached(cache: dict):
             weights = checkpoint_data["weights"]
             weights = {k.replace("_dot_", "."): v for k, v in weights.items()}
 
-            weights = convert_to_torch_tensor(weights, device=policy.device)
+            weights = convert_to_torch_tensor_safe(weights, device=policy.device)
             cache[pure_strat_checkpoint_path] = weights
         # policy.set_weights(weights=weights)
         policy.model.load_state_dict(weights)
 
         policy.policy_spec = pure_strat_spec
+
     return load_pure_strat_cached
 
+
 def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
-                             scenario: dict,
-                             player_to_base_game_action_specs: Dict[int, List[PayoffTableStrategySpec]],
-                             stopping_condition: StoppingCondition,
-                             manager_metadata: dict,
-                             print_train_results: bool = True):
-
-
+                                             scenario: dict,
+                                             player_to_base_game_action_specs: Dict[int, List[StrategySpec]],
+                                             stopping_condition: StoppingCondition,
+                                             manager_metadata: dict,
+                                             print_train_results: bool = True):
     use_openspiel_restricted_game: bool = scenario["use_openspiel_restricted_game"]
     restricted_game_custom_model = scenario["restricted_game_custom_model"]
 
@@ -196,19 +188,27 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
         "multiagent": {
             "policies_to_train": ["average_policy_0", "average_policy_1"],
             "policies": {
-                "average_policy_0": (policy_classes["average_policy"], tmp_env.observation_space, restricted_game_action_spaces[0], {"explore": False}),
-                "average_policy_1": (policy_classes["average_policy"], tmp_env.observation_space, restricted_game_action_spaces[1], {"explore": False}),
-                "delegate_policy": (policy_classes["delegate_policy"], tmp_base_env.observation_space, tmp_env.base_action_space, {"explore": False}),
+                "average_policy_0": (
+                policy_classes["average_policy"], tmp_env.observation_space, restricted_game_action_spaces[0],
+                {"explore": False}),
+                "average_policy_1": (
+                policy_classes["average_policy"], tmp_env.observation_space, restricted_game_action_spaces[1],
+                {"explore": False}),
+                "delegate_policy": (
+                policy_classes["delegate_policy"], tmp_base_env.observation_space, tmp_env.base_action_space,
+                {"explore": False}),
             },
             "policy_mapping_fn": assert_not_called,
         },
 
     }, get_avg_trainer_config(tmp_env.base_action_space))
     for _policy_id in ["average_policy_0", "average_policy_1"]:
-        avg_trainer_config["multiagent"]["policies"][_policy_id][3]["model"] = {"custom_model": restricted_game_custom_model}
+        avg_trainer_config["multiagent"]["policies"][_policy_id][3]["model"] = {
+            "custom_model": restricted_game_custom_model}
 
-    avg_trainer = avg_trainer_class(config=avg_trainer_config, logger_creator=get_trainer_logger_creator(base_dir=results_dir,
-                                                 scenario_name=f"nfsp_restricted_game_avg_trainer"))
+    avg_trainer = avg_trainer_class(config=avg_trainer_config,
+                                    logger_creator=get_trainer_logger_creator(base_dir=results_dir,
+                                                                              scenario_name=f"nfsp_restricted_game_avg_trainer"))
 
     store_to_avg_policy_buffer = get_store_to_avg_policy_buffer_fn(nfsp_trainer=avg_trainer)
 
@@ -227,7 +227,8 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
 
             # All data from both policies will go into the best response's replay buffer.
             # Here we ensure policies not from the best response have the exact same preprocessing as the best response.
-            for average_policy_id, br_policy_id in [("average_policy_0", "best_response_0"), ("average_policy_1", "best_response_1")]:
+            for average_policy_id, br_policy_id in [("average_policy_0", "best_response_0"),
+                                                    ("average_policy_1", "best_response_1")]:
                 if policy_id == average_policy_id:
 
                     if "action_probs" in postprocessed_batch:
@@ -264,7 +265,8 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
                 if "action_logp" in policy_samples.data:
                     del policy_samples.data["action_logp"]
 
-            for average_policy_id, br_policy_id in [("average_policy_0", "best_response_0"), ("average_policy_1", "best_response_1")]:
+            for average_policy_id, br_policy_id in [("average_policy_0", "best_response_0"),
+                                                    ("average_policy_1", "best_response_1")]:
                 for policy_id, policy_samples in samples.policy_batches.items():
                     if policy_id == br_policy_id:
                         store_to_avg_policy_buffer(MultiAgentBatch(policy_batches={
@@ -290,7 +292,6 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
             elif episode_policies == {(1, "average_policy_1"), (0, "best_response_0")}:
                 worker.avg_br_reward_deque.add.remote(episode.agent_rewards[(0, "best_response_0")])
 
-
         def on_train_result(self, *, trainer, result: dict, **kwargs):
             super().on_train_result(trainer=trainer, result=result, **kwargs)
             training_iteration = result["training_iteration"]
@@ -314,14 +315,12 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
                 )
                 result["z_avg_policy_exploitability"] = exploitability
 
-
                 # check_local_avg_policy_0 = trainer.avg_trainer.workers.local_worker().policy_map["average_policy_0"]
                 # check_local_avg_policy_1 = trainer.avg_trainer.workers.local_worker().policy_map["average_policy_1"]
                 # check_exploitability = nfsp_measure_exploitability_nonlstm(
                 #     rllib_policies=[check_local_avg_policy_0, check_local_avg_policy_1],
                 #     poker_game_version="leduc_poker")
                 # assert np.isclose(exploitability, check_exploitability), f"values are {exploitability} and {check_exploitability}"
-
 
     # def train_avg_policy(x: MultiAgentBatch, worker, *args, **kwargs):
     #     avg_train_results = worker.avg_trainer.train()
@@ -345,13 +344,21 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
         "multiagent": {
             "policies_to_train": ["best_response_0", "best_response_1"],
             "policies": {
-                "average_policy_0": (policy_classes["average_policy"], tmp_env.observation_space, restricted_game_action_spaces[0], {"explore": False}),
-                "best_response_0": (policy_classes["best_response"], tmp_env.observation_space, restricted_game_action_spaces[0], {}),
+                "average_policy_0": (
+                policy_classes["average_policy"], tmp_env.observation_space, restricted_game_action_spaces[0],
+                {"explore": False}),
+                "best_response_0": (
+                policy_classes["best_response"], tmp_env.observation_space, restricted_game_action_spaces[0], {}),
 
-                "average_policy_1": (policy_classes["average_policy"], tmp_env.observation_space, restricted_game_action_spaces[1], {"explore": False}),
-                "best_response_1": (policy_classes["best_response"], tmp_env.observation_space, restricted_game_action_spaces[1], {}),
+                "average_policy_1": (
+                policy_classes["average_policy"], tmp_env.observation_space, restricted_game_action_spaces[1],
+                {"explore": False}),
+                "best_response_1": (
+                policy_classes["best_response"], tmp_env.observation_space, restricted_game_action_spaces[1], {}),
 
-                "delegate_policy": (policy_classes["delegate_policy"], tmp_base_env.observation_space, tmp_env.base_action_space, {"explore": False}),
+                "delegate_policy": (
+                policy_classes["delegate_policy"], tmp_base_env.observation_space, tmp_env.base_action_space,
+                {"explore": False}),
 
             },
             "policy_mapping_fn": select_policy,
@@ -361,7 +368,8 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
         "If not true, the line below with \"get_trainer_config\" may need to be changed to a better solution."
     br_trainer_config = merge_dicts(br_trainer_config, get_trainer_config(tmp_env.base_action_space))
     for _policy_id in ["average_policy_0", "average_policy_1", "best_response_0", "best_response_1"]:
-        br_trainer_config["multiagent"]["policies"][_policy_id][3]["model"] = {"custom_model": restricted_game_custom_model}
+        br_trainer_config["multiagent"]["policies"][_policy_id][3]["model"] = {
+            "custom_model": restricted_game_custom_model}
 
     br_trainer_config["metrics_smoothing_episodes"] = metrics_smoothing_episodes_override
 
@@ -373,6 +381,7 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
 
     def _set_avg_br_rew_deque(worker: RolloutWorker):
         worker.avg_br_reward_deque = avg_br_reward_deque
+
     br_trainer.workers.foreach_worker(_set_avg_br_rew_deque)
     br_trainer.avg_br_reward_deque = avg_br_reward_deque
 
@@ -382,9 +391,9 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
         for p in range(2):
             print("Creating restricted game obs conversions...")
             convertor = get_restricted_game_obs_conversions(player=p, delegate_policy=local_delegate_policy,
-                                                                  policy_specs=player_to_base_game_action_specs[p],
-                                                                  load_policy_spec_fn=create_get_pure_strat_cached(cache={}),
-                                                                  tmp_base_env=tmp_base_env)
+                                                            policy_specs=player_to_base_game_action_specs[p],
+                                                            load_policy_spec_fn=create_get_pure_strat_cached(cache={}),
+                                                            tmp_base_env=tmp_base_env)
             player_converters.append(convertor)
         for _trainer in [br_trainer, avg_trainer]:
             def _set_worker_converters(worker: RolloutWorker):
@@ -392,6 +401,7 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
                 for p in range(2):
                     worker.foreach_env(lambda env: env.set_obs_conversion_dict(p, player_converters[p]))
                 worker_delegate_policy.player_converters = player_converters
+
             _trainer.workers.foreach_worker(_set_worker_converters)
             _trainer.get_local_converters = lambda: _trainer.workers.local_worker().policy_map[
                 "delegate_policy"].player_converters
@@ -412,8 +422,6 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
             _trainer.workers.foreach_worker(_set_worker_converters)
             _trainer.get_local_converters = lambda: _trainer.workers.local_worker().policy_map[
                 "delegate_policy"].player_converters
-
-
 
     br_trainer.latest_avg_trainer_result = None
     train_iter_count = 0
@@ -438,7 +446,6 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
             br_trainer.workers.foreach_worker(lambda worker: worker.set_weights(avg_weights))
             br_trainer.latest_avg_trainer_result = copy.deepcopy(avg_train_results)
             train_iter_results = br_trainer.train()  # do a step (or several) in the main RL loop
-
 
             train_iter_count += 1
             if print_train_results:
@@ -474,13 +481,14 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
     for player in range(2):
         strategy_id = f"avg_policy_player_{player}_{datetime_str()}"
 
-        checkpoint_path = save_nfsp_avg_policy_checkpoint(trainer=br_trainer, policy_id_to_save=f"average_policy_{player}",
-                                        save_dir=checkpoint_dir(trainer=br_trainer),
-                                        timesteps_training=final_train_result["timesteps_total"],
-                                        episodes_training=final_train_result["episodes_total"],
-                                        checkpoint_name=f"{strategy_id}.h5")
+        checkpoint_path = save_nfsp_avg_policy_checkpoint(trainer=br_trainer,
+                                                          policy_id_to_save=f"average_policy_{player}",
+                                                          save_dir=checkpoint_dir(trainer=br_trainer),
+                                                          timesteps_training=final_train_result["timesteps_total"],
+                                                          episodes_training=final_train_result["episodes_total"],
+                                                          checkpoint_name=f"{strategy_id}.h5")
 
-        avg_policy_spec = PayoffTableStrategySpec(
+        avg_policy_spec = StrategySpec(
             strategy_id=strategy_id,
             metadata={"checkpoint_path": checkpoint_path,
                       "delegate_policy_specs": [spec.to_json() for spec in player_to_base_game_action_specs[player]]

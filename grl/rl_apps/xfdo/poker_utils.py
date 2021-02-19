@@ -1,30 +1,17 @@
-from grl.p2sro.payoff_table import PayoffTable, PayoffTableStrategySpec
-from ray.rllib.agents.sac import SACTorchPolicy
-from ray.rllib.agents.trainer import with_common_config, MODEL_DEFAULTS
-from ray.rllib.policy import Policy
-import deepdish
+from typing import Callable, List, Tuple, Union
 
-from typing import Iterable, Dict, Callable, List, Tuple, Generator, Union
-from open_spiel.python import policy
-from open_spiel.python import rl_environment
-from open_spiel.python.algorithms import exploitability
 import numpy as np
-
-
-import ray
-
-from open_spiel.python.policy import Policy as OpenSpielPolicy, TabularPolicy, tabular_policy_from_callable
-from open_spiel.python.algorithms.exploitability import nash_conv, exploitability
-from pyspiel import Game as OpenSpielGame
-
 import pyspiel
-from grl.p2sro.p2sro_manager.utils import get_latest_metanash_strategies
-from grl.p2sro.payoff_table import PayoffTableStrategySpec
-from grl.rl_apps.kuhn_poker_p2sro.poker_multi_agent_env import PokerMultiAgentEnv
-from grl.rl_apps.kuhn_poker_p2sro.poker_utils import tabular_policies_from_weighted_policies, JointPlayerPolicy, softmax
+from open_spiel.python.algorithms.exploitability import exploitability
+from open_spiel.python.policy import tabular_policy_from_callable
+from pyspiel import Game as OpenSpielGame
+from ray.rllib.policy import Policy
+
+from grl.envs.poker_multi_agent_env import parse_discrete_poker_action_from_continuous_space
+from grl.rl_apps.psro.poker_utils import tabular_policies_from_weighted_policies, JointPlayerPolicy, softmax
 from grl.xfdo.action_space_conversion import RestrictedToBaseGameActionSpaceConverter
-from grl.xfdo.openspiel.opnsl_restricted_game import AgentRestrictedGameOpenSpielObsConversions
-from grl.rl_apps.kuhn_poker_p2sro.poker_multi_agent_env import parse_discrete_poker_action_from_continuous_space
+from grl.xfdo.opnsl_restricted_game import AgentRestrictedGameOpenSpielObsConversions
+
 
 def _parse_action_probs_from_action_info(action, action_info, legal_actions_list, total_num_discrete_actions):
     action_probs = None
@@ -49,8 +36,8 @@ def _parse_action_probs_from_action_info(action, action_info, legal_actions_list
 
 def openspiel_policy_from_nonlstm_rllib_xfdo_policy(openspiel_game: OpenSpielGame,
                                                     rllib_policy: Policy,
-                                                    restricted_game_convertor: Union[RestrictedToBaseGameActionSpaceConverter, AgentRestrictedGameOpenSpielObsConversions]):
-
+                                                    restricted_game_convertor: Union[
+                                                        RestrictedToBaseGameActionSpaceConverter, AgentRestrictedGameOpenSpielObsConversions]):
     is_openspiel_restricted_game = isinstance(restricted_game_convertor, AgentRestrictedGameOpenSpielObsConversions)
 
     def policy_callable(state: pyspiel.State):
@@ -62,7 +49,8 @@ def openspiel_policy_from_nonlstm_rllib_xfdo_policy(openspiel_game: OpenSpielGam
 
         info_state_vector = state.information_state_tensor()
 
-        if openspiel_game.get_type().short_name in ["leduc_poker", "oshi_zumo", "oshi_zumo_tiny", "universal_poker"] or is_openspiel_restricted_game:
+        if openspiel_game.get_type().short_name in ["leduc_poker", "oshi_zumo", "oshi_zumo_tiny",
+                                                    "universal_poker"] or is_openspiel_restricted_game:
             # Observation includes both the info_state and legal actions, but agent isn't forced to take legal actions.
             # Taking an illegal action will result in a random legal action being played.
             # Allows easy compatibility with standard RL implementations for small action-space games like this one.
@@ -77,10 +65,15 @@ def openspiel_policy_from_nonlstm_rllib_xfdo_policy(openspiel_game: OpenSpielGam
             try:
                 obs = os_restricted_game_convertor.orig_obs_to_restricted_game_obs[tuple(obs)]
             except KeyError:
-                print(f"missing key: {tuple(obs)}\nexample key: {list(os_restricted_game_convertor.orig_obs_to_restricted_game_obs.keys())[0]}")
+                print(
+                    f"missing key: {tuple(obs)}\nexample key: {list(os_restricted_game_convertor.orig_obs_to_restricted_game_obs.keys())[0]}")
                 raise
         action, _, restricted_action_info = rllib_policy.compute_single_action(obs=obs, state=[], explore=False)
-        restricted_game_action_probs = _parse_action_probs_from_action_info(action=action, action_info=restricted_action_info, legal_actions_list=legal_actions_list, total_num_discrete_actions=len(valid_actions_mask))
+        restricted_game_action_probs = _parse_action_probs_from_action_info(action=action,
+                                                                            action_info=restricted_action_info,
+                                                                            legal_actions_list=legal_actions_list,
+                                                                            total_num_discrete_actions=len(
+                                                                                valid_actions_mask))
 
         if is_openspiel_restricted_game:
             action_probs = restricted_game_action_probs
@@ -91,11 +84,16 @@ def openspiel_policy_from_nonlstm_rllib_xfdo_policy(openspiel_game: OpenSpielGam
                     obs=obs, restricted_game_action=restricted_game_action, use_delegate_policy_exploration=False,
                     clip_base_game_actions=False, delegate_policy_state=None
                 )
-                base_game_action_probs_for_rstr_action = _parse_action_probs_from_action_info(action=action, action_info=action_info, legal_actions_list=legal_actions_list, total_num_discrete_actions=len(valid_actions_mask))
+                base_game_action_probs_for_rstr_action = _parse_action_probs_from_action_info(action=action,
+                                                                                              action_info=action_info,
+                                                                                              legal_actions_list=legal_actions_list,
+                                                                                              total_num_discrete_actions=len(
+                                                                                                  valid_actions_mask))
                 base_action_probs_for_each_restricted_game_action.append(base_game_action_probs_for_rstr_action)
 
             action_probs = np.zeros_like(base_action_probs_for_each_restricted_game_action[0])
-            for base_action_probs, restricted_action_prob in zip(base_action_probs_for_each_restricted_game_action, restricted_game_action_probs):
+            for base_action_probs, restricted_action_prob in zip(base_action_probs_for_each_restricted_game_action,
+                                                                 restricted_game_action_probs):
                 action_probs += (base_action_probs * restricted_action_prob)
 
         assert np.isclose(sum(action_probs), 1.0)
@@ -134,9 +132,10 @@ def openspiel_policy_from_nonlstm_rllib_xfdo_policy(openspiel_game: OpenSpielGam
     return tabular_policy_from_callable(game=openspiel_game, callable_policy=policy_callable)
 
 
-
 def xfdo_nfsp_measure_exploitability_nonlstm(rllib_policies: List[Policy],
-                                             restricted_game_convertors: Union[List[RestrictedToBaseGameActionSpaceConverter], List[AgentRestrictedGameOpenSpielObsConversions]],
+                                             restricted_game_convertors: Union[
+                                                 List[RestrictedToBaseGameActionSpaceConverter], List[
+                                                     AgentRestrictedGameOpenSpielObsConversions]],
                                              poker_game_version: str,
                                              open_spiel_env_config: dict = None):
     if open_spiel_env_config is None:
@@ -177,11 +176,12 @@ def xfdo_nfsp_measure_exploitability_nonlstm(rllib_policies: List[Policy],
     return exploitability_result
 
 
-
 def xfdo_snfsp_measure_exploitability_nonlstm(br_checkpoint_path_tuple_list: List[Tuple[str, str]],
                                               set_policy_weights_fn: Callable,
                                               rllib_policies: List[Policy],
-                                              restricted_game_convertors: Union[List[RestrictedToBaseGameActionSpaceConverter], List[AgentRestrictedGameOpenSpielObsConversions]],
+                                              restricted_game_convertors: Union[
+                                                  List[RestrictedToBaseGameActionSpaceConverter], List[
+                                                      AgentRestrictedGameOpenSpielObsConversions]],
                                               poker_game_version: str):
     if poker_game_version in ["kuhn_poker", "leduc_poker"]:
         open_spiel_env_config = {
@@ -196,7 +196,8 @@ def xfdo_snfsp_measure_exploitability_nonlstm(br_checkpoint_path_tuple_list: Lis
         for checkpoint_path_tuple in br_checkpoint_path_tuple_list:
             openspiel_policies = []
             assert isinstance(restricted_game_convertors, list)
-            for player, (restricted_game_convertor, player_rllib_policy) in enumerate(zip(restricted_game_convertors, rllib_policies)):
+            for player, (restricted_game_convertor, player_rllib_policy) in enumerate(
+                    zip(restricted_game_convertors, rllib_policies)):
                 checkpoint_path = checkpoint_path_tuple[player]
                 set_policy_weights_fn(player_rllib_policy, checkpoint_path)
 

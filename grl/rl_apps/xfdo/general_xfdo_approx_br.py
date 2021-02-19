@@ -1,5 +1,6 @@
 import ray
 from ray.rllib.utils import merge_dicts, try_import_torch
+
 torch, _ = try_import_torch()
 
 import os
@@ -10,34 +11,23 @@ import tempfile
 from gym.spaces import Discrete
 
 from typing import Dict, List, Type, Callable
-from tables.exceptions import HDF5ExtError
 import deepdish
-import argparse
 
 from ray.rllib.agents import Trainer
 from ray.rllib.env.multi_agent_env import MultiAgentEnv
-from ray.rllib.utils.torch_ops import convert_to_non_torch_type, \
-    convert_to_torch_tensor
-from ray.rllib.utils.typing import ModelGradients, ModelWeights, \
-    TensorType, TrainerConfigDict
-from ray.rllib.evaluation.rollout_worker import RolloutWorker
 from ray.rllib.agents.callbacks import DefaultCallbacks
 from ray.rllib.evaluation import MultiAgentEpisode, RolloutWorker
 from ray.rllib.env import BaseEnv
 from ray.rllib.policy import Policy
 from ray.rllib.utils.typing import AgentID, PolicyID
-from grl.p2sro.payoff_table import PayoffTableStrategySpec
-from grl.utils import pretty_dict_str, datetime_str, ensure_dir
-from grl.p2sro.p2sro_manager.utils import PolicySpecDistribution
-from grl.xfdo.xfdo_manager.manager import XFDOManager
-from grl.xfdo.xfdo_manager.remote import RemoteXFDOManagerClient
+from grl.utils.strategy_spec import StrategySpec
+from grl.utils.common import pretty_dict_str, datetime_str
 from grl.xfdo.action_space_conversion import RestrictedToBaseGameActionSpaceConverter
 from grl.xfdo.restricted_game import RestrictedGame
 from grl.rllib_tools.space_saving_logger import SpaceSavingLogger
-from grl.rl_apps.scenarios.poker import scenarios
 from grl.rl_apps.scenarios.ray_setup import init_ray_for_scenario
 from grl.rl_apps.scenarios.stopping_conditions import StoppingCondition
-from grl.xfdo.openspiel.opnsl_restricted_game import OpenSpielRestrictedGame, AgentRestrictedGameOpenSpielObsConversions, get_restricted_game_obs_conversions
+from grl.xfdo.opnsl_restricted_game import OpenSpielRestrictedGame, get_restricted_game_obs_conversions
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +61,9 @@ def load_pure_strat(policy: Policy, pure_strat_spec, checkpoint_path: str = None
     else:
         pure_strat_checkpoint_path = checkpoint_path
 
-    pure_strat_checkpoint_path = pure_strat_checkpoint_path.replace("/home/jb/git/grl/grl/data/12_no_limit_leduc_xfdo_dqn_nfsp_gpu_dynamic_threshold_1_aggressive/manager_01.04.42AM_Feb-03-2021/", "/home/jblanier/gokuleduc/xfdo/manager_01.04.42AM_Feb-03-2021/")
+    pure_strat_checkpoint_path = pure_strat_checkpoint_path.replace(
+        "/home/jb/git/grl/grl/data/12_no_limit_leduc_xfdo_dqn_nfsp_gpu_dynamic_threshold_1_aggressive/manager_01.04.42AM_Feb-03-2021/",
+        "/home/jblanier/gokuleduc/xfdo/manager_01.04.42AM_Feb-03-2021/")
 
     checkpoint_data = deepdish.io.load(path=pure_strat_checkpoint_path)
     weights = checkpoint_data["weights"]
@@ -98,6 +90,7 @@ def create_get_pure_strat_cached(cache: dict):
 
         policy.set_weights(weights=weights)
         policy.policy_spec = pure_strat_spec
+
     return load_pure_strat_cached
 
 
@@ -119,9 +112,8 @@ class P2SROPreAndPostEpisodeCallbacks(DefaultCallbacks):
 def set_restricted_game_conversations_for_all_workers(
         trainer: Trainer,
         delegate_policy_id: PolicyID,
-        agent_id_to_restricted_game_specs: Dict[AgentID, List[PayoffTableStrategySpec]],
+        agent_id_to_restricted_game_specs: Dict[AgentID, List[StrategySpec]],
         load_policy_spec_fn):
-
     def _set_conversions(worker: RolloutWorker):
 
         def _set_restricted_env_convertions(restricted_env):
@@ -133,7 +125,9 @@ def set_restricted_game_conversations_for_all_workers(
                         policy_specs=action_policy_specs,
                         load_policy_spec_fn=load_policy_spec_fn)
                     restricted_env.set_action_conversion(agent_id=agent_id, converter=convertor)
+
         worker.foreach_env(_set_restricted_env_convertions)
+
     trainer.workers.foreach_worker(_set_conversions)
 
 
@@ -141,7 +135,7 @@ def set_restricted_game_conversions_for_all_workers_openspiel(
         trainer: Trainer,
         tmp_base_env: MultiAgentEnv,
         delegate_policy_id: PolicyID,
-        agent_id_to_restricted_game_specs: Dict[AgentID, List[PayoffTableStrategySpec]],
+        agent_id_to_restricted_game_specs: Dict[AgentID, List[StrategySpec]],
         load_policy_spec_fn):
     local_delegate_policy = trainer.workers.local_worker().policy_map[delegate_policy_id]
     player_converters = {}
@@ -149,10 +143,11 @@ def set_restricted_game_conversions_for_all_workers_openspiel(
         if len(restricted_game_specs) == 0:
             continue
         player_converters[p] = (get_restricted_game_obs_conversions(player=p, delegate_policy=local_delegate_policy,
-                                                                     policy_specs=restricted_game_specs,
-                                                                     load_policy_spec_fn=load_policy_spec_fn,
-                                                                     tmp_base_env=tmp_base_env))
+                                                                    policy_specs=restricted_game_specs,
+                                                                    load_policy_spec_fn=load_policy_spec_fn,
+                                                                    tmp_base_env=tmp_base_env))
     assert len(player_converters) == 0 or len(player_converters) == 1
+
     def _set_worker_converters(worker: RolloutWorker):
         worker_delegate_policy = worker.policy_map[delegate_policy_id]
         for p, player_converter in player_converters.items():
@@ -170,11 +165,10 @@ def train_poker_approx_best_response_xdfo(br_player: int,
                                           general_trainer_config_overrrides,
                                           br_policy_config_overrides: dict,
                                           get_stopping_condition: Callable[[], StoppingCondition],
-                                          metanash_specs_for_players: Dict[int, PayoffTableStrategySpec],
-                                          delegate_specs_for_players: Dict[int, List[PayoffTableStrategySpec]],
+                                          metanash_specs_for_players: Dict[int, StrategySpec],
+                                          delegate_specs_for_players: Dict[int, List[StrategySpec]],
                                           results_dir: str,
                                           print_train_results: bool = True):
-
     use_openspiel_restricted_game: bool = scenario["use_openspiel_restricted_game"]
     restricted_game_custom_model = scenario["restricted_game_custom_model"]
 
@@ -190,7 +184,7 @@ def train_poker_approx_best_response_xdfo(br_player: int,
         cfp_metanash_specs_for_players = {}
         for p, player_metanash_spec in metanash_specs_for_players.items():
             player_cfp_json_specs = player_metanash_spec.metadata["cfp_pure_strat_specs"]
-            player_cfp_specs = [PayoffTableStrategySpec.from_json(json_spec) for json_spec in player_cfp_json_specs]
+            player_cfp_specs = [StrategySpec.from_json(json_spec) for json_spec in player_cfp_json_specs]
             cfp_metanash_specs_for_players[p] = player_cfp_specs
     else:
         cfp_metanash_specs_for_players = None
@@ -243,16 +237,23 @@ def train_poker_approx_best_response_xdfo(br_player: int,
         "multiagent": {
             "policies_to_train": [f"best_response"],
             "policies": {
-                f"metanash": (policy_classes["metanash"], other_player_restricted_obs_space, other_player_restricted_action_space, {"explore": False}),
-                f"metanash_delegate": (policy_classes["best_response"], tmp_env.base_observation_space, tmp_env.base_action_space, {"explore": False}),
-                f"best_response": (policy_classes["best_response"], tmp_env.base_observation_space, tmp_env.base_action_space, br_policy_config_overrides),
+                f"metanash": (
+                policy_classes["metanash"], other_player_restricted_obs_space, other_player_restricted_action_space,
+                {"explore": False}),
+                f"metanash_delegate": (
+                policy_classes["best_response"], tmp_env.base_observation_space, tmp_env.base_action_space,
+                {"explore": False}),
+                f"best_response": (
+                policy_classes["best_response"], tmp_env.base_observation_space, tmp_env.base_action_space,
+                br_policy_config_overrides),
             },
             "policy_mapping_fn": select_policy,
         },
     }
 
     if metanash_specs_for_players is not None:
-        trainer_config["multiagent"]["policies"]["metanash"][3]["model"] = {"custom_model": restricted_game_custom_model}
+        trainer_config["multiagent"]["policies"]["metanash"][3]["model"] = {
+            "custom_model": restricted_game_custom_model}
 
     trainer_config = merge_dicts(trainer_config, get_trainer_config(action_space=tmp_env.base_action_space))
 
@@ -260,12 +261,14 @@ def train_poker_approx_best_response_xdfo(br_player: int,
 
     init_ray_for_scenario(scenario=scenario, head_address=ray_head_address, logging_level=logging.INFO)
 
-    trainer = trainer_class(config=trainer_config, logger_creator=get_trainer_logger_creator(base_dir=results_dir, scenario_name="approx_br"))
+    trainer = trainer_class(config=trainer_config,
+                            logger_creator=get_trainer_logger_creator(base_dir=results_dir, scenario_name="approx_br"))
 
     if use_cfp_metanash and cfp_metanash_specs_for_players:
         # metanash is uniform distribution of pure strat specs
         def _set_worker_metanash_cfp_specs(worker: RolloutWorker):
             worker.policy_map["metanash"].cfp_br_specs = cfp_metanash_specs_for_players[other_player]
+
         trainer.workers.foreach_worker(_set_worker_metanash_cfp_specs)
     elif not use_cfp_metanash:
         # metanash is single pure strat spec
@@ -273,6 +276,7 @@ def train_poker_approx_best_response_xdfo(br_player: int,
             if metanash_specs_for_players is not None:
                 metanash_policy = worker.policy_map["metanash"]
                 load_pure_strat(policy=metanash_policy, pure_strat_spec=metanash_specs_for_players[other_player])
+
         trainer.workers.foreach_worker(_set_worker_metanash)
 
     trainer.weights_cache = {}
@@ -281,16 +285,17 @@ def train_poker_approx_best_response_xdfo(br_player: int,
             set_restricted_game_conversions_for_all_workers_openspiel(trainer=trainer,
                                                                       tmp_base_env=tmp_base_eny,
                                                                       delegate_policy_id="metanash_delegate",
-                                                              agent_id_to_restricted_game_specs={
-                                                                  other_player: delegate_specs_for_players[
-                                                                      other_player]},
-                                                              load_policy_spec_fn=load_pure_strat)
+                                                                      agent_id_to_restricted_game_specs={
+                                                                          other_player: delegate_specs_for_players[
+                                                                              other_player]},
+                                                                      load_policy_spec_fn=load_pure_strat)
         else:
             set_restricted_game_conversations_for_all_workers(trainer=trainer, delegate_policy_id="metanash_delegate",
                                                               agent_id_to_restricted_game_specs={
-                                                                  other_player: delegate_specs_for_players[other_player]},
-                                                              load_policy_spec_fn=create_get_pure_strat_cached(cache=trainer.weights_cache))
-
+                                                                  other_player: delegate_specs_for_players[
+                                                                      other_player]},
+                                                              load_policy_spec_fn=create_get_pure_strat_cached(
+                                                                  cache=trainer.weights_cache))
 
     # Perform main RL training loop. Stop if we reach max iters or saturate.
     # Saturation is determined by checking if we improve by a minimum amount every n iters.
@@ -324,12 +329,9 @@ def train_poker_approx_best_response_xdfo(br_player: int,
 
     log(f"Training stopped.")
 
-
     # trainer.cleanup()
     # del trainer
     ray.shutdown()
     time.sleep(10)
 
     return max_reward
-
-

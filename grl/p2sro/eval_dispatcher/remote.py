@@ -1,15 +1,15 @@
-import grpc
 import logging
-from typing import Tuple, List, Union
 from concurrent import futures
+from typing import Tuple, List, Union
+
+import grpc
 from google.protobuf.empty_pb2 import Empty
 
-from grl.p2sro.payoff_table import PayoffTableStrategySpec
+from grl.p2sro.eval_dispatcher.eval_dispatcher import EvalDispatcher
+from grl.p2sro.eval_dispatcher.protobuf.eval_dispatcher_pb2 import EvalJob, EvalJobResult, EvalConfirmation
 from grl.p2sro.eval_dispatcher.protobuf.eval_dispatcher_pb2_grpc import EvalDispatcherServicer, \
     add_EvalDispatcherServicer_to_server, EvalDispatcherStub
-from grl.p2sro.eval_dispatcher.protobuf.eval_dispatcher_pb2 import EvalJob, EvalJobResult, EvalConfirmation
-
-from grl.p2sro.eval_dispatcher.eval_dispatcher import EvalDispatcher
+from grl.utils.strategy_spec import StrategySpec
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ class _EvalDispatcherServerServicerImpl(EvalDispatcherServicer):
         return response
 
     def SubmitEvalJobResult(self, request: EvalJobResult, context):
-        policy_specs_for_each_player = tuple(PayoffTableStrategySpec.from_json(json_string=json_string)
+        policy_specs_for_each_player = tuple(StrategySpec.from_json(json_string=json_string)
                                              for json_string in request.json_policy_specs_for_each_player)
         self._eval_dispatcher.submit_eval_job_result(policy_specs_for_each_player_tuple=policy_specs_for_each_player,
                                                      payoffs_for_each_player=request.payoffs_for_each_player,
@@ -76,9 +76,9 @@ class RemoteEvalDispatcherClient(EvalDispatcher):
     def __init__(self, port=4536, remote_server_host="127.0.0.1"):
         self._stub = EvalDispatcherStub(channel=grpc.insecure_channel(target=f"{remote_server_host}:{port}"))
 
-    def take_eval_job(self) -> (Union[None, Tuple[PayoffTableStrategySpec]], int):
+    def take_eval_job(self) -> (Union[None, Tuple[StrategySpec]], int):
         response: EvalJob = self._stub.TakeEvalJob(Empty())
-        policy_specs_for_each_player = tuple(PayoffTableStrategySpec.from_json(json_string=json_string)
+        policy_specs_for_each_player = tuple(StrategySpec.from_json(json_string=json_string)
                                              for json_string in response.json_policy_specs_for_each_player)
         if len(policy_specs_for_each_player) == 0:
             return None, response.required_games_to_play
@@ -91,7 +91,7 @@ class RemoteEvalDispatcherClient(EvalDispatcher):
         request.payoffs_for_each_player.extend(payoffs_for_each_player)
         self._stub.SubmitEvalJobResult(request)
 
-    def submit_eval_request(self, policy_specs_for_each_player: Tuple[PayoffTableStrategySpec]):
+    def submit_eval_request(self, policy_specs_for_each_player: Tuple[StrategySpec]):
         raise NotImplemented
 
     def get_unclaimed_eval_results(self):

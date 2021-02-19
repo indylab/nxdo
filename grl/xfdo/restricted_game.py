@@ -1,12 +1,10 @@
-from typing import Tuple, Dict
 from copy import deepcopy
-
-from gym.spaces import Discrete
-
-from grl.xfdo.action_space_conversion import RestrictedToBaseGameActionSpaceConverter
+from typing import Tuple
 
 from ray.rllib.env.multi_agent_env import MultiAgentEnv
 from ray.rllib.utils.typing import MultiAgentDict, AgentID
+
+from grl.xfdo.action_space_conversion import RestrictedToBaseGameActionSpaceConverter
 
 RESTRICTED_GAME = "restricted_game"
 

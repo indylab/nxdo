@@ -1,22 +1,20 @@
-import numpy as np
-
 from typing import List, Dict, Union
 
-from grl.p2sro.payoff_table import PayoffTableStrategySpec
-from grl.rl_apps.scenarios.stopping_conditions import TwoPlayerBRRewardsBelowAmtStoppingCondition, StoppingCondition, NoStoppingCondition
+import numpy as np
 
-from grl.xfdo.xfdo_manager.manager import SolveRestrictedGame, RestrictedGameSolveResult
-
-from grl.rl_apps.xfdo.general_xfdo_nfsp_metanash import train_off_policy_rl_nfsp_restricted_game
+from grl.rl_apps.scenarios.stopping_conditions import TwoPlayerBRRewardsBelowAmtStoppingCondition, StoppingCondition, \
+    NoStoppingCondition
 from grl.rl_apps.xfdo.general_xfdo_cfp_metanash import train_cfp_restricted_game
+from grl.rl_apps.xfdo.general_xfdo_nfsp_metanash import train_off_policy_rl_nfsp_restricted_game
+from grl.utils.strategy_spec import StrategySpec
+from grl.xfdo.xfdo_manager.manager import SolveRestrictedGame, RestrictedGameSolveResult
 
 
 def _solve_game(scenario: dict,
                 log_dir: str,
-                br_spec_lists_for_each_player: Dict[int, List[PayoffTableStrategySpec]],
+                br_spec_lists_for_each_player: Dict[int, List[StrategySpec]],
                 stopping_condition: StoppingCondition,
                 manager_metadata: dict = None) -> RestrictedGameSolveResult:
-
     if scenario["xfdo_metanash_method"] == "nfsp":
         avg_policy_specs, final_train_result = train_off_policy_rl_nfsp_restricted_game(
             results_dir=log_dir, scenario=scenario, player_to_base_game_action_specs=br_spec_lists_for_each_player,
@@ -59,7 +57,7 @@ class SolveRestrictedGameFixedRewardThreshold(SolveRestrictedGame):
 
     def __call__(self,
                  log_dir: str,
-                 br_spec_lists_for_each_player: Dict[int, List[PayoffTableStrategySpec]],
+                 br_spec_lists_for_each_player: Dict[int, List[StrategySpec]],
                  manager_metadata: dict = None) -> RestrictedGameSolveResult:
 
         stopping_condition = TwoPlayerBRRewardsBelowAmtStoppingCondition(
@@ -101,7 +99,7 @@ class SolveRestrictedGameDynamicRewardThreshold1(SolveRestrictedGame):
             required_fields.append("z_avg_policy_exploitability")
         self.required_fields = required_fields
 
-    def _update_reward_threshold(self, br_spec_lists_for_each_player: Dict[int, List[PayoffTableStrategySpec]]) -> float:
+    def _update_reward_threshold(self, br_spec_lists_for_each_player: Dict[int, List[StrategySpec]]) -> float:
         latest_avg_br_reward = float(np.mean(
             [spec_list[-1].metadata["average_br_reward"] for spec_list in br_spec_lists_for_each_player.values()])
         )
@@ -112,7 +110,7 @@ class SolveRestrictedGameDynamicRewardThreshold1(SolveRestrictedGame):
 
     def __call__(self,
                  log_dir: str,
-                 br_spec_lists_for_each_player: Dict[int, List[PayoffTableStrategySpec]],
+                 br_spec_lists_for_each_player: Dict[int, List[StrategySpec]],
                  manager_metadata: dict = None) -> RestrictedGameSolveResult:
         # This method is called each time we need to solve the metanash for XFDO
 
@@ -141,7 +139,6 @@ class SolveRestrictedGameDynamicRewardThreshold1(SolveRestrictedGame):
                            manager_metadata=manager_metadata)
 
 
-
 class SolveRestrictedGameDynamicRewardThresholdBinary(SolveRestrictedGame):
 
     def __init__(self,
@@ -163,7 +160,7 @@ class SolveRestrictedGameDynamicRewardThresholdBinary(SolveRestrictedGame):
 
     def __call__(self,
                  log_dir: str,
-                 br_spec_lists_for_each_player: Dict[int, List[PayoffTableStrategySpec]],
+                 br_spec_lists_for_each_player: Dict[int, List[StrategySpec]],
                  manager_metadata: dict = None) -> RestrictedGameSolveResult:
         # This method is called each time we need to solve the metanash for XFDO
 

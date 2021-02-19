@@ -1,12 +1,15 @@
+from typing import Dict, List
+
 import numpy as np
-from typing import Dict, List, Tuple
-from grl.p2sro.p2sro_manager.p2sro_manager import P2SROManager
-from grl.p2sro.payoff_table import PayoffTable, PayoffTableStrategySpec
+
+from grl.p2sro.payoff_table import PayoffTable
+from grl.utils.strategy_spec import StrategySpec
 
 
 class PolicySpecDistribution(object):
 
-    def __init__(self, payoff_table: PayoffTable, player: int, policy_selection_probs_indexed_by_policy_num: List[float]):
+    def __init__(self, payoff_table: PayoffTable, player: int,
+                 policy_selection_probs_indexed_by_policy_num: List[float]):
         self._probs_to_policy_specs = {
             selection_prob: payoff_table.get_spec_for_player_and_pure_strat_index(
                 player=player, pure_strat_index=policy_num)
@@ -14,7 +17,7 @@ class PolicySpecDistribution(object):
         }
         self.player = player
 
-    def sample_policy_spec(self) -> PayoffTableStrategySpec:
+    def sample_policy_spec(self) -> StrategySpec:
         return np.random.choice(a=list(self._probs_to_policy_specs.values()),
                                 p=list(self._probs_to_policy_specs.keys()))
 
@@ -28,7 +31,6 @@ def get_latest_metanash_strategies(payoff_table: PayoffTable,
                                    fictitious_play_iters: int,
                                    mix_with_uniform_dist_coeff: float = 0.0,
                                    print_matrix: bool = True) -> Dict[int, PolicySpecDistribution]:
-
     # Currently this function only handles 2-player games
     if as_policy_num == None:
         as_policy_num = payoff_table.shape()[as_player] - 1
@@ -50,7 +52,7 @@ def get_latest_metanash_strategies(payoff_table: PayoffTable,
     opponent_strategy_distributions = {}
     for other_player in other_players:
         player_payoff_matrix = payoff_table.get_payoff_matrix_for_player(player=other_player)
-        assert len(player_payoff_matrix.shape) == 2 # assume a 2D payoff matrix
+        assert len(player_payoff_matrix.shape) == 2  # assume a 2D payoff matrix
 
         # only consider policies below 'as_policy_num' in the p2sro hierarchy
         player_payoff_matrix = player_payoff_matrix[:as_policy_num, :as_policy_num]
@@ -62,7 +64,7 @@ def get_latest_metanash_strategies(payoff_table: PayoffTable,
             print(player_payoff_matrix_current_player_is_rows)
 
         row_averages, col_averages, exps = fictitious_play(iters=fictitious_play_iters,
-                                          payoffs=player_payoff_matrix_current_player_is_rows)
+                                                           payoffs=player_payoff_matrix_current_player_is_rows)
         selection_probs = np.copy(row_averages[-1])
 
         if mix_with_uniform_dist_coeff is not None and mix_with_uniform_dist_coeff > 0:

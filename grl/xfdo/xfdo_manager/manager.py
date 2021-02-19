@@ -1,18 +1,17 @@
-from abc import ABC, abstractmethod
-import numpy as np
-from copy import deepcopy
-from threading import RLock
-from itertools import product
-from typing import List, Tuple, Union, Dict, Callable
 import json
 import os
-from grl.p2sro.payoff_table import PayoffTable, PayoffTableStrategySpec
-from grl.utils import datetime_str, ensure_dir, check_if_jsonable
+from abc import ABC, abstractmethod
+from copy import deepcopy
+from threading import RLock
+from typing import List, Tuple, Union, Dict
+
+from grl.utils.common import datetime_str, ensure_dir, check_if_jsonable
+from grl.utils.strategy_spec import StrategySpec
 
 
 class RestrictedGameSolveResult:
     def __init__(self,
-                 latest_metanash_spec_for_each_player: Tuple[PayoffTableStrategySpec],
+                 latest_metanash_spec_for_each_player: Tuple[StrategySpec],
                  episodes_spent_in_solve: int,
                  timesteps_spent_in_solve: int,
                  extra_data_to_log: dict):
@@ -27,9 +26,10 @@ class SolveRestrictedGame(ABC):
     @abstractmethod
     def __call__(self,
                  log_dir: str,
-                 br_spec_lists_for_each_player: Dict[int, List[PayoffTableStrategySpec]],
+                 br_spec_lists_for_each_player: Dict[int, List[StrategySpec]],
                  manager_metadata: dict = None) -> RestrictedGameSolveResult:
         pass
+
 
 class XFDOManager(object):
 
@@ -53,15 +53,15 @@ class XFDOManager(object):
 
         self._current_double_oracle_iteration = 0
         self._player_brs_are_finished_this_iter = {p: False for p in range(self._n_players)}
-        self._br_spec_lists_for_each_player: Dict[int, List[PayoffTableStrategySpec]] = {p: [] for p in
-                                                                                    range(self._n_players)}
+        self._br_spec_lists_for_each_player: Dict[int, List[StrategySpec]] = {p: [] for p in
+                                                                              range(self._n_players)}
 
         self._episodes_count = 0
         self._timesteps_count = 0
 
         self._next_iter_br_spec_lists_for_each_player = deepcopy(self._br_spec_lists_for_each_player)
 
-        self._latest_metanash_spec_for_each_player: List[PayoffTableStrategySpec] = [None, None]
+        self._latest_metanash_spec_for_each_player: List[StrategySpec] = [None, None]
 
         if manager_metadata is None:
             manager_metadata = {}
@@ -85,7 +85,7 @@ class XFDOManager(object):
         return self.manager_metadata
 
     def claim_new_active_policy_for_player(self, player) -> Union[
-        Tuple[Dict[int, PayoffTableStrategySpec], Dict[int, List[PayoffTableStrategySpec]], int],
+        Tuple[Dict[int, StrategySpec], Dict[int, List[StrategySpec]], int],
         Tuple[None, None, None]
     ]:
         with self.modification_lock:
@@ -113,7 +113,7 @@ class XFDOManager(object):
                 raise ValueError(f"Policy {policy_num} isn't the same as the current double oracle iteration "
                                  f"{self._current_double_oracle_iteration}.")
 
-            br_policy_spec: PayoffTableStrategySpec = PayoffTableStrategySpec(
+            br_policy_spec: StrategySpec = StrategySpec(
                 strategy_id=self._strat_id(player=player, policy_num=policy_num),
                 metadata=metadata_dict,
                 pure_strategy_indexes={player: policy_num}
@@ -140,17 +140,18 @@ class XFDOManager(object):
                 self._timesteps_count += game_solve_result.timesteps_spent_in_solve
 
                 data_to_log = {
-                        "episodes_total": self._episodes_count,
-                        "timesteps_total": self._timesteps_count,
-                        "metanash_specs": [spec.to_json() for spec in self._latest_metanash_spec_for_each_player]
-                    }
+                    "episodes_total": self._episodes_count,
+                    "timesteps_total": self._timesteps_count,
+                    "metanash_specs": [spec.to_json() for spec in self._latest_metanash_spec_for_each_player]
+                }
                 assert "episodes_total" not in game_solve_result.extra_data_to_log
                 assert "timesteps_total" not in game_solve_result.extra_data_to_log
                 data_to_log.update(game_solve_result.extra_data_to_log)
                 with open(self._json_log_path, "+a") as json_file:
-                    json_file.writelines([json.dumps(data_to_log)+'\n'])
+                    json_file.writelines([json.dumps(data_to_log) + '\n'])
 
-                for checkpoint_player, player_metanash_spec in enumerate(game_solve_result.latest_metanash_spec_for_each_player):
+                for checkpoint_player, player_metanash_spec in enumerate(
+                        game_solve_result.latest_metanash_spec_for_each_player):
                     checkpoint_path = os.path.join(
                         self.log_dir, "xfdo_metanash_specs",
                         f"{checkpoint_player}_metanash_{self._current_double_oracle_iteration}.json")

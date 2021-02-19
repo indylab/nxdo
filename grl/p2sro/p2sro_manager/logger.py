@@ -1,11 +1,11 @@
-import os
 import json
-from typing import Tuple
 import logging
+import os
 from abc import ABC, abstractmethod
+from typing import Tuple
 
-from grl.p2sro.payoff_table import PayoffTable, PayoffTableStrategySpec
-from grl.utils import ensure_dir
+from grl.utils.common import ensure_dir
+from grl.utils.strategy_spec import StrategySpec
 
 logger = logging.getLogger(__name__)
 
@@ -20,20 +20,20 @@ class P2SROManagerLogger(ABC):
     def __init__(self, p2sro_manger, log_dir: str):
         pass
 
-    def on_new_active_policy(self, player: int, new_policy_num: int, new_policy_spec: PayoffTableStrategySpec):
+    def on_new_active_policy(self, player: int, new_policy_num: int, new_policy_spec: StrategySpec):
         pass
 
-    def on_new_active_policy_metadata(self, player: int, policy_num: int, new_policy_spec: PayoffTableStrategySpec):
+    def on_new_active_policy_metadata(self, player: int, policy_num: int, new_policy_spec: StrategySpec):
         pass
 
-    def on_active_policy_moved_to_fixed(self, player: int, policy_num: int, fixed_policy_spec: PayoffTableStrategySpec):
+    def on_active_policy_moved_to_fixed(self, player: int, policy_num: int, fixed_policy_spec: StrategySpec):
         pass
 
     def on_payoff_result(self,
-                                policy_specs_for_each_player: Tuple[PayoffTableStrategySpec],
-                                payoffs_for_each_player: Tuple[float],
-                                games_played: int,
-                                overrode_all_previous_results: bool):
+                         policy_specs_for_each_player: Tuple[StrategySpec],
+                         payoffs_for_each_player: Tuple[float],
+                         games_played: int,
+                         overrode_all_previous_results: bool):
         pass
 
 
@@ -50,22 +50,24 @@ class SimpleP2SROManagerLogger(P2SROManagerLogger):
         self._payoff_table_checkpoint_dir = os.path.join(self._log_dir, "payoff_table_checkpoints")
         self._payoff_table_checkpoint_count = 0
 
-    def on_new_active_policy(self, player: int, new_policy_num: int, new_policy_spec: PayoffTableStrategySpec):
+    def on_new_active_policy(self, player: int, new_policy_num: int, new_policy_spec: StrategySpec):
         logger.info(f"Player {player} active policy {new_policy_num} claimed")
 
-    def on_new_active_policy_metadata(self, player: int, policy_num: int, new_policy_spec: PayoffTableStrategySpec):
+    def on_new_active_policy_metadata(self, player: int, policy_num: int, new_policy_spec: StrategySpec):
         pass
         # logger.info(f"Player {player} active policy {policy_num} new metadata: {new_policy_spec.metadata}")
 
-    def on_active_policy_moved_to_fixed(self, player: int, policy_num: int, fixed_policy_spec: PayoffTableStrategySpec):
+    def on_active_policy_moved_to_fixed(self, player: int, policy_num: int, fixed_policy_spec: StrategySpec):
         logger.info(f"Player {player} policy {policy_num} moved to fixed.")
 
         # save a checkpoint of the payoff table
         data = self._manager.get_copy_of_latest_data()
         latest_payoff_table, active_policy_nums_per_player, fixed_policy_nums_per_player = data
 
-        numbered_pt_checkpoint_path = os.path.join(self._payoff_table_checkpoint_dir, f"payoff_table_checkpoint_{self._payoff_table_checkpoint_count}.json")
-        numbered_policy_nums_path = os.path.join(self._payoff_table_checkpoint_dir, f"policy_nums_checkpoint_{self._payoff_table_checkpoint_count}.json")
+        numbered_pt_checkpoint_path = os.path.join(self._payoff_table_checkpoint_dir,
+                                                   f"payoff_table_checkpoint_{self._payoff_table_checkpoint_count}.json")
+        numbered_policy_nums_path = os.path.join(self._payoff_table_checkpoint_dir,
+                                                 f"policy_nums_checkpoint_{self._payoff_table_checkpoint_count}.json")
 
         pt_checkpoint_paths = [os.path.join(self._payoff_table_checkpoint_dir, f"payoff_table_checkpoint_latest.json"),
                                numbered_pt_checkpoint_path]
@@ -96,7 +98,8 @@ class SimpleP2SROManagerLogger(P2SROManagerLogger):
         ensure_dir(file_path=checkpoints_manifest_path)
         with open(checkpoints_manifest_path, "a+") as manifest_file:
             if all(len(fixed_policy_nums) > 0 for fixed_policy_nums in fixed_policy_nums_per_player):
-                highest_fixed_policies_for_all_players = min(max(fixed_policy_nums) for fixed_policy_nums in fixed_policy_nums_per_player)
+                highest_fixed_policies_for_all_players = min(
+                    max(fixed_policy_nums) for fixed_policy_nums in fixed_policy_nums_per_player)
             else:
                 highest_fixed_policies_for_all_players = None
             manifest_json_line = json.dumps({"payoff_table_checkpoint_num": self._payoff_table_checkpoint_count,
@@ -107,9 +110,9 @@ class SimpleP2SROManagerLogger(P2SROManagerLogger):
 
         self._payoff_table_checkpoint_count += 1
 
-    def on_payoff_result(self, policy_specs_for_each_player: Tuple[PayoffTableStrategySpec],
-                                payoffs_for_each_player: Tuple[float], games_played: int,
-                                overrode_all_previous_results: bool):
+    def on_payoff_result(self, policy_specs_for_each_player: Tuple[StrategySpec],
+                         payoffs_for_each_player: Tuple[float], games_played: int,
+                         overrode_all_previous_results: bool):
         pass
         # json_specs = [spec.to_json() for spec in policy_specs_for_each_player]
         # logger.debug(f"Payoff result for {json_specs}, payoffs: {payoffs_for_each_player}, games: {games_played},"
@@ -120,11 +123,9 @@ class SimpleP2SROManagerLogger(P2SROManagerLogger):
         # latest_payoff_table, active_policy_nums_per_player, fixed_policy_nums_per_player = data
         # latest_payoff_table: PayoffTable = latest_payoff_table
 
-
         # print("Player 0 matrix ---------------------------------------")
         # print(latest_payoff_table.get_payoff_matrix_for_player(0))
         # print("------------------------------------------------------")
         # print("Player 1 matrix ---------------------------------------")
         # print(latest_payoff_table.get_payoff_matrix_for_player(1))
         # print("------------------------------------------------------")
-

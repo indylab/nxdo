@@ -1,19 +1,18 @@
-
 import json
 from typing import Callable, List
 
-from grl.p2sro.payoff_table import PayoffTableStrategySpec
-
 from ray.rllib.policy.policy import Policy
 from ray.rllib.utils.typing import EnvObsType, EnvActionType
+
+from grl.utils.strategy_spec import StrategySpec
 
 
 class RestrictedToBaseGameActionSpaceConverter:
 
     def __init__(self,
                  delegate_policy: Policy,
-                 policy_specs: List[PayoffTableStrategySpec],
-                 load_policy_spec_fn: Callable[[Policy, PayoffTableStrategySpec], None]):
+                 policy_specs: List[StrategySpec],
+                 load_policy_spec_fn: Callable[[Policy, StrategySpec], None]):
 
         self.delegate_policy = delegate_policy
         self.policy_specs = policy_specs
@@ -33,9 +32,10 @@ class RestrictedToBaseGameActionSpaceConverter:
             raise IndexError(f"restricted game action was {restricted_game_action}"
                              f"while there are only {self.num_actions()} restricted game actions specified.")
         try:
-            corresponding_spec_to_action: PayoffTableStrategySpec = self.policy_specs[restricted_game_action]
+            corresponding_spec_to_action: StrategySpec = self.policy_specs[restricted_game_action]
         except IndexError:
-            raise IndexError(f"restricted game action of {restricted_game_action} used with space of n={self.num_actions()}")
+            raise IndexError(
+                f"restricted game action of {restricted_game_action} used with space of n={self.num_actions()}")
         self.load_policy_fn(self.delegate_policy, corresponding_spec_to_action)
         base_game_action = self.delegate_policy.compute_single_action(
             obs=obs, state=delegate_policy_state, prev_action=None, prev_reward=None, info=None,

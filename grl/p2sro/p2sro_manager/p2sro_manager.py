@@ -1,13 +1,14 @@
+from itertools import product
+from threading import RLock
+from typing import List, Tuple
 
 import numpy as np
-from threading import RLock
-from itertools import product
-from typing import List, Tuple, Union
 
-from grl.p2sro.payoff_table import PayoffTable, PayoffTableStrategySpec
 from grl.p2sro.eval_dispatcher import EvalDispatcherWithServer, EvalResult
 from grl.p2sro.p2sro_manager.logger import P2SROManagerLogger, SimpleP2SROManagerLogger
-from grl.utils import datetime_str, check_if_jsonable
+from grl.p2sro.payoff_table import PayoffTable
+from grl.utils.common import datetime_str, check_if_jsonable
+from grl.utils.strategy_spec import StrategySpec
 
 
 class _P2SROPlayerStats(object):
@@ -43,11 +44,12 @@ class _P2SROPlayerStats(object):
         assert len(set(self.fixed_policy_indexes)) == len(self.fixed_policy_indexes)
         all_indexes = list(set(self.active_policy_indexes).union(set(self.fixed_policy_indexes)))
         all_indexes.sort()
-        assert np.array_equal(all_indexes, list(range(0, policy_num+1))), \
+        assert np.array_equal(all_indexes, list(range(0, policy_num + 1))), \
             f"all_indexes: {all_indexes}\n" \
-            f"list(range(0, policy_num+1)):{list(range(0, policy_num+1))}\n" \
+            f"list(range(0, policy_num+1)):{list(range(0, policy_num + 1))}\n" \
             f"self.active_policy_indexes:{self.active_policy_indexes}\n" \
             f"self.fixed_policy_indexes:{self.fixed_policy_indexes}"
+
 
 class P2SROManager(object):
 
@@ -114,7 +116,7 @@ class P2SROManager(object):
     def get_manager_metadata(self) -> dict:
         return self.manager_metadata
 
-    def claim_new_active_policy_for_player(self, player, new_policy_metadata_dict) -> PayoffTableStrategySpec:
+    def claim_new_active_policy_for_player(self, player, new_policy_metadata_dict) -> StrategySpec:
         with self._modification_lock:
             if player < 0 or player >= self._n_players:
                 raise ValueError(f"player {player} is out of range. Must be in [0, n_players).")
@@ -124,13 +126,13 @@ class P2SROManager(object):
             new_active_policy_num = self._player_stats[player].get_new_active_policy_num()
             new_strat_id = self._strat_id(player=player, policy_num=new_active_policy_num)
             new_policy_spec = self._payoff_table.add_new_pure_strategy(player=player,
-                                                     strategy_id=new_strat_id,
-                                                     metadata=new_policy_metadata_dict)
+                                                                       strategy_id=new_strat_id,
+                                                                       metadata=new_policy_metadata_dict)
             if self._is_two_player_symmetric_zero_sum:
                 # Add the same strategy for the second player to maintain a 2D payoff matrix
                 new_policy_spec = self._payoff_table.add_new_pure_strategy(player=1,
-                                                         strategy_id=new_strat_id,
-                                                         metadata=new_policy_metadata_dict)
+                                                                           strategy_id=new_strat_id,
+                                                                           metadata=new_policy_metadata_dict)
                 assert np.array_equal(list(new_policy_spec.get_pure_strat_indexes().keys()), [0, 1])
                 assert len(set(new_policy_spec.get_pure_strat_indexes().values())) == 1
 
@@ -140,7 +142,7 @@ class P2SROManager(object):
             # print(f"active policy pure strat indexes are: {new_policy_spec._pure_strategy_indexes}")
             return new_policy_spec
 
-    def submit_new_active_policy_metadata(self, player, policy_num, metadata_dict) -> PayoffTableStrategySpec:
+    def submit_new_active_policy_metadata(self, player, policy_num, metadata_dict) -> StrategySpec:
         with self._modification_lock:
             if player < 0 or player >= self._n_players:
                 raise ValueError(f"player {player} is out of range. Must be in [0, n_players).")
@@ -149,7 +151,7 @@ class P2SROManager(object):
             if policy_num not in self._player_stats[player].active_policy_indexes:
                 raise ValueError(f"Policy {policy_num} isn't an active policy for player {player}.")
 
-            active_policy_spec: PayoffTableStrategySpec = self._payoff_table.get_spec_for_strat_id(
+            active_policy_spec: StrategySpec = self._payoff_table.get_spec_for_strat_id(
                 strat_id=self._strat_id(player=player, policy_num=policy_num))
             active_policy_spec.update_metadata(new_metadata=metadata_dict)
 
@@ -175,7 +177,7 @@ class P2SROManager(object):
                         return False
             return True
 
-    def set_active_policy_as_fixed(self, player, policy_num, final_metadata_dict) -> PayoffTableStrategySpec:
+    def set_active_policy_as_fixed(self, player, policy_num, final_metadata_dict) -> StrategySpec:
         with self._modification_lock:
             if player < 0 or player >= self._n_players:
                 raise ValueError(f"player {player} is out of range. Must be in [0, n_players).")
@@ -224,7 +226,7 @@ class P2SROManager(object):
             return self._payoff_table.copy(), active_policies_per_player, fixed_policies_per_player
 
     def submit_empirical_payoff_result(self,
-                                       policy_specs_for_each_player: Tuple[PayoffTableStrategySpec],
+                                       policy_specs_for_each_player: Tuple[StrategySpec],
                                        payoffs_for_each_player: Tuple[float],
                                        games_played: int,
                                        override_all_previous_results: bool):
@@ -240,8 +242,9 @@ class P2SROManager(object):
                                  f"player 1's, however, payoffs submitted were {payoffs_for_each_player[0]} and "
                                  f"{payoffs_for_each_player[1]}.")
 
-            strat_ids_for_each_player = [self._strat_id(player=player, policy_num=spec.pure_strat_index_for_player(player))
-                                         for player, spec in enumerate(policy_specs_for_each_player)]
+            strat_ids_for_each_player = [
+                self._strat_id(player=player, policy_num=spec.pure_strat_index_for_player(player))
+                for player, spec in enumerate(policy_specs_for_each_player)]
 
             for player in range(self._n_players):
                 player_payoff_index = 0 if self._is_two_player_symmetric_zero_sum else player
@@ -353,7 +356,8 @@ class P2SROManager(object):
                         self._player_stats[player].move_active_policy_to_fixed(policy_num=new_fixed_policy_num)
                         fixed_policy_spec = self._payoff_table.get_spec_for_player_and_pure_strat_index(
                             player=player, pure_strat_index=new_fixed_policy_num)
-                        self._manager_logger.on_active_policy_moved_to_fixed(player=player, policy_num=new_fixed_policy_num,
+                        self._manager_logger.on_active_policy_moved_to_fixed(player=player,
+                                                                             policy_num=new_fixed_policy_num,
                                                                              fixed_policy_spec=fixed_policy_spec)
             for key in keys_to_remove:
                 del self._pending_spec_matchups_for_new_fixed_policies[key]

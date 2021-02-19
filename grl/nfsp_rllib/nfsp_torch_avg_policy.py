@@ -1,34 +1,18 @@
-
 import logging
 from typing import Dict, Tuple, Type, List
-import numpy as np
+
 import gym
-import ray
+import numpy as np
+from ray.rllib.models import ModelCatalog
 from ray.rllib.models.modelv2 import ModelV2
-from ray.rllib.models.torch.torch_action_dist import TorchCategorical, \
-    TorchDistributionWrapper
+from ray.rllib.models.tf.tf_action_dist import (Categorical)
+from ray.rllib.models.torch.torch_action_dist import TorchCategorical
+from ray.rllib.models.torch.torch_action_dist import TorchDistributionWrapper
 from ray.rllib.policy import Policy
 from ray.rllib.policy.sample_batch import SampleBatch
 from ray.rllib.policy.torch_policy_template import build_torch_policy
-from ray.rllib.utils.framework import try_import_torch
-from ray.rllib.utils.torch_ops import huber_loss
-from ray.rllib.utils.typing import TensorType, TrainerConfigDict
-
-
-from ray.rllib.models import ModelCatalog
-from ray.rllib.models.modelv2 import ModelV2
-from ray.rllib.models.tf.tf_action_dist import (Categorical,
-                                                TFActionDistribution)
-from ray.rllib.models.torch.torch_action_dist import TorchCategorical
-from ray.rllib.policy import Policy
-from ray.rllib.policy.dynamic_tf_policy import DynamicTFPolicy
-from ray.rllib.policy.sample_batch import SampleBatch
-from ray.rllib.policy.tf_policy import TFPolicy
-from ray.rllib.policy.tf_policy_template import build_tf_policy
-from ray.rllib.utils.annotations import override
 from ray.rllib.utils.error import UnsupportedSpaceException
-from ray.rllib.utils.framework import try_import_tf
-from ray.rllib.utils.tf_ops import huber_loss, make_tf_callable
+from ray.rllib.utils.framework import try_import_torch
 from ray.rllib.utils.typing import TensorType, TrainerConfigDict
 
 import grl
@@ -43,9 +27,9 @@ logger = logging.getLogger(__name__)
 
 
 def compute_policy_logits(policy: Policy,
-                     model: ModelV2,
-                     obs: TensorType,
-                     is_training=None) -> TensorType:
+                          model: ModelV2,
+                          obs: TensorType,
+                          is_training=None) -> TensorType:
     model_out, _ = model({
         SampleBatch.CUR_OBS: obs,
         "is_training": is_training
@@ -76,7 +60,6 @@ def build_avg_model_and_distribution(
         policy: Policy, obs_space: gym.spaces.Space,
         action_space: gym.spaces.Space,
         config: TrainerConfigDict) -> Tuple[ModelV2, Type[TorchDistributionWrapper]]:
-
     if not isinstance(action_space, gym.spaces.Discrete):
         raise UnsupportedSpaceException(f"Action space {action_space} is not supported for NFSP.")
 
@@ -93,9 +76,8 @@ def build_avg_model_and_distribution(
     return policy.avg_model, TorchCategorical
 
 
-
 def build_supervised_learning_loss(policy: Policy, model: ModelV2, dist_class: Type[TorchDistributionWrapper],
-                   train_batch: SampleBatch) -> TensorType:
+                                   train_batch: SampleBatch) -> TensorType:
     """Constructs the loss for SimpleQTorchPolicy.
 
     Args:
@@ -117,6 +99,7 @@ def build_supervised_learning_loss(policy: Policy, model: ModelV2, dist_class: T
     policy.loss = F.cross_entropy(input=logits_t, target=action_targets_t)
 
     return policy.loss
+
 
 def behaviour_logits_fetches(
         policy: Policy, input_dict: Dict[str, TensorType],
@@ -143,6 +126,7 @@ def behaviour_logits_fetches(
         "action_probs": policy.action_probs,
         "behaviour_logits": policy.logits,
     }
+
 
 # actions, logp, state_out = self.action_sampler_fn(
 #                 self,
@@ -175,14 +159,16 @@ def action_sampler(policy, model, input_dict, state, explore, timestep):
     return np.asarray(actions, dtype=np.int32), None, state_out
     # return np.asarray(actions, dtype=np.int32), np.asarray(logps, dtype=np.float32), state_out
 
+
 def sgd_optimizer(policy: Policy,
-                   config: TrainerConfigDict) -> "torch.optim.Optimizer":
+                  config: TrainerConfigDict) -> "torch.optim.Optimizer":
     return torch.optim.SGD(
         policy.avg_func_vars, lr=policy.config["lr"])
 
 
 def build_avg_policy_stats(policy: Policy, batch) -> Dict[str, TensorType]:
     return {"loss": policy.loss}
+
 
 NFSPTorchAveragePolicy = build_torch_policy(
     name="NFSPAveragePolicy",
