@@ -1,9 +1,8 @@
-
-from threading import RLock
 from queue import Queue, Empty
+from threading import RLock
 from typing import List, Tuple
 
-from grl.p2sro.payoff_table import PayoffTableStrategySpec
+from grl.utils.strategy_spec import StrategySpec
 
 
 class _EvalQueue(object):
@@ -18,7 +17,7 @@ class _EvalQueue(object):
     def get(self):
         with self._lock:
             try:
-                policy_spec_tuple: Tuple[PayoffTableStrategySpec] = self._queue.get_nowait()
+                policy_spec_tuple: Tuple[StrategySpec] = self._queue.get_nowait()
             except Empty:
                 return None
             if self._drop_duplicates:
@@ -29,7 +28,7 @@ class _EvalQueue(object):
                     self._unique_set.remove(policy_spec_tuple[::-1])
             return policy_spec_tuple
 
-    def put(self, policy_spec_tuple: Tuple[PayoffTableStrategySpec]):
+    def put(self, policy_spec_tuple: Tuple[StrategySpec]):
         with self._lock:
             if self._drop_duplicates:
                 if policy_spec_tuple in self._unique_set:
@@ -44,6 +43,7 @@ class _EvalQueue(object):
     def __len__(self):
         with self._lock:
             return self._queue.qsize()
+
 
 class EvalResult(object):
 
@@ -61,14 +61,15 @@ class EvalDispatcher(object):
                                       game_is_two_player_symmetric=game_is_two_player_symmetric)
         self._on_eval_result_callbacks = []
 
-    def submit_eval_request(self, policy_specs_for_each_player: Tuple[PayoffTableStrategySpec]):
+    def submit_eval_request(self, policy_specs_for_each_player: Tuple[StrategySpec]):
         self._eval_queue.put(policy_spec_tuple=policy_specs_for_each_player)
 
     def take_eval_job(self):
         policy_specs_for_each_player_tuple = self._eval_queue.get()
         return policy_specs_for_each_player_tuple, self._games_per_eval
 
-    def submit_eval_job_result(self, policy_specs_for_each_player_tuple, payoffs_for_each_player: List[float], games_played):
+    def submit_eval_job_result(self, policy_specs_for_each_player_tuple, payoffs_for_each_player: List[float],
+                               games_played):
         eval_result = EvalResult(policy_specs_for_each_player=policy_specs_for_each_player_tuple,
                                  payoff_for_each_player=payoffs_for_each_player,
                                  games_played=games_played)

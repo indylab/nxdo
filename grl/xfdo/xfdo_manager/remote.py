@@ -1,18 +1,19 @@
 import json
-import grpc
 import logging
 import traceback
-from typing import Tuple, List, Dict, Callable, Union
 from concurrent import futures
+from typing import Tuple, List, Dict, Callable, Union
+
+import grpc
 from google.protobuf.empty_pb2 import Empty
 
-from grl.p2sro.payoff_table import PayoffTable, PayoffTableStrategySpec
+from grl.utils.strategy_spec import StrategySpec
+from grl.xfdo.xfdo_manager.manager import XFDOManager, SolveRestrictedGame
+from grl.xfdo.xfdo_manager.protobuf.xfdo_manager_pb2 import XFDOPolicyMetadataRequest, XFDONewBestResponseParams, \
+    XFDOConfirmation, XFDOPolicySpecJson, XFDOPlayerAndPolicyNum, XFDOString, XFDOPlayer, XFDOPolicySpecList, \
+    XFDOMetadata
 from grl.xfdo.xfdo_manager.protobuf.xfdo_manager_pb2_grpc import XFDOManagerServicer, add_XFDOManagerServicer_to_server, \
     XFDOManagerStub
-from grl.xfdo.xfdo_manager.protobuf.xfdo_manager_pb2 import XFDOPolicyMetadataRequest, XFDONewBestResponseParams, \
-    XFDOConfirmation, XFDOPolicySpecJson, XFDOPlayerAndPolicyNum, XFDOString, XFDOPlayer, XFDOPolicySpecList, XFDOMetadata
-
-from grl.xfdo.xfdo_manager.manager import XFDOManager, SolveRestrictedGame
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +55,7 @@ class _XFDOMangerServerServicerImpl(XFDOManagerServicer):
             player_delegate_json_spec_list = XFDOPolicySpecList()
             player_delegate_json_spec_list.policy_spec_list.extend(
                 [XFDOPolicySpecJson(policy_spec_json=spec.to_json())
-                for spec in player_delegate_spec_list]
+                 for spec in player_delegate_spec_list]
             )
             response_delegate_spec_lists_for_other_players.append(player_delegate_json_spec_list)
         response.delegate_specs_for_players.extend(response_delegate_spec_lists_for_other_players)
@@ -90,7 +91,6 @@ class XFDOManagerWithServer(XFDOManager):
                  log_dir: str = None,
                  manager_metadata: dict = None,
                  port: int = 4545):
-
         super(XFDOManagerWithServer, self).__init__(
             solve_restricted_game=solve_restricted_game,
             n_players=n_players,
@@ -130,7 +130,7 @@ class RemoteXFDOManagerClient(XFDOManager):
         return json.loads(response.json_metadata)
 
     def claim_new_active_policy_for_player(self, player) -> Union[
-        Tuple[Dict[int, PayoffTableStrategySpec], Dict[int, List[PayoffTableStrategySpec]], int],
+        Tuple[Dict[int, StrategySpec], Dict[int, List[StrategySpec]], int],
         Tuple[None, None, None]
     ]:
         request = XFDOPlayer(player=player)
@@ -146,7 +146,7 @@ class RemoteXFDOManagerClient(XFDOManager):
                                                  for elem in response.metanash_specs_for_players.policy_spec_list]
 
         metanash_specs_for_players = {
-            player: PayoffTableStrategySpec.from_json(json_spec)
+            player: StrategySpec.from_json(json_spec)
             for player, json_spec in enumerate(metanash_json_specs_for_other_players)
         }
 
@@ -155,7 +155,7 @@ class RemoteXFDOManagerClient(XFDOManager):
             for player_delegate_list in response.delegate_specs_for_players
         ]
         delegate_specs_for_players = {
-            player: [PayoffTableStrategySpec.from_json(json_spec) for json_spec in player_delegate_json_list]
+            player: [StrategySpec.from_json(json_spec) for json_spec in player_delegate_json_list]
             for player, player_delegate_json_list in enumerate(delegate_json_spec_lists_for_other_players)
         }
 
@@ -180,7 +180,6 @@ class RemoteXFDOManagerClient(XFDOManager):
         self._stub.SubmitFinalBRPolicy(request)
 
     def is_policy_fixed(self, player, policy_num):
-        response: XFDOConfirmation = self._stub.IsPolicyFixed(XFDOPlayerAndPolicyNum(player=player, policy_num=policy_num))
+        response: XFDOConfirmation = self._stub.IsPolicyFixed(
+            XFDOPlayerAndPolicyNum(player=player, policy_num=policy_num))
         return response.result
-
-

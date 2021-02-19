@@ -1,35 +1,28 @@
 import argparse
 import logging
 import os
-import random
 import tempfile
 import time
 from copy import deepcopy
 from typing import List, Tuple, Type, Dict
 
 import deepdish
-import numpy as np
 import ray
 from ray.rllib.utils import merge_dicts, try_import_torch
 
 torch, _ = try_import_torch()
 
 from ray.rllib.agents import Trainer
-from ray.rllib.agents.sac import SACTrainer, SACTorchPolicy
-from ray.rllib.agents.dqn import DQNTrainer
-from ray.rllib.utils.typing import TensorType, PolicyID
+from ray.rllib.utils.typing import PolicyID
 from ray.rllib.agents.callbacks import DefaultCallbacks
 from ray.rllib.evaluation import MultiAgentEpisode, RolloutWorker
 from ray.rllib.env import BaseEnv
 from ray.rllib.policy import Policy
-from ray.rllib.models.modelv2 import ModelV2
-from ray.rllib.models.action_dist import ActionDistribution
-from ray.rllib.models.torch.torch_action_dist import TorchDistributionWrapper
 
 import grl
-from grl.utils import pretty_dict_str, datetime_str, ensure_dir
+from grl.utils.common import pretty_dict_str, datetime_str, ensure_dir
 
-from grl.p2sro.payoff_table import PayoffTableStrategySpec
+from grl.utils.strategy_spec import StrategySpec
 from grl.rl_apps.nfsp.openspiel_utils import snfsp_measure_exploitability_nonlstm
 
 from grl.rllib_tools.space_saving_logger import SpaceSavingLogger
@@ -38,8 +31,6 @@ from grl.rl_apps.scenarios.stopping_conditions import StoppingCondition
 from grl.nfsp_rllib.checkpoint_reservoir_buffer import ReservoirBuffer
 
 logger = logging.getLogger(__name__)
-
-
 
 
 def save_cfp_best_response_checkpoint(trainer: Trainer,
@@ -54,7 +45,8 @@ def save_cfp_best_response_checkpoint(trainer: Trainer,
         checkpoint_name = f"policy_{policy_name}_{date_time}.h5"
     checkpoint_path = os.path.join(save_dir, checkpoint_name)
     br_weights = trainer.get_weights([policy_id_to_save])[policy_id_to_save]
-    br_weights = {k.replace(".", "_dot_"): v for k, v in br_weights.items()} # periods cause HDF5 NaturalNaming warnings
+    br_weights = {k.replace(".", "_dot_"): v for k, v in
+                  br_weights.items()}  # periods cause HDF5 NaturalNaming warnings
     ensure_dir(file_path=checkpoint_path)
     deepdish.io.save(path=checkpoint_path, data={
         "weights": br_weights,
@@ -80,12 +72,12 @@ def load_pure_strat(policy: Policy, pure_strat_spec, checkpoint_path: str = None
 
 
 def create_metadata_with_new_checkpoint_for_current_best_response(br_trainer: Trainer,
-                                                                policy_id_to_save: str,
-                                                              save_dir: str,
-                                                              timesteps_training_br: int,
-                                                              episodes_training_br: int,
-                                                              checkpoint_name=None
-                                                              ):
+                                                                  policy_id_to_save: str,
+                                                                  save_dir: str,
+                                                                  timesteps_training_br: int,
+                                                                  episodes_training_br: int,
+                                                                  checkpoint_name=None
+                                                                  ):
     return {
         "checkpoint_path": save_cfp_best_response_checkpoint(trainer=br_trainer,
                                                              policy_id_to_save=policy_id_to_save,
@@ -97,12 +89,15 @@ def create_metadata_with_new_checkpoint_for_current_best_response(br_trainer: Tr
         "episodes_training_br": episodes_training_br
     }
 
-def add_best_response_strat_to_average_policy(recepient_trainer: Trainer, br_spec: PayoffTableStrategySpec, reservoir_buffer_idx: int, avg_policy_id):
+
+def add_best_response_strat_to_average_policy(recepient_trainer: Trainer, br_spec: StrategySpec,
+                                              reservoir_buffer_idx: int, avg_policy_id):
     def worker_add_spec(worker: RolloutWorker):
         avg_policy: Policy = worker.policy_map[avg_policy_id]
         if not hasattr(avg_policy, "br_specs"):
             avg_policy.br_specs = ReservoirBuffer()
         avg_policy.br_specs.add(br_spec, idx=reservoir_buffer_idx)
+
     recepient_trainer.workers.foreach_worker(worker_add_spec)
 
 
@@ -148,7 +143,8 @@ def train_cfp(results_dir: str, scenario_name: str, print_train_results: bool = 
     calc_metanash_every_n_iters: int = scenario["calc_metanash_every_n_iters"]
     cfp_get_stopping_condition = scenario["cfp_get_stopping_condition"]
 
-    ray.init(log_to_driver=os.getenv("RAY_LOG_TO_DRIVER", False), address='auto', _redis_password='5241590000000000', ignore_reinit_error=True, local_mode=False)
+    ray.init(log_to_driver=os.getenv("RAY_LOG_TO_DRIVER", False), address='auto', _redis_password='5241590000000000',
+             ignore_reinit_error=True, local_mode=False)
 
     def log(message, level=logging.INFO):
         logger.log(level, message)
@@ -161,6 +157,7 @@ def train_cfp(results_dir: str, scenario_name: str, print_train_results: bool = 
                 return "opponent_average_policy"
             else:
                 raise ValueError(f"unexpected agent_id: {agent_id}")
+
         return select_policy
 
     tmp_env = env_class(env_config=env_config)
@@ -208,7 +205,8 @@ def train_cfp(results_dir: str, scenario_name: str, print_train_results: bool = 
 
                     exploitability = snfsp_measure_exploitability_nonlstm(
                         br_checkpoint_path_tuple_list=br_checkpoint_path_tuple_list,
-                        set_policy_weights_fn=lambda policy, path: load_pure_strat(policy=policy, checkpoint_path=path, pure_strat_spec=None),
+                        set_policy_weights_fn=lambda policy, path: load_pure_strat(policy=policy, checkpoint_path=path,
+                                                                                   pure_strat_spec=None),
                         rllib_policies=[local_avg_policy_0, local_avg_policy_1],
                         poker_game_version="kuhn_poker")
                     result["z_avg_policy_exploitability"] = exploitability
@@ -241,19 +239,20 @@ def train_cfp(results_dir: str, scenario_name: str, print_train_results: bool = 
             "policies_to_train": ["best_response"],
             "policies": {
                 "best_response": (policy_classes["best_response"], tmp_env.observation_space, tmp_env.action_space, {}),
-                "opponent_average_policy": (policy_classes["best_response"], tmp_env.observation_space, tmp_env.action_space, {"explore": False}),
+                "opponent_average_policy": (
+                policy_classes["best_response"], tmp_env.observation_space, tmp_env.action_space, {"explore": False}),
             },
             "policy_mapping_fn": get_select_policy(trainer_player_num=player),
         },
     }, get_trainer_config(tmp_env.action_space)) for player in range(2)]
 
     br_trainers: List[Trainer] = [trainer_class(config=br_trainer_configs[player],
-                                    logger_creator=get_trainer_logger_creator(base_dir=results_dir,
-                                                                              scenario_name=f"{scenario_name}_trainer_{player}"))
-                    for player in range(2)]
+                                                logger_creator=get_trainer_logger_creator(base_dir=results_dir,
+                                                                                          scenario_name=f"{scenario_name}_trainer_{player}"))
+                                  for player in range(2)]
 
     for player, br_trainer in enumerate(br_trainers):
-        other_player = 1-player
+        other_player = 1 - player
         br_trainer.player = player
         br_trainer.other_trainer = br_trainers[other_player]
         br_trainer.other_player_latest_train_result = {}
@@ -295,8 +294,8 @@ def train_cfp(results_dir: str, scenario_name: str, print_train_results: bool = 
                 )
                 log(checkpoint_metadata)
 
-                br_checkpoint_spec = PayoffTableStrategySpec(strategy_id=str(checkpoint_count),
-                                                             metadata=checkpoint_metadata)
+                br_checkpoint_spec = StrategySpec(strategy_id=str(checkpoint_count),
+                                                  metadata=checkpoint_metadata)
                 add_best_response_strat_to_average_policy(recepient_trainer=other_trainer, br_spec=br_checkpoint_spec,
                                                           reservoir_buffer_idx=add_idx,
                                                           avg_policy_id="opponent_average_policy")
@@ -329,7 +328,8 @@ def train_cfp(results_dir: str, scenario_name: str, print_train_results: bool = 
         both_train_iter_results = tuple(trainer.train() for trainer in br_trainers)
 
         if train_iter_count % checkpoint_every_n_iters == 0:
-            checkpoint_brs_for_average_policy(checkpoint_count=checkpoint_count, both_train_iter_results=both_train_iter_results)
+            checkpoint_brs_for_average_policy(checkpoint_count=checkpoint_count,
+                                              both_train_iter_results=both_train_iter_results)
             checkpoint_count += 1
 
         train_iter_count += 1
@@ -342,7 +342,7 @@ def train_cfp(results_dir: str, scenario_name: str, print_train_results: bool = 
                 del train_iter_results["hist_stats"]
             if "td_error" in train_iter_results["info"]["learner"]["best_response"]:
                 del train_iter_results["info"]["learner"]["best_response"]["td_error"]
-            assert br_trainer.player in [0,1]
+            assert br_trainer.player in [0, 1]
             log(f"Trainer {br_trainer.player} logdir is {br_trainer.logdir}")
 
         assert br_trainer_1.other_trainer.player == 0, br_trainer_1.other_trainer.player

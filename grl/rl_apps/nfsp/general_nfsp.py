@@ -1,36 +1,27 @@
-import os
-import time
-import logging
-import numpy as np
-from typing import Dict, List, Any, Tuple, Callable, Type, Dict, Union
-import tempfile
 import argparse
-
-from gym.spaces import Space
 import copy
-import deepdish
+import logging
+import os
+import tempfile
+import time
+from typing import Any, Tuple, Type, Dict, Union
 
+import deepdish
+import numpy as np
 import ray
 from ray.rllib.utils import merge_dicts, try_import_torch
+
 torch, _ = try_import_torch()
 
-from ray.rllib import SampleBatch, Policy
 from ray.rllib.agents import Trainer
-from ray.rllib.utils.torch_ops import convert_to_non_torch_type, \
-    convert_to_torch_tensor
-from ray.rllib.utils.typing import ModelGradients, ModelWeights, \
-    TensorType, TrainerConfigDict, AgentID, PolicyID
-from ray.rllib.evaluation.rollout_worker import RolloutWorker
+from ray.rllib.utils.typing import AgentID, PolicyID
 from ray.rllib.agents.callbacks import DefaultCallbacks
 from ray.rllib.evaluation import MultiAgentEpisode, RolloutWorker
 from ray.rllib.env import BaseEnv
 from ray.rllib.policy import Policy
-from ray.tune.logger import Logger, UnifiedLogger
-from ray.rllib.policy.sample_batch import SampleBatch, DEFAULT_POLICY_ID, \
-    MultiAgentBatch
-from ray.rllib.agents.dqn.dqn_tf_policy import PRIO_WEIGHTS
+from ray.rllib.policy.sample_batch import SampleBatch, MultiAgentBatch
 import grl
-from grl.utils import pretty_dict_str, datetime_str, ensure_dir, copy_attributes
+from grl.utils.common import pretty_dict_str, datetime_str, ensure_dir, copy_attributes
 
 from grl.nfsp_rllib.nfsp import get_store_to_avg_policy_buffer_fn
 from grl.rl_apps.nfsp.openspiel_utils import nfsp_measure_exploitability_nonlstm
@@ -38,7 +29,7 @@ from grl.rllib_tools.space_saving_logger import SpaceSavingLogger
 from grl.rl_apps.scenarios.poker import scenarios
 from grl.rl_apps.scenarios.ray_setup import init_ray_for_scenario
 from grl.rl_apps.scenarios.stopping_conditions import StoppingCondition
-from grl.p2sro.payoff_table import PayoffTableStrategySpec
+from grl.utils.strategy_spec import StrategySpec
 
 logger = logging.getLogger(__name__)
 
@@ -67,22 +58,25 @@ def get_trainer_logger_creator(base_dir: str, scenario_name: str):
 def checkpoint_dir(trainer: Trainer):
     return os.path.join(trainer.logdir, "avg_policy_checkpoints")
 
+
 def spec_checkpoint_dir(trainer: Trainer):
     return os.path.join(trainer.logdir, "avg_policy_checkpoint_specs")
 
+
 def save_nfsp_average_policy_checkpoint(trainer: Trainer,
-                                      policy_id_to_save: str,
-                                      save_dir: str,
-                                      timesteps_training: int,
-                                      episodes_training: int,
-                                      checkpoint_name=None):
+                                        policy_id_to_save: str,
+                                        save_dir: str,
+                                        timesteps_training: int,
+                                        episodes_training: int,
+                                        checkpoint_name=None):
     policy_name = policy_id_to_save
     date_time = datetime_str()
     if checkpoint_name is None:
         checkpoint_name = f"policy_{policy_name}_{date_time}.h5"
     checkpoint_path = os.path.join(save_dir, checkpoint_name)
     br_weights = trainer.get_weights([policy_id_to_save])[policy_id_to_save]
-    br_weights = {k.replace(".", "_dot_"): v for k, v in br_weights.items()} # periods cause HDF5 NaturalNaming warnings
+    br_weights = {k.replace(".", "_dot_"): v for k, v in
+                  br_weights.items()}  # periods cause HDF5 NaturalNaming warnings
     ensure_dir(file_path=checkpoint_path)
     deepdish.io.save(path=checkpoint_path, data={
         "weights": br_weights,
@@ -93,23 +87,25 @@ def save_nfsp_average_policy_checkpoint(trainer: Trainer,
     }, )
     return checkpoint_path
 
+
 def create_metadata_with_new_checkpoint(br_trainer: Trainer,
-                                      policy_id_to_save: str,
-                                      save_dir: str,
-                                      timesteps_training: int,
-                                      episodes_training: int,
-                                      checkpoint_name=None
-                                      ):
+                                        policy_id_to_save: str,
+                                        save_dir: str,
+                                        timesteps_training: int,
+                                        episodes_training: int,
+                                        checkpoint_name=None
+                                        ):
     return {
         "checkpoint_path": save_nfsp_average_policy_checkpoint(trainer=br_trainer,
-                                                             policy_id_to_save=policy_id_to_save,
-                                                             save_dir=save_dir,
-                                                             timesteps_training=timesteps_training,
-                                                             episodes_training=episodes_training,
-                                                             checkpoint_name=checkpoint_name),
+                                                               policy_id_to_save=policy_id_to_save,
+                                                               save_dir=save_dir,
+                                                               timesteps_training=timesteps_training,
+                                                               episodes_training=episodes_training,
+                                                               checkpoint_name=checkpoint_name),
         "timesteps_training": timesteps_training,
         "episodes_training": episodes_training
     }
+
 
 @ray.remote(num_cpus=0)
 class StatDeque(object):
@@ -125,10 +121,10 @@ class StatDeque(object):
     def get_mean(self):
         return np.mean(self._data)
 
+
 def train_off_policy_rl_nfsp(results_dir: str,
                              scenario_name: str,
                              print_train_results: bool = True):
-
     try:
         scenario = scenarios[scenario_name]
     except KeyError:
@@ -185,10 +181,12 @@ def train_off_policy_rl_nfsp(results_dir: str,
         "multiagent": {
             "policies_to_train": ["average_policy_0", "average_policy_1"],
             "policies": {
-                "average_policy_0": (policy_classes["average_policy"], tmp_env.observation_space, tmp_env.action_space, {
+                "average_policy_0": (
+                policy_classes["average_policy"], tmp_env.observation_space, tmp_env.action_space, {
                     "model": avg_policy_model_config
                 }),
-                "average_policy_1": (policy_classes["average_policy"], tmp_env.observation_space, tmp_env.action_space, {
+                "average_policy_1": (
+                policy_classes["average_policy"], tmp_env.observation_space, tmp_env.action_space, {
                     "model": avg_policy_model_config
                 }),
             },
@@ -197,8 +195,9 @@ def train_off_policy_rl_nfsp(results_dir: str,
 
     }, get_avg_trainer_config(tmp_env.action_space))
 
-    avg_trainer = avg_trainer_class(config=avg_trainer_config, logger_creator=get_trainer_logger_creator(base_dir=results_dir,
-                                                 scenario_name=f"{scenario_name}_avg_trainer"))
+    avg_trainer = avg_trainer_class(config=avg_trainer_config,
+                                    logger_creator=get_trainer_logger_creator(base_dir=results_dir,
+                                                                              scenario_name=f"{scenario_name}_avg_trainer"))
 
     store_to_avg_policy_buffer = get_store_to_avg_policy_buffer_fn(nfsp_trainer=avg_trainer)
 
@@ -217,7 +216,8 @@ def train_off_policy_rl_nfsp(results_dir: str,
 
             # All data from both policies will go into the best response's replay buffer.
             # Here we ensure policies not from the best response have the exact same preprocessing as the best response.
-            for average_policy_id, br_policy_id in [("average_policy_0", "best_response_0"), ("average_policy_1", "best_response_1")]:
+            for average_policy_id, br_policy_id in [("average_policy_0", "best_response_0"),
+                                                    ("average_policy_1", "best_response_1")]:
                 if policy_id == average_policy_id:
 
                     if "action_probs" in postprocessed_batch:
@@ -265,7 +265,8 @@ def train_off_policy_rl_nfsp(results_dir: str,
                 if "action_logp" in policy_samples.data:
                     del policy_samples.data["action_logp"]
 
-            for average_policy_id, br_policy_id in [("average_policy_0", "best_response_0"), ("average_policy_1", "best_response_1")]:
+            for average_policy_id, br_policy_id in [("average_policy_0", "best_response_0"),
+                                                    ("average_policy_1", "best_response_1")]:
                 for policy_id, policy_samples in samples.policy_batches.items():
                     if policy_id == br_policy_id:
                         store_to_avg_policy_buffer(MultiAgentBatch(policy_batches={
@@ -280,7 +281,6 @@ def train_off_policy_rl_nfsp(results_dir: str,
                         all_policies_samples = samples.policy_batches[average_policy_id]
                     del samples.policy_batches[average_policy_id]
                     samples.policy_batches[br_policy_id] = all_policies_samples
-
 
         def on_train_result(self, *, trainer, result: dict, **kwargs):
             super().on_train_result(trainer=trainer, result=result, **kwargs)
@@ -315,15 +315,14 @@ def train_off_policy_rl_nfsp(results_dir: str,
                         episodes_training=result["episodes_total"],
                         checkpoint_name=f"average_policy_player_{player}_iter_{training_iteration}.h5"
                     )
-                    avg_pol_checkpoint_spec = PayoffTableStrategySpec(
+                    avg_pol_checkpoint_spec = StrategySpec(
                         strategy_id=f"avg_pol_player_{player}_iter_{training_iteration}",
                         metadata=checkpoint_metadata)
                     checkpoint_path = os.path.join(spec_checkpoint_dir(br_trainer),
-                        f"average_policy_player_{player}_iter_{training_iteration}.json")
+                                                   f"average_policy_player_{player}_iter_{training_iteration}.json")
                     ensure_dir(checkpoint_path)
                     with open(checkpoint_path, "+w") as checkpoint_spec_file:
                         checkpoint_spec_file.write(avg_pol_checkpoint_spec.to_json())
-
 
     br_trainer_config = {
         "log_level": "DEBUG",
@@ -340,17 +339,21 @@ def train_off_policy_rl_nfsp(results_dir: str,
         "multiagent": {
             "policies_to_train": ["best_response_0", "best_response_1"],
             "policies": {
-                "average_policy_0": (policy_classes["average_policy"], tmp_env.observation_space, tmp_env.action_space, {
+                "average_policy_0": (
+                policy_classes["average_policy"], tmp_env.observation_space, tmp_env.action_space, {
                     "model": avg_policy_model_config,
                     "explore": False,
                 }),
-                "best_response_0": (policy_classes["best_response"], tmp_env.observation_space, tmp_env.action_space, {}),
+                "best_response_0": (
+                policy_classes["best_response"], tmp_env.observation_space, tmp_env.action_space, {}),
 
-                "average_policy_1": (policy_classes["average_policy"], tmp_env.observation_space, tmp_env.action_space, {
+                "average_policy_1": (
+                policy_classes["average_policy"], tmp_env.observation_space, tmp_env.action_space, {
                     "model": avg_policy_model_config,
                     "explore": False,
                 }),
-                "best_response_1": (policy_classes["best_response"], tmp_env.observation_space, tmp_env.action_space, {}),
+                "best_response_1": (
+                policy_classes["best_response"], tmp_env.observation_space, tmp_env.action_space, {}),
             },
             "policy_mapping_fn": select_policy,
         },
@@ -358,11 +361,14 @@ def train_off_policy_rl_nfsp(results_dir: str,
     br_trainer_config = merge_dicts(br_trainer_config, get_trainer_config(tmp_env.action_space))
 
     br_trainer = trainer_class(config=br_trainer_config,
-                               logger_creator=get_trainer_logger_creator(base_dir=results_dir, scenario_name=scenario_name))
+                               logger_creator=get_trainer_logger_creator(base_dir=results_dir,
+                                                                         scenario_name=scenario_name))
 
     avg_br_reward_deque = StatDeque.remote(max_items=br_trainer_config["metrics_smoothing_episodes"])
+
     def _set_avg_br_rew_deque(worker: RolloutWorker):
         worker.avg_br_reward_deque = avg_br_reward_deque
+
     br_trainer.workers.foreach_worker(_set_avg_br_rew_deque)
     br_trainer.avg_br_reward_deque = avg_br_reward_deque
 
@@ -397,7 +403,6 @@ def train_off_policy_rl_nfsp(results_dir: str,
         br_trainer.latest_avg_trainer_result = copy.deepcopy(avg_train_results)
         print("br train...")
         train_iter_results = br_trainer.train()  # do a step (or several) in the main RL loop
-
 
         train_iter_count += 1
         print("printing results..")

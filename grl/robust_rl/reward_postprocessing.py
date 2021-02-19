@@ -1,6 +1,7 @@
-import numpy as np
-from typing import List, Dict
 from abc import ABC, abstractmethod
+from typing import List, Dict
+
+import numpy as np
 from ray.rllib.utils.typing import AgentID
 
 

@@ -16,12 +16,16 @@ torch, _ = try_import_torch()
 
 import torch
 
+
 class ValidActionsEpsilonGreedy(Exploration):
     """Epsilon-greedy Exploration class that produces exploration actions.
 
     When given a Model's output and a current epsilon value (based on some
     Schedule), it produces a random action (if rand(1) < eps) or
     uses the model-computed one (if rand(1) >= eps).
+
+    Modified from the original RLlib implementation to never consider actions with logits
+    almost as low as ILLEGAL_ACTION_LOGITS_PENALTY. Those logits correspond to illegal action in the environment.
     """
 
     def __init__(self,
@@ -76,7 +80,7 @@ class ValidActionsEpsilonGreedy(Exploration):
         q_values = action_distribution.inputs
 
         return self._get_torch_exploration_action(q_values, explore,
-                                                      timestep)
+                                                  timestep)
 
     def _get_torch_exploration_action(self, q_values: TensorType,
                                       explore: bool,
@@ -98,8 +102,10 @@ class ValidActionsEpsilonGreedy(Exploration):
             # Get the current epsilon.
             epsilon = self.epsilon_schedule(self.last_timestep)
             batch_size = q_values.size()[0]
-            # Mask out actions, whose Q-values are less than ILLEGAL_ACTION_LOGITS_PENALTY, so that we don't
+            # Mask out actions whose Q-values are almost as low as ILLEGAL_ACTION_LOGITS_PENALTY so that we don't
             # even consider them for exploration.
+            # We compare to 0.1 * ILLEGAL_ACTION_LOGITS_PENALTY instead of just ILLEGAL_ACTION_LOGITS_PENALTY to avoid
+            # any ambiguity with floating point precision on extremely low numbers.
             random_valid_action_logits = torch.where(
                 q_values <= 0.1 * ILLEGAL_ACTION_LOGITS_PENALTY,
                 torch.ones_like(q_values) * 0.0, torch.ones_like(q_values))
@@ -109,7 +115,7 @@ class ValidActionsEpsilonGreedy(Exploration):
             # Pick either random or greedy.
             action = torch.where(
                 torch.empty(
-                    (batch_size, )).uniform_().to(self.device) < epsilon,
+                    (batch_size,)).uniform_().to(self.device) < epsilon,
                 random_actions, exploit_action)
 
             return action, action_logp

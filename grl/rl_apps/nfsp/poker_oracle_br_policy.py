@@ -2,27 +2,20 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from collections import namedtuple
-import numpy as np
 import logging
-import collections
-
-from ray.rllib.utils.annotations import override
-from ray.rllib.policy.policy import Policy
-from ray.rllib.models.catalog import ModelCatalog
-
-import pyspiel
-import numpy as np
+from collections import namedtuple
 from typing import Optional
-from open_spiel.python.algorithms import get_all_states
 
-from open_spiel.python.algorithms import cfr
-from open_spiel.python.algorithms import exploitability
-from open_spiel.python import policy
-from open_spiel.python.algorithms.best_response import BestResponsePolicy
-from grl.rl_apps.kuhn_poker_p2sro.poker_multi_agent_env import PokerMultiAgentEnv, OBS_SHAPES, VALID_ACTIONS_SHAPES
-from grl.rl_apps.kuhn_poker_p2sro.poker_utils import openspiel_policy_from_nonlstm_rllib_policy, tabular_policy_from_weighted_policies
+import numpy as np
 import pyspiel
+from open_spiel.python.algorithms import get_all_states
+from open_spiel.python.algorithms.best_response import BestResponsePolicy
+from ray.rllib.policy.policy import Policy
+from ray.rllib.utils.annotations import override
+
+from grl.envs.poker_multi_agent_env import OBS_SHAPES, VALID_ACTIONS_SHAPES
+from grl.rl_apps.psro.poker_utils import openspiel_policy_from_nonlstm_rllib_policy, \
+    tabular_policy_from_weighted_policies
 
 # Used to return tuple actions as a list of batches per tuple element
 TupleActions = namedtuple("TupleActions", ["batches"])
@@ -31,6 +24,7 @@ OBSERVATION = 'observation'
 VALID_ACTIONS_MASK = 'valid_actions_mask'
 
 logger = logging.getLogger(__name__)
+
 
 def softmax(x):
     """
@@ -41,12 +35,11 @@ def softmax(x):
     return e_x / e_x.sum()
 
 
-
 def policy_to_dict(player_policy,
-                                              game,
-                                              all_states=None,
-                                              state_to_information_state=None,
-                                              player_id:Optional = None):
+                   game,
+                   all_states=None,
+                   state_to_information_state=None,
+                   player_id: Optional = None):
     """Converts a Policy instance into a tabular policy represented as a dict.
 
     This is compatible with the C++ TabularExploitability code (i.e.
@@ -91,7 +84,6 @@ def policy_to_dict(player_policy,
     return tabular_policy
 
 
-
 class PokerOracleBestResponsePolicy(Policy):
     @override(Policy)
     def __init__(self, observation_space, action_space, config):
@@ -112,10 +104,11 @@ class PokerOracleBestResponsePolicy(Policy):
         # exit()
         # print("LOADED CFR POLICY EXPLOITABILITY:", exploitability.exploitability(game, self.tabular_policy))
 
-    def compute_best_response(self, policy_to_exploit, br_only_as_player_id=None, policy_mixture_dict=None, set_policy_weights_fn=None):
+    def compute_best_response(self, policy_to_exploit, br_only_as_player_id=None, policy_mixture_dict=None,
+                              set_policy_weights_fn=None):
         if policy_mixture_dict is None:
             openspiel_policy_to_exploit = openspiel_policy_from_nonlstm_rllib_policy(openspiel_game=self.game,
-                                                                          rllib_policy=policy_to_exploit)
+                                                                                     rllib_policy=policy_to_exploit)
         else:
             if set_policy_weights_fn is None:
                 raise ValueError(
@@ -131,14 +124,14 @@ class PokerOracleBestResponsePolicy(Policy):
                     yield single_openspiel_policy
 
             openspiel_policy_to_exploit = tabular_policy_from_weighted_policies(game=self.game,
-                                                                     policy_iterable=policy_iterable(),
-                                                                     weights=policy_mixture_dict.values())
+                                                                                policy_iterable=policy_iterable(),
+                                                                                weights=policy_mixture_dict.values())
             print("made policy average")
 
         br_player_ids = [br_only_as_player_id] if br_only_as_player_id is not None else [0, 1]
 
         br = {player_id: BestResponsePolicy(game=self.game, player_id=player_id,
-                                                  policy=openspiel_policy_to_exploit) for player_id in br_player_ids}
+                                            policy=openspiel_policy_to_exploit) for player_id in br_player_ids}
 
         policy_dict = {}
         for player_id, br_policy in br.items():
@@ -297,5 +290,3 @@ class PokerOracleBestResponsePolicy(Policy):
             export_dir (str): Local writable directory.
         """
         raise NotImplementedError
-
-

@@ -1,24 +1,22 @@
 import collections
 import logging
-import numpy as np
 import platform
 import random
 from typing import List
 
+import numpy as np
+import psutil  # noqa E402
 # Import ray before psutil will make sure we use psutil's bundled version
 import ray  # noqa F401
-import psutil  # noqa E402
-
-from ray.rllib.execution.segment_tree import SumSegmentTree, MinSegmentTree
+from ray.rllib.execution.replay_buffer import LocalReplayBuffer
 from ray.rllib.policy.sample_batch import SampleBatch, MultiAgentBatch, \
     DEFAULT_POLICY_ID
 from ray.rllib.utils.annotations import DeveloperAPI
-from ray.util.iter import ParallelIteratorWorker
-from ray.util.debug import log_once
 from ray.rllib.utils.timer import TimerStat
-from ray.rllib.utils.window_stat import WindowStat
 from ray.rllib.utils.typing import SampleBatchType
-from ray.rllib.execution.replay_buffer import LocalReplayBuffer
+from ray.rllib.utils.window_stat import WindowStat
+from ray.util.debug import log_once
+from ray.util.iter import ParallelIteratorWorker
 
 # Constant that represents all policies in lockstep replay mode.
 _ALL_POLICIES = "__all__"
@@ -36,7 +34,7 @@ def warn_replay_buffer_size(*, item: SampleBatchType, num_items: int) -> None:
         msg = ("Estimated max memory usage for replay buffer is {} GB "
                "({} batches of size {}, {} bytes each), "
                "available system memory is {} GB".format(
-                   mem_size, num_items, item.count, item_size, total_gb))
+            mem_size, num_items, item.count, item_size, total_gb))
         if mem_size > total_gb:
             raise ValueError(msg)
         elif mem_size > 0.2 * total_gb:
@@ -96,7 +94,6 @@ class ReservoirReplayBuffer:
                 self._sample_reservior_buffer_next_index()
             else:
                 self._next_idx += 1
-
 
             if self._eviction_started:
                 self._evicted_hit_stats.push(self._hit_count[self._next_idx])

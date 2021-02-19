@@ -1,34 +1,17 @@
-from grl.p2sro.payoff_table import PayoffTable, PayoffTableStrategySpec
-from ray.rllib.agents.sac import SACTorchPolicy
-from ray.rllib.agents.trainer import with_common_config, MODEL_DEFAULTS
-from ray.rllib.policy import Policy
-import deepdish
+from typing import Callable, List, Tuple
 
-from typing import Iterable, Dict, Callable, List, Tuple, Generator
-from open_spiel.python import policy
-from open_spiel.python import rl_environment
-from open_spiel.python.algorithms import exploitability
 import numpy as np
-
-
-import ray
-
-from open_spiel.python.policy import Policy as OpenSpielPolicy, TabularPolicy
-from open_spiel.python.algorithms.exploitability import nash_conv, exploitability
-from pyspiel import Game as OpenSpielGame
-
 import pyspiel
-from grl.p2sro.p2sro_manager.utils import get_latest_metanash_strategies
-from grl.p2sro.payoff_table import PayoffTableStrategySpec
-from grl.rl_apps.kuhn_poker_p2sro.poker_multi_agent_env import PokerMultiAgentEnv
-from grl.rl_apps.kuhn_poker_p2sro.poker_utils import openspiel_policy_from_nonlstm_rllib_policy, tabular_policies_from_weighted_policies, _policy_dict_at_state, JointPlayerPolicy
+from open_spiel.python.algorithms import exploitability
+from open_spiel.python.algorithms.exploitability import exploitability
+from ray.rllib.policy import Policy
 
-
-
+from grl.rl_apps.psro.poker_utils import openspiel_policy_from_nonlstm_rllib_policy, \
+    tabular_policies_from_weighted_policies, JointPlayerPolicy
 
 
 def nfsp_measure_exploitability_nonlstm(rllib_policies: List[Policy],
-                                   poker_game_version: str,
+                                        poker_game_version: str,
                                         open_spiel_env_config: dict = None):
     if open_spiel_env_config is None:
         if poker_game_version in ["kuhn_poker", "leduc_poker"]:
@@ -45,14 +28,15 @@ def nfsp_measure_exploitability_nonlstm(rllib_policies: List[Policy],
         else:
             open_spiel_env_config = {}
 
-    open_spiel_env_config = {k: pyspiel.GameParameter(v) if not isinstance(v, pyspiel.GameParameter) else v for k, v in open_spiel_env_config.items()}
+    open_spiel_env_config = {k: pyspiel.GameParameter(v) if not isinstance(v, pyspiel.GameParameter) else v for k, v in
+                             open_spiel_env_config.items()}
 
     openspiel_game = pyspiel.load_game(poker_game_version, open_spiel_env_config)
 
     opnsl_policies = []
     for rllib_policy in rllib_policies:
         openspiel_policy = openspiel_policy_from_nonlstm_rllib_policy(openspiel_game=openspiel_game,
-                                                                          rllib_policy=rllib_policy)
+                                                                      rllib_policy=rllib_policy)
         opnsl_policies.append(openspiel_policy)
 
     nfsp_policy = JointPlayerPolicy(game=openspiel_game, policies=opnsl_policies)
@@ -64,11 +48,10 @@ def nfsp_measure_exploitability_nonlstm(rllib_policies: List[Policy],
     return exploitability_result
 
 
-
 def snfsp_measure_exploitability_nonlstm(br_checkpoint_path_tuple_list: List[Tuple[str, str]],
                                          set_policy_weights_fn: Callable,
-                                        rllib_policies: List[Policy],
-                                        poker_game_version: str):
+                                         rllib_policies: List[Policy],
+                                         poker_game_version: str):
     if poker_game_version in ["kuhn_poker", "leduc_poker"]:
         open_spiel_env_config = {
             "players": pyspiel.GameParameter(2)

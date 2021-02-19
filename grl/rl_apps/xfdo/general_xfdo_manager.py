@@ -1,7 +1,6 @@
-import ray
-from ray.rllib.utils import merge_dicts, try_import_torch
-torch, _ = try_import_torch()
+from ray.rllib.utils import try_import_torch
 
+torch, _ = try_import_torch()
 
 import os
 import logging
@@ -10,7 +9,7 @@ import argparse
 import grl
 from grl.xfdo.xfdo_manager.remote import XFDOManagerWithServer
 from grl.xfdo.xfdo_manager.manager import SolveRestrictedGame
-from grl.utils import datetime_str, ensure_dir
+from grl.utils.common import datetime_str, ensure_dir
 from grl.rl_apps.scenarios.poker import scenarios
 from grl.rl_apps.scenarios.ray_setup import init_ray_for_scenario
 

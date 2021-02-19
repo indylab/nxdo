@@ -1,8 +1,12 @@
+import os
+import tempfile
+
 import logging
 from typing import Dict, Callable
 from ray.tune.result import NODE_IP
-
 from ray.tune.logger import UnifiedLogger
+
+from grl.utils.common import datetime_str
 
 logger = logging.getLogger(__name__)
 
@@ -50,3 +54,20 @@ class SpaceSavingLogger(UnifiedLogger):
                 _logger.on_result(result)
             self._log_syncer.set_worker_ip(result.get(NODE_IP))
             self._log_syncer.sync_down_if_needed()
+
+
+def get_trainer_logger_creator(base_dir: str, scenario_name: str, should_log_result_fn: Callable[[dict], bool]):
+    logdir_prefix = f"{scenario_name}_sparse_{datetime_str()}"
+
+    def trainer_logger_creator(config):
+        """Creates a Unified logger with a default logdir prefix
+        containing the agent name and the env id
+        """
+        if not os.path.exists(base_dir):
+            os.makedirs(base_dir)
+        logdir = tempfile.mkdtemp(
+            prefix=logdir_prefix, dir=base_dir)
+
+        return SpaceSavingLogger(config=config, logdir=logdir, should_log_result_fn=should_log_result_fn)
+
+    return trainer_logger_creator

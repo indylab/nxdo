@@ -1,44 +1,23 @@
-import os
-import time
 import logging
-import numpy as np
-from typing import Dict, List, Any, Tuple, Callable, Type, Dict, Union
+import os
 import tempfile
-import argparse
+from typing import Type, Dict, Union
 
-from gym.spaces import Space
-import copy
 import deepdish
-
-import ray
+import numpy as np
 from ray.rllib.utils import merge_dicts, try_import_torch
+
 torch, _ = try_import_torch()
 
-from ray.rllib import SampleBatch, Policy
 from ray.rllib.agents import Trainer
-from ray.rllib.utils.torch_ops import convert_to_non_torch_type, \
-    convert_to_torch_tensor
-from ray.rllib.utils.typing import ModelGradients, ModelWeights, \
-    TensorType, TrainerConfigDict, AgentID, PolicyID
-from ray.rllib.evaluation.rollout_worker import RolloutWorker
-from ray.rllib.agents.callbacks import DefaultCallbacks
-from ray.rllib.evaluation import MultiAgentEpisode, RolloutWorker
-from ray.rllib.env import BaseEnv
+from ray.rllib.evaluation import RolloutWorker
 from ray.rllib.policy import Policy
-from ray.tune.logger import Logger, UnifiedLogger
-from ray.rllib.policy.sample_batch import SampleBatch, DEFAULT_POLICY_ID, \
-    MultiAgentBatch
-from ray.rllib.agents.dqn.dqn_tf_policy import PRIO_WEIGHTS
-import grl
-from grl.utils import pretty_dict_str, datetime_str, ensure_dir, copy_attributes
+from grl.utils.common import pretty_dict_str, datetime_str
 
-from grl.nfsp_rllib.nfsp import get_store_to_avg_policy_buffer_fn
-from grl.rl_apps.nfsp.openspiel_utils import nfsp_measure_exploitability_nonlstm
 from grl.rllib_tools.space_saving_logger import SpaceSavingLogger
-from grl.rl_apps.scenarios.poker import scenarios
 from grl.rl_apps.scenarios.ray_setup import init_ray_for_scenario
 from grl.rl_apps.scenarios.stopping_conditions import StoppingCondition
-from grl.p2sro.payoff_table import PayoffTableStrategySpec
+from grl.utils.strategy_spec import StrategySpec
 
 logger = logging.getLogger(__name__)
 
@@ -52,13 +31,16 @@ def load_pure_strat(policy: Policy, pure_strat_spec, checkpoint_path: str = None
     else:
         pure_strat_checkpoint_path = checkpoint_path
 
-    pure_strat_checkpoint_path = pure_strat_checkpoint_path.replace("/home/jb/git/grl/grl/data/12_no_limit_leduc_nfsp_dqn_gpu_sparse_10.44.52PM_Feb-02-20213spj98kj/", "/home/jblanier/gokuleduc/nfsp/12_no_limit_leduc_nfsp_dqn_gpu_sparse_10.44.52PM_Feb-02-20213spj98kj/")
+    pure_strat_checkpoint_path = pure_strat_checkpoint_path.replace(
+        "/home/jb/git/grl/grl/data/12_no_limit_leduc_nfsp_dqn_gpu_sparse_10.44.52PM_Feb-02-20213spj98kj/",
+        "/home/jblanier/gokuleduc/nfsp/12_no_limit_leduc_nfsp_dqn_gpu_sparse_10.44.52PM_Feb-02-20213spj98kj/")
 
     checkpoint_data = deepdish.io.load(path=pure_strat_checkpoint_path)
     weights = checkpoint_data["weights"]
     weights = {k.replace("_dot_", "."): v for k, v in weights.items()}
     policy.set_weights(weights=weights)
     policy.policy_spec = pure_strat_spec
+
 
 def get_trainer_logger_creator(base_dir: str, scenario_name: str):
     logdir_prefix = f"{scenario_name}_sparse_{datetime_str()}"
@@ -84,20 +66,20 @@ def get_trainer_logger_creator(base_dir: str, scenario_name: str):
 def checkpoint_dir(trainer: Trainer):
     return os.path.join(trainer.logdir, "avg_policy_checkpoints")
 
+
 def spec_checkpoint_dir(trainer: Trainer):
     return os.path.join(trainer.logdir, "avg_policy_checkpoint_specs")
 
 
 def train_poker_approx_best_response_nfsp(br_player,
-                             ray_head_address,
-                             scenario,
-                             general_trainer_config_overrrides,
-                             br_policy_config_overrides,
-                             get_stopping_condition,
-                             avg_policy_specs_for_players: Dict[int, PayoffTableStrategySpec],
-                             results_dir: str,
-                             print_train_results: bool = True):
-
+                                          ray_head_address,
+                                          scenario,
+                                          general_trainer_config_overrrides,
+                                          br_policy_config_overrides,
+                                          get_stopping_condition,
+                                          avg_policy_specs_for_players: Dict[int, StrategySpec],
+                                          results_dir: str,
+                                          print_train_results: bool = True):
     env_class = scenario["env_class"]
     env_config = scenario["env_config"]
     trainer_class = scenario["trainer_class"]
@@ -122,7 +104,6 @@ def train_poker_approx_best_response_nfsp(br_player,
             return "best_response"
         else:
             return f"average_policy"
-
 
     def assert_not_called(agent_id):
         assert False, "This function should never be called."
@@ -151,7 +132,8 @@ def train_poker_approx_best_response_nfsp(br_player,
                     "model": avg_policy_model_config,
                     "explore": False,
                 }),
-                "best_response": (policy_classes["best_response"], tmp_env.observation_space, tmp_env.action_space, br_policy_config_overrides),
+                "best_response": (policy_classes["best_response"], tmp_env.observation_space, tmp_env.action_space,
+                                  br_policy_config_overrides),
             },
             "policy_mapping_fn": select_policy,
         },
@@ -161,11 +143,13 @@ def train_poker_approx_best_response_nfsp(br_player,
     br_trainer_config = merge_dicts(br_trainer_config, general_trainer_config_overrrides)
 
     br_trainer = trainer_class(config=br_trainer_config,
-                               logger_creator=get_trainer_logger_creator(base_dir=results_dir, scenario_name="approx_br"))
+                               logger_creator=get_trainer_logger_creator(base_dir=results_dir,
+                                                                         scenario_name="approx_br"))
 
     def _set_avg_policy(worker: RolloutWorker):
         avg_policy = worker.policy_map["average_policy"]
         load_pure_strat(policy=avg_policy, pure_strat_spec=avg_policy_specs_for_players[1 - br_player])
+
     br_trainer.workers.foreach_worker(_set_avg_policy)
 
     br_trainer.latest_avg_trainer_result = None
