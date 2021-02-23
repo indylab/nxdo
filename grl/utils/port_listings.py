@@ -37,9 +37,14 @@ def establish_new_server_port_for_service(service_name: str) -> int:
                                   f"in {retries} retries.")
 
 
-def get_client_port_for_service(service_name: str) -> Union[None, int]:
+def get_client_port_for_service(service_name: str, raise_if_not_found=True) -> Union[None, int]:
     with FileLock(f"{PORT_LISTING_PATH}.lock"):
         with open(PORT_LISTING_PATH, "r+") as port_listing_file:
             port_listings: Dict[str, str] = json.load(port_listing_file)
             port_for_service = port_listings.get(service_name)
+
+            if raise_if_not_found and port_for_service is None:
+                raise ConnectionError(f"Couldn't find a list port for service name {service_name}.\n"
+                                      f"Port listings are:\n{port_listings}")
+
             return int(port_for_service) if port_for_service is not None else None
