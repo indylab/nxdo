@@ -17,6 +17,8 @@ from grl.p2sro.p2sro_manager.protobuf.p2sro_manager_pb2_grpc import P2SROManager
 from grl.p2sro.payoff_table import PayoffTable
 from grl.utils.strategy_spec import StrategySpec
 
+GRPC_MAX_MESSAGE_LENGTH = 1048576 * 40  # 40MiB
+
 logger = logging.getLogger(__name__)
 
 
@@ -136,7 +138,10 @@ class P2SROManagerWithServer(P2SROManager):
             manager_metadata=manager_metadata,
             payoff_table_exponential_average_coeff=payoff_table_exponential_average_coeff
         )
-        self._grpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=1))
+        self._grpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=1), options=[
+            ('grpc.max_send_message_length', GRPC_MAX_MESSAGE_LENGTH),
+            ('grpc.max_receive_message_length', GRPC_MAX_MESSAGE_LENGTH)
+        ])
         servicer = _P2SROMangerServerServicerImpl(manager=self)
         add_P2SROManagerServicer_to_server(servicer=servicer, server=self._grpc_server)
         address = f'[::]:{port}'
@@ -159,8 +164,11 @@ class RemoteP2SROManagerClient(P2SROManager):
     """
 
     # noinspection PyMissingConstructor
-    def __init__(self, n_players, port=4535, remote_server_host="127.0.0.1"):
-        self._stub = P2SROManagerStub(channel=grpc.insecure_channel(target=f"{remote_server_host}:{port}"))
+    def __init__(self, n_players: int, port: int = 4535, remote_server_host: str = "127.0.0.1"):
+        self._stub = P2SROManagerStub(channel=grpc.insecure_channel(target=f"{remote_server_host}:{port}", options=[
+            ('grpc.max_send_message_length', GRPC_MAX_MESSAGE_LENGTH),
+            ('grpc.max_receive_message_length', GRPC_MAX_MESSAGE_LENGTH),
+        ]))
         server_is_same_num_players: Confirmation = self._stub.CheckNumPlayers(NumPlayers(num_players=n_players))
         if not server_is_same_num_players.result:
             raise ValueError("Remote P2SROManger server has a different number of players than this one.")

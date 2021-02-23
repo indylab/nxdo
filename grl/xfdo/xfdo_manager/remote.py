@@ -15,6 +15,8 @@ from grl.xfdo.xfdo_manager.protobuf.xfdo_manager_pb2 import XFDOPolicyMetadataRe
 from grl.xfdo.xfdo_manager.protobuf.xfdo_manager_pb2_grpc import XFDOManagerServicer, add_XFDOManagerServicer_to_server, \
     XFDOManagerStub
 
+GRPC_MAX_MESSAGE_LENGTH = 1048576 * 40  # 40MiB
+
 logger = logging.getLogger(__name__)
 
 
@@ -97,7 +99,10 @@ class XFDOManagerWithServer(XFDOManager):
             log_dir=log_dir,
             manager_metadata=manager_metadata
         )
-        self._grpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=1))
+        self._grpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=1), options=[
+            ('grpc.max_send_message_length', GRPC_MAX_MESSAGE_LENGTH),
+            ('grpc.max_receive_message_length', GRPC_MAX_MESSAGE_LENGTH)
+        ])
         servicer = _XFDOMangerServerServicerImpl(manager=self, stop_server_fn=self.stop_server)
         add_XFDOManagerServicer_to_server(servicer=servicer, server=self._grpc_server)
         address = f'[::]:{port}'
@@ -116,7 +121,10 @@ class RemoteXFDOManagerClient(XFDOManager):
 
     # noinspection PyMissingConstructor
     def __init__(self, n_players, port=4545, remote_server_host="127.0.0.1"):
-        self._stub = XFDOManagerStub(channel=grpc.insecure_channel(target=f"{remote_server_host}:{port}"))
+        self._stub = XFDOManagerStub(channel=grpc.insecure_channel(target=f"{remote_server_host}:{port}", options=[
+            ('grpc.max_send_message_length', GRPC_MAX_MESSAGE_LENGTH),
+            ('grpc.max_receive_message_length', GRPC_MAX_MESSAGE_LENGTH),
+        ]))
         self._n_players = n_players
 
     def n_players(self) -> int:
