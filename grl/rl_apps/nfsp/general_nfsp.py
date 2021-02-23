@@ -26,7 +26,7 @@ from grl.utils.common import pretty_dict_str, datetime_str, ensure_dir, copy_att
 from grl.nfsp_rllib.nfsp import get_store_to_avg_policy_buffer_fn
 from grl.rl_apps.nfsp.openspiel_utils import nfsp_measure_exploitability_nonlstm
 from grl.rllib_tools.space_saving_logger import SpaceSavingLogger
-from grl.rl_apps.scenarios.poker import scenarios
+from grl.rl_apps.scenarios import scenario_catalog, NFSPScenario
 from grl.rl_apps.scenarios.ray_setup import init_ray_for_scenario
 from grl.rl_apps.scenarios.stopping_conditions import StoppingCondition
 from grl.utils.strategy_spec import StrategySpec
@@ -125,23 +125,21 @@ class StatDeque(object):
 def train_off_policy_rl_nfsp(results_dir: str,
                              scenario_name: str,
                              print_train_results: bool = True):
-    try:
-        scenario = scenarios[scenario_name]
-    except KeyError:
-        raise NotImplementedError(f"Unknown scenario name: \'{scenario_name}\'. Existing scenarios are:\n"
-                                  f"{list(scenarios.keys())}")
-    env_class = scenario["env_class"]
-    env_config = scenario["env_config"]
-    trainer_class = scenario["trainer_class"]
-    avg_trainer_class = scenario["avg_trainer_class"]
-    policy_classes: Dict[str, Type[Policy]] = scenario["policy_classes"]
-    anticipatory_param: float = scenario["anticipatory_param"]
-    get_trainer_config = scenario["get_trainer_config"]
-    get_avg_trainer_config = scenario["get_avg_trainer_config"]
-    calculate_openspiel_metanash: bool = scenario["calculate_openspiel_metanash"]
-    calc_metanash_every_n_iters: int = scenario["calc_metanash_every_n_iters"]
-    checkpoint_every_n_iters: Union[int, None] = scenario["checkpoint_every_n_iters"]
-    nfsp_get_stopping_condition = scenario["nfsp_get_stopping_condition"]
+    
+    scenario: NFSPScenario = scenario_catalog.get(scenario_name=scenario_name)
+
+    env_class = scenario.env_class
+    env_config = scenario.env_config
+    trainer_class = scenario.trainer_class
+    avg_trainer_class = scenario.avg_trainer_class
+    policy_classes: Dict[str, Type[Policy]] = scenario.policy_classes
+    anticipatory_param: float = scenario.anticipatory_param
+    get_trainer_config = scenario.get_trainer_config
+    get_avg_trainer_config = scenario.get_avg_trainer_config
+    calculate_openspiel_metanash: bool = scenario.calculate_openspiel_metanash
+    calc_metanash_every_n_iters: int = scenario.calc_metanash_every_n_iters
+    checkpoint_every_n_iters: Union[int, None] = scenario.checkpoint_every_n_iters
+    nfsp_get_stopping_condition = scenario.nfsp_get_stopping_condition
 
     init_ray_for_scenario(scenario=scenario, head_address=None, logging_level=logging.INFO)
 
@@ -167,7 +165,7 @@ def train_off_policy_rl_nfsp(results_dir: str,
     tmp_env = env_class(env_config=env_config)
     open_spiel_env_config = tmp_env.open_spiel_env_config if calculate_openspiel_metanash else None
 
-    avg_policy_model_config = get_trainer_config(action_space=tmp_env.action_space)["model"]
+    avg_policy_model_config = get_trainer_config(tmp_env)["model"]
 
     avg_trainer_config = merge_dicts({
         "log_level": "DEBUG",
@@ -193,7 +191,7 @@ def train_off_policy_rl_nfsp(results_dir: str,
             "policy_mapping_fn": assert_not_called,
         },
 
-    }, get_avg_trainer_config(tmp_env.action_space))
+    }, get_avg_trainer_config(tmp_env))
 
     avg_trainer = avg_trainer_class(config=avg_trainer_config,
                                     logger_creator=get_trainer_logger_creator(base_dir=results_dir,
@@ -358,7 +356,7 @@ def train_off_policy_rl_nfsp(results_dir: str,
             "policy_mapping_fn": select_policy,
         },
     }
-    br_trainer_config = merge_dicts(br_trainer_config, get_trainer_config(tmp_env.action_space))
+    br_trainer_config = merge_dicts(br_trainer_config, get_trainer_config(tmp_env))
 
     br_trainer = trainer_class(config=br_trainer_config,
                                logger_creator=get_trainer_logger_creator(base_dir=results_dir,

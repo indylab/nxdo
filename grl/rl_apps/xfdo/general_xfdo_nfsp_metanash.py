@@ -8,7 +8,6 @@ import time
 import logging
 import numpy as np
 from typing import List, Any, Tuple, Type, Dict
-import tempfile
 from copy import deepcopy
 
 from gym.spaces import Discrete
@@ -23,42 +22,27 @@ from ray.rllib.evaluation import MultiAgentEpisode, RolloutWorker
 from ray.rllib.env import BaseEnv
 from ray.rllib.policy import Policy
 from ray.rllib.policy.sample_batch import SampleBatch, MultiAgentBatch
+from grl.rl_apps.scenarios import NXDOScenario
 from grl.utils.common import pretty_dict_str, datetime_str, ensure_dir, copy_attributes
 from grl.rllib_tools.stat_deque import StatDeque
 from grl.nfsp_rllib.nfsp import get_store_to_avg_policy_buffer_fn
-from grl.rllib_tools.space_saving_logger import SpaceSavingLogger
+from grl.rllib_tools.space_saving_logger import SpaceSavingLogger, get_trainer_logger_creator
 from grl.rl_apps.scenarios.stopping_conditions import StoppingCondition
 from grl.utils.strategy_spec import StrategySpec
 from grl.xfdo.restricted_game import RestrictedGame
 from grl.xfdo.action_space_conversion import RestrictedToBaseGameActionSpaceConverter
 from grl.rl_apps.xfdo.poker_utils import xfdo_nfsp_measure_exploitability_nonlstm
 from grl.xfdo.opnsl_restricted_game import OpenSpielRestrictedGame, get_restricted_game_obs_conversions
+from grl.rllib_tools.policy_checkpoints import save_policy_checkpoint, create_get_pure_strat_cached
 
 from grl.rl_apps.scenarios.ray_setup import init_ray_for_scenario
 
 logger = logging.getLogger(__name__)
 
 
-def get_trainer_logger_creator(base_dir: str, scenario_name: str):
-    logdir_prefix = f"{scenario_name}_sparse_{datetime_str()}"
-
-    def trainer_logger_creator(config):
-        """Creates a Unified logger with a default logdir prefix
-        containing the agent name and the env id
-        """
-        if not os.path.exists(base_dir):
-            os.makedirs(base_dir)
-        logdir = tempfile.mkdtemp(
-            prefix=logdir_prefix, dir=base_dir)
-
-        def _should_log(result: dict) -> bool:
-            return ("z_avg_policy_exploitability" in result or
-                    result["training_iteration"] % 1000 == 0)
-
-        return SpaceSavingLogger(config=config, logdir=logdir, should_log_result_fn=_should_log)
-
-    return trainer_logger_creator
-
+def should_log_trainer_result(result: dict) -> bool:
+    return ("z_avg_policy_exploitability" in result or
+            result["training_iteration"] % 1000 == 0)
 
 def checkpoint_dir(trainer: Trainer):
     return os.path.join(trainer.logdir, "br_checkpoints")
@@ -89,49 +73,27 @@ def save_nfsp_avg_policy_checkpoint(trainer: Trainer,
     return checkpoint_path
 
 
-def create_get_pure_strat_cached(cache: dict):
-    def load_pure_strat_cached(policy: Policy, pure_strat_spec):
-
-        pure_strat_checkpoint_path = pure_strat_spec.metadata["checkpoint_path"]
-
-        if pure_strat_checkpoint_path in cache:
-            weights = cache[pure_strat_checkpoint_path]
-        else:
-            checkpoint_data = deepdish.io.load(path=pure_strat_checkpoint_path)
-            weights = checkpoint_data["weights"]
-            weights = {k.replace("_dot_", "."): v for k, v in weights.items()}
-
-            weights = convert_to_torch_tensor_safe(weights, device=policy.device)
-            cache[pure_strat_checkpoint_path] = weights
-        # policy.set_weights(weights=weights)
-        policy.model.load_state_dict(weights)
-
-        policy.policy_spec = pure_strat_spec
-
-    return load_pure_strat_cached
-
-
 def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
-                                             scenario: dict,
+                                             scenario: NXDOScenario,
                                              player_to_base_game_action_specs: Dict[int, List[StrategySpec]],
                                              stopping_condition: StoppingCondition,
                                              manager_metadata: dict,
                                              print_train_results: bool = True):
-    use_openspiel_restricted_game: bool = scenario["use_openspiel_restricted_game"]
-    restricted_game_custom_model = scenario["restricted_game_custom_model"]
 
-    env_class = scenario["env_class"]
-    base_env_config = scenario["env_config"]
-    trainer_class = scenario["trainer_class_nfsp"]
-    avg_trainer_class = scenario["avg_trainer_class_nfsp"]
-    policy_classes: Dict[str, Type[Policy]] = scenario["policy_classes_nfsp"]
-    anticipatory_param: float = scenario["anticipatory_param_nfsp"]
-    get_trainer_config = scenario["get_trainer_config_nfsp"]
-    get_avg_trainer_config = scenario["get_avg_trainer_config_nfsp"]
-    calculate_openspiel_metanash: bool = scenario["calculate_openspiel_metanash"]
-    calculate_openspiel_metanash_at_end: bool = scenario["calculate_openspiel_metanash_at_end"]
-    calc_metanash_every_n_iters: int = scenario["calc_metanash_every_n_iters"]
-    metrics_smoothing_episodes_override: int = scenario["metanash_metrics_smoothing_episodes_override"]
+    use_openspiel_restricted_game: bool = scenario.use_openspiel_restricted_game
+    get_restricted_game_custom_model = scenario.get_restricted_game_custom_model
+    env_class = scenario.env_class
+    base_env_config = scenario.env_config
+    trainer_class = scenario.trainer_class_nfsp
+    avg_trainer_class = scenario.avg_trainer_class_nfsp
+    policy_classes: Dict[str, Type[Policy]] = scenario.policy_classes_nfsp
+    anticipatory_param: float = scenario.anticipatory_param_nfsp
+    get_trainer_config = scenario.get_trainer_config_nfsp
+    get_avg_trainer_config = scenario.get_avg_trainer_config_nfsp
+    calculate_openspiel_metanash: bool = scenario.calculate_openspiel_metanash
+    calculate_openspiel_metanash_at_end: bool = scenario.calculate_openspiel_metanash_at_end
+    calc_metanash_every_n_iters: int = scenario.calc_metanash_every_n_iters
+    metrics_smoothing_episodes_override: int = scenario.metanash_metrics_smoothing_episodes_override
 
     assert scenario["xfdo_metanash_method"] == "nfsp"
 
@@ -204,11 +166,13 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
     }, get_avg_trainer_config(tmp_env.base_action_space))
     for _policy_id in ["average_policy_0", "average_policy_1"]:
         avg_trainer_config["multiagent"]["policies"][_policy_id][3]["model"] = {
-            "custom_model": restricted_game_custom_model}
+            "custom_model": get_restricted_game_custom_model(tmp_base_env)}
 
     avg_trainer = avg_trainer_class(config=avg_trainer_config,
-                                    logger_creator=get_trainer_logger_creator(base_dir=results_dir,
-                                                                              scenario_name=f"nfsp_restricted_game_avg_trainer"))
+                                    logger_creator=get_trainer_logger_creator(
+                                        base_dir=results_dir,
+                                        scenario_name=f"nfsp_restricted_game_avg_trainer", 
+                                        should_log_result_fn=should_log_trainer_result))
 
     store_to_avg_policy_buffer = get_store_to_avg_policy_buffer_fn(nfsp_trainer=avg_trainer)
 
@@ -369,13 +333,15 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
     br_trainer_config = merge_dicts(br_trainer_config, get_trainer_config(tmp_env.base_action_space))
     for _policy_id in ["average_policy_0", "average_policy_1", "best_response_0", "best_response_1"]:
         br_trainer_config["multiagent"]["policies"][_policy_id][3]["model"] = {
-            "custom_model": restricted_game_custom_model}
+            "custom_model": get_restricted_game_custom_model(tmp_base_env)}
 
     br_trainer_config["metrics_smoothing_episodes"] = metrics_smoothing_episodes_override
 
     br_trainer = trainer_class(config=br_trainer_config,
-                               logger_creator=get_trainer_logger_creator(base_dir=results_dir,
-                                                                         scenario_name="nfsp_restricted_game_trainer"))
+                               logger_creator=get_trainer_logger_creator(
+                                   base_dir=results_dir,
+                                   scenario_name="nfsp_restricted_game_trainer",
+                                   should_log_result_fn=should_log_trainer_result))
 
     avg_br_reward_deque = StatDeque.remote(max_items=br_trainer_config["metrics_smoothing_episodes"])
 

@@ -18,10 +18,12 @@ from ray.rllib.policy import Policy
 
 from grl.utils.strategy_spec import StrategySpec
 from grl.utils.common import pretty_dict_str
+from grl.utils.port_listings import get_client_port_for_service
 from grl.p2sro.p2sro_manager import RemoteP2SROManagerClient
 from grl.p2sro.p2sro_manager.utils import get_latest_metanash_strategies, PolicySpecDistribution
-from grl.rl_apps.scenarios.poker import scenarios
+from grl.rl_apps.scenarios import scenario_catalog, PSROScenario
 from grl.rl_apps.scenarios.stopping_conditions import StoppingCondition
+from grl.rl_apps import GRL_SEED
 
 from grl.rl_apps.scenarios.ray_setup import init_ray_for_scenario
 from grl.rllib_tools.space_saving_logger import get_trainer_logger_creator
@@ -182,21 +184,19 @@ class P2SROPreAndPostEpisodeCallbacks(DefaultCallbacks):
     #         override_all_previous_results=False)
 
 
-def train_poker_best_response(player, results_dir, scenario_name, print_train_results=True):
-    try:
-        scenario = scenarios[scenario_name]
-    except KeyError:
-        raise NotImplementedError(f"Unknown scenario name: \'{scenario_name}\'. Existing scenarios are:\n"
-                                  f"{list(scenarios.keys())}")
-    env_class = scenario["env_class"]
-    env_config = scenario["env_config"]
-    trainer_class = scenario["trainer_class"]
-    policy_classes: Dict[str, Type[Policy]] = scenario["policy_classes"]
-    default_psro_port = scenario["psro_port"]
-    p2sro = scenario["p2sro"]
-    get_trainer_config = scenario["get_trainer_config"]
-    psro_get_stopping_condition = scenario["psro_get_stopping_condition"]
-    mix_metanash_with_uniform_dist_coeff = scenario["mix_metanash_with_uniform_dist_coeff"]
+def train_psro_best_response(player, results_dir, scenario_name, psro_manager_port: int, psro_manager_host: str,
+                             print_train_results=True):
+    
+    scenario: PSROScenario = scenario_catalog.get(scenario_name=scenario_name)
+    
+    env_class = scenario.env_class
+    env_config = scenario.env_config
+    trainer_class = scenario.trainer_class
+    policy_classes: Dict[str, Type[Policy]] = scenario.policy_classes
+    p2sro = scenario.p2sro
+    get_trainer_config = scenario.get_trainer_config
+    psro_get_stopping_condition = scenario.psro_get_stopping_condition
+    mix_metanash_with_uniform_dist_coeff = scenario.mix_metanash_with_uniform_dist_coeff
 
     other_player = 1 - player
 
@@ -213,8 +213,8 @@ def train_poker_best_response(player, results_dir, scenario_name, print_train_re
         else:
             raise ValueError(f"Unknown agent id: {agent_id}")
 
-    p2sro_manager = RemoteP2SROManagerClient(n_players=2, port=os.getenv("P2SRO_PORT", default_psro_port),
-                                             remote_server_host="127.0.0.1")
+    p2sro_manager = RemoteP2SROManagerClient(n_players=2, port=psro_manager_port,
+                                             remote_server_host=psro_manager_host)
     manager_metadata = p2sro_manager.get_manager_metadata()
     ray_head_address = manager_metadata["ray_head_address"]
     init_ray_for_scenario(scenario=scenario, head_address=ray_head_address, logging_level=logging.INFO)
@@ -241,9 +241,7 @@ def train_poker_best_response(player, results_dir, scenario_name, print_train_re
         },
     }
 
-    trainer_config = merge_dicts(trainer_config, get_trainer_config(action_space=tmp_env.action_space))
-
-    # trainer_config["rollout_fragment_length"] = trainer_config["rollout_fragment_length"] // max(1, trainer_config["num_workers"] * trainer_config["num_envs_per_worker"] )
+    trainer_config = merge_dicts(trainer_config, get_trainer_config(tmp_env))
 
     trainer = trainer_class(config=trainer_config,
                             logger_creator=get_trainer_logger_creator(
@@ -353,26 +351,29 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--player', type=int)
     parser.add_argument('--scenario', type=str)
-    args = parser.parse_args()
+    parser.add_argument('--psro_port', type=int, required=False, default=None)
+    parser.add_argument('--psro_host', type=str, required=False, default='localhost')
+    commandline_args = parser.parse_args()
 
-    scenario_name = args.scenario
-    try:
-        scenario = scenarios[scenario_name]
-    except KeyError:
-        raise NotImplementedError(f"Unknown scenario name: \'{scenario_name}\'. Existing scenarios are:\n"
-                                  f"{list(scenarios.keys())}")
-    default_psro_port = scenario["psro_port"]
+    scenario_name = commandline_args.scenario
 
-    manager_log_dir = RemoteP2SROManagerClient(n_players=2, port=os.getenv("P2SRO_PORT", default_psro_port),
-                                               remote_server_host="127.0.0.1").get_log_dir()
-    results_dir = os.path.join(manager_log_dir, f"learners_player_{args.player}/")
+    psro_host = commandline_args.psro_host
+    psro_port = commandline_args.psro_port
+    if psro_port is None:
+        psro_port = get_client_port_for_service(service_name=f"seed_{GRL_SEED}_{scenario_name}")
+
+    manager_log_dir = RemoteP2SROManagerClient(n_players=2, port=os.getenv("P2SRO_PORT", psro_port),
+                                               remote_server_host=psro_host).get_log_dir()
+    results_dir = os.path.join(manager_log_dir, f"learners_player_{commandline_args.player}/")
     print(f"results dir is {results_dir}")
 
     while True:
-        # Train a br for each player, then repeat.
-        train_poker_best_response(
-            player=args.player,
-            print_train_results=True,
+        # Train a br for the specified player, then repeat.
+        train_psro_best_response(
+            player=commandline_args.player,
             results_dir=results_dir,
             scenario_name=scenario_name,
+            psro_manager_port=psro_port,
+            psro_manager_host=psro_host,
+            print_train_results=True,
         )

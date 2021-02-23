@@ -11,17 +11,12 @@ from ray.rllib.agents.trainer import with_common_config
 from ray.rllib.policy.policy import Policy
 
 from grl.p2sro.eval_dispatcher.remote import RemoteEvalDispatcherClient
-from grl.rl_apps.scenarios.poker import scenarios
+from grl.rl_apps.scenarios import scenario_catalog, PSROScenario
 from grl.rl_apps.scenarios.ray_setup import init_ray_for_scenario
 from grl.utils.strategy_spec import StrategySpec
-
-
-def load_weights(policy: Policy, pure_strat_spec: StrategySpec):
-    pure_strat_checkpoint_path = pure_strat_spec.metadata["checkpoint_path"]
-    checkpoint_data = deepdish.io.load(path=pure_strat_checkpoint_path)
-    weights = checkpoint_data["weights"]
-    weights = {k.replace("_dot_", "."): v for k, v in weights.items()}
-    policy.set_weights(weights=weights)
+from grl.utils.port_listings import get_client_port_for_service
+from grl.rl_apps import GRL_SEED
+from grl.rllib_tools.policy_checkpoints import load_pure_strat
 
 
 def run_episode(env, policies_for_each_player) -> np.ndarray:
@@ -57,33 +52,20 @@ def run_episode(env, policies_for_each_player) -> np.ndarray:
 
 
 @ray.remote(num_cpus=0, num_gpus=0)
-def run_poker_evaluation_loop(scenario_name: str):
-    try:
-        scenario = scenarios[scenario_name]
-    except KeyError:
-        raise NotImplementedError(f"Unknown scenario name: \'{scenario_name}\'. Existing scenarios are:\n"
-                                  f"{list(scenarios.keys())}")
-
-    env_class = scenario["env_class"]
-    env_config: dict = scenario["env_config"]
-    eval_policy_class: Type[Policy] = scenario["policy_classes"]["eval"]
-    default_eval_port = scenario["eval_port"]
-    get_trainer_config = scenario["get_trainer_config"]
-
-    eval_dispatcher_port = os.getenv("EVAL_PORT", default_eval_port)
-    eval_dispatcher_host = os.getenv("EVAL_HOST", "localhost")
+def run_poker_evaluation_loop(scenario_name: str, eval_dispatcher_port: int, eval_dispatcher_host: str):
+    scenario: PSROScenario = scenario_catalog.get(scenario_name=scenario_name)
 
     eval_dispatcher = RemoteEvalDispatcherClient(port=eval_dispatcher_port, remote_server_host=eval_dispatcher_host)
 
-    env = env_class(env_config=env_config)
+    env = scenario.env_class(env_config=scenario.env_config)
     num_players = 2
 
-    trainer_config = get_trainer_config(action_space=env.action_space)
+    trainer_config = scenario.get_trainer_config(env)
     trainer_config["explore"] = False
 
-    policies = [eval_policy_class(env.observation_space,
-                                  env.action_space,
-                                  with_common_config(trainer_config))
+    policies = [scenario.policy_classes["eval"](env.observation_space,
+                                                env.action_space,
+                                                with_common_config(trainer_config))
                 for _ in range(num_players)]
 
     while True:
@@ -101,7 +83,7 @@ def run_poker_evaluation_loop(scenario_name: str):
             #     print(f"spec: {spec.to_json()}")
 
             for policy, spec in zip(policies, policy_specs_for_each_player):
-                load_weights(policy=policy, pure_strat_spec=spec)
+                load_pure_strat(policy=policy, pure_strat_spec=spec)
 
             total_payoffs_per_player = np.zeros(shape=num_players, dtype=np.float64)
 
@@ -141,17 +123,18 @@ def run_poker_evaluation_loop(scenario_name: str):
             )
 
 
-def launch_evals(scenario_name: str, block=True, ray_head_address=None):
-    try:
-        scenario = scenarios[scenario_name]
-    except KeyError:
-        raise NotImplementedError(f"Unknown scenario name: \'{scenario_name}\'. Existing scenarios are:\n"
-                                  f"{list(scenarios.keys())}")
+def launch_evals(scenario_name: str,
+                 eval_dispatcher_port: int,
+                 eval_dispatcher_host: str,
+                 block=True,
+                 ray_head_address=None):
+    scenario: PSROScenario = scenario_catalog.get(scenario_name=scenario_name)
 
     init_ray_for_scenario(scenario=scenario, head_address=ray_head_address, logging_level=logging.INFO)
 
-    num_workers = scenario["num_eval_workers"]
-    evaluator_refs = [run_poker_evaluation_loop.remote(scenario_name) for _ in range(num_workers)]
+    num_workers = scenario.num_eval_workers
+    evaluator_refs = [run_poker_evaluation_loop.remote(scenario_name, eval_dispatcher_port, eval_dispatcher_host)
+                      for _ in range(num_workers)]
     if block:
         ray.wait(evaluator_refs, num_returns=num_workers)
 
@@ -159,8 +142,15 @@ def launch_evals(scenario_name: str, block=True, ray_head_address=None):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--scenario', type=str)
+    parser.add_argument('--eval_port', type=int, required=False, default=None)
+    parser.add_argument('--eval_host', type=str, required=False, default='localhost')
     commandline_args = parser.parse_args()
 
     scenario_name = commandline_args.scenario
+    eval_port = commandline_args.eval_port
+    if eval_port is None:
+        eval_port = get_client_port_for_service(service_name=f"seed_{GRL_SEED}_{scenario_name}_evals")
 
-    launch_evals(scenario_name=scenario_name)
+    launch_evals(scenario_name=scenario_name,
+                 eval_dispatcher_port=eval_port,
+                 eval_dispatcher_host=commandline_args.eval_host)

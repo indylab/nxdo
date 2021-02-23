@@ -33,6 +33,9 @@ from grl.nfsp_rllib.checkpoint_reservoir_buffer import ReservoirBuffer
 logger = logging.getLogger(__name__)
 
 
+# TODO This file is incomplete, need to convert this to make use of Scenario objects to specify hyperparameters.
+
+
 def save_cfp_best_response_checkpoint(trainer: Trainer,
                                       policy_id_to_save: str,
                                       save_dir: str,

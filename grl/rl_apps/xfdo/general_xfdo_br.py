@@ -27,33 +27,16 @@ from grl.utils.common import pretty_dict_str, datetime_str, ensure_dir
 from grl.xfdo.xfdo_manager.remote import RemoteXFDOManagerClient
 from grl.xfdo.action_space_conversion import RestrictedToBaseGameActionSpaceConverter
 from grl.xfdo.restricted_game import RestrictedGame
-from grl.rllib_tools.space_saving_logger import SpaceSavingLogger
-from grl.rl_apps.scenarios.poker import scenarios
+from grl.rllib_tools.space_saving_logger import SpaceSavingLogger, get_trainer_logger_creator
+from grl.rllib_tools.policy_checkpoints import load_pure_strat, save_policy_checkpoint, create_get_pure_strat_cached
+from grl.rl_apps.scenarios import scenario_catalog, NXDOScenario
 from grl.rl_apps.scenarios.ray_setup import init_ray_for_scenario
 from grl.rl_apps.scenarios.stopping_conditions import StoppingCondition
 from grl.xfdo.opnsl_restricted_game import OpenSpielRestrictedGame, get_restricted_game_obs_conversions
+from grl.utils.port_listings import get_client_port_for_service
+from grl.rl_apps import GRL_SEED
 
 logger = logging.getLogger(__name__)
-
-
-def get_trainer_logger_creator(base_dir: str, scenario_name: str):
-    logdir_prefix = f"{scenario_name}_sparse_{datetime_str()}"
-
-    def trainer_logger_creator(config):
-        """Creates a Unified logger with a default logdir prefix
-        containing the agent name and the env id
-        """
-        if not os.path.exists(base_dir):
-            os.makedirs(base_dir)
-        logdir = tempfile.mkdtemp(
-            prefix=logdir_prefix, dir=base_dir)
-
-        def _should_log(result: dict) -> bool:
-            return result["training_iteration"] % 100 == 0
-
-        return SpaceSavingLogger(config=config, logdir=logdir, should_log_result_fn=_should_log)
-
-    return trainer_logger_creator
 
 
 def checkpoint_dir(trainer):
@@ -94,40 +77,6 @@ def save_best_response_checkpoint(trainer,
                 raise
             time.sleep(1.0)
     return checkpoint_path
-
-
-def load_pure_strat(policy: Policy, pure_strat_spec, checkpoint_path: str = None):
-    assert pure_strat_spec is None or checkpoint_path is None, "can only pass one or the other"
-    if checkpoint_path is None:
-        if hasattr(policy, "policy_spec") and pure_strat_spec == policy.policy_spec:
-            return
-        pure_strat_checkpoint_path = pure_strat_spec.metadata["checkpoint_path"]
-    else:
-        pure_strat_checkpoint_path = checkpoint_path
-    checkpoint_data = deepdish.io.load(path=pure_strat_checkpoint_path)
-    weights = checkpoint_data["weights"]
-    weights = {k.replace("_dot_", "."): v for k, v in weights.items()}
-    policy.set_weights(weights=weights)
-    policy.policy_spec = pure_strat_spec
-
-
-def create_get_pure_strat_cached(cache: dict):
-    def load_pure_strat_cached(policy: Policy, pure_strat_spec):
-
-        pure_strat_checkpoint_path = pure_strat_spec.metadata["checkpoint_path"]
-
-        if pure_strat_checkpoint_path in cache:
-            weights = cache[pure_strat_checkpoint_path]
-        else:
-            checkpoint_data = deepdish.io.load(path=pure_strat_checkpoint_path)
-            weights = checkpoint_data["weights"]
-            weights = {k.replace("_dot_", "."): v for k, v in weights.items()}
-            cache[pure_strat_checkpoint_path] = weights
-
-        policy.set_weights(weights=weights)
-        policy.policy_spec = pure_strat_spec
-
-    return load_pure_strat_cached
 
 
 def create_metadata_with_new_checkpoint_for_current_best_response(trainer,
@@ -227,29 +176,28 @@ def set_restricted_game_conversions_for_all_workers_openspiel(
         delegate_policy_id].player_converters
 
 
-def train_poker_best_response(br_player: int, scenario_name: str, print_train_results: bool = True):
-    try:
-        scenario = scenarios[scenario_name]
-    except KeyError:
-        raise NotImplementedError(f"Unknown scenario name: \'{scenario_name}\'. Existing scenarios are:\n"
-                                  f"{list(scenarios.keys())}")
+def train_nxdo_best_response(br_player: int,
+                             scenario_name: str,
+                             nxdo_manager_port: int,
+                             nxdo_manager_host: str,
+                             print_train_results: bool = True):
+    scenario: NXDOScenario = scenario_catalog.get(scenario_name=scenario_name)
 
-    use_openspiel_restricted_game: bool = scenario["use_openspiel_restricted_game"]
-    restricted_game_custom_model = scenario["restricted_game_custom_model"]
+    use_openspiel_restricted_game: bool = scenario.use_openspiel_restricted_game
+    get_restricted_game_custom_model = scenario.get_restricted_game_custom_model
 
-    env_class = scenario["env_class"]
-    base_env_config = scenario["env_config"]
-    trainer_class = scenario["trainer_class_br"]
-    policy_classes: Dict[str, Type[Policy]] = scenario["policy_classes_br"]
-    default_xfdo_port = scenario["xfdo_port"]
-    get_trainer_config = scenario["get_trainer_config_br"]
-    xfdo_br_get_stopping_condition = scenario["get_stopping_condition_br"]
-    xfdo_metanash_method: str = scenario["xfdo_metanash_method"]
+    env_class = scenario.env_class
+    base_env_config = scenario.env_config
+    trainer_class = scenario.trainer_class_br
+    policy_classes: Dict[str, Type[Policy]] = scenario.policy_classes_br
+    get_trainer_config = scenario.get_trainer_config_br
+    xfdo_br_get_stopping_condition = scenario.get_stopping_condition_br
+    xfdo_metanash_method: str = scenario.xdo_metanash_method
     use_cfp_metanash = (xfdo_metanash_method == "cfp")
 
     xfdo_manager = RemoteXFDOManagerClient(n_players=2,
-                                           port=os.getenv("XFDO_PORT", default_xfdo_port),
-                                           remote_server_host="127.0.0.1")
+                                           port=nxdo_manager_port,
+                                           remote_server_host=nxdo_manager_host)
 
     manager_metadata = xfdo_manager.get_manager_metadata()
     results_dir = xfdo_manager.get_log_dir()
@@ -332,15 +280,16 @@ def train_poker_best_response(br_player: int, scenario_name: str, print_train_re
 
     if metanash_specs_for_players is not None:
         trainer_config["multiagent"]["policies"]["metanash"][3]["model"] = {
-            "custom_model": restricted_game_custom_model}
+            "custom_model": get_restricted_game_custom_model(tmp_base_eny)}
 
-    trainer_config = merge_dicts(trainer_config, get_trainer_config(action_space=tmp_env.base_action_space))
+    trainer_config = merge_dicts(trainer_config, get_trainer_config(tmp_env))
 
     ray_head_address = manager_metadata["ray_head_address"]
     init_ray_for_scenario(scenario=scenario, head_address=ray_head_address, logging_level=logging.INFO)
 
-    trainer = trainer_class(config=trainer_config, logger_creator=get_trainer_logger_creator(base_dir=results_dir,
-                                                                                             scenario_name=scenario_name))
+    trainer = trainer_class(config=trainer_config, logger_creator=get_trainer_logger_creator(
+        base_dir=results_dir, scenario_name=scenario_name,
+        should_log_result_fn=lambda result: result["training_iteration"] % 100 == 0))
 
     if use_cfp_metanash and cfp_metanash_specs_for_players:
         # metanash is uniform distribution of pure strat specs
@@ -441,12 +390,23 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--player', type=int)
     parser.add_argument('--scenario', type=str)
-    args = parser.parse_args()
+    parser.add_argument('--nxdo_port', type=int, required=False, default=None)
+    parser.add_argument('--nxdo_host', type=str, required=False, default='localhost')
+    commandline_args = parser.parse_args()
+
+    scenario_name = commandline_args.scenario
+
+    nxdo_host = commandline_args.psro_host
+    nxdo_port = commandline_args.psro_port
+    if nxdo_port is None:
+        nxdo_port = get_client_port_for_service(service_name=f"seed_{GRL_SEED}_{scenario_name}")
 
     while True:
         # Train a br for each player, then repeat.
-        train_poker_best_response(
-            br_player=args.player,
+        train_nxdo_best_response(
+            br_player=commandline_args.player,
+            scenario_name=scenario_name,
+            nxdo_manager_port=nxdo_port,
+            nxdo_manager_host=nxdo_host,
             print_train_results=True,
-            scenario_name=args.scenario,
         )
