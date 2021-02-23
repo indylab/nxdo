@@ -26,7 +26,21 @@ class Scenario(ABC):
                                  f"Yours was '{self.name}'.")
 
 
-class NFSPScenario(Scenario):
+class RayScenario(Scenario, ABC):
+
+    @abstractmethod
+    def __init__(self,
+                 name: str,
+                 ray_cluster_cpus: Union[int, float],
+                 ray_cluster_gpus: Union[int, float],
+                 ray_object_store_memory_cap_gigabytes: Union[int, float]):
+        super().__init__(name=name)
+        self.ray_cluster_cpus = ray_cluster_cpus
+        self.ray_cluster_gpus = ray_cluster_gpus
+        self.ray_object_store_memory_cap_gigabytes = ray_object_store_memory_cap_gigabytes
+
+
+class NFSPScenario(RayScenario):
 
     def __init__(self,
                  name: str,
@@ -46,10 +60,10 @@ class NFSPScenario(Scenario):
                  calculate_openspiel_metanash_at_end: bool,
                  calc_metanash_every_n_iters: int,
                  checkpoint_every_n_iters: Union[None, int]):
-        super().__init__(name=name)
-        self.ray_cluster_cpus = ray_cluster_cpus
-        self.ray_cluster_gpus = ray_cluster_gpus
-        self.ray_object_store_memory_cap_gigabytes = ray_object_store_memory_cap_gigabytes
+        super().__init__(name=name,
+                         ray_cluster_cpus=ray_cluster_cpus,
+                         ray_cluster_gpus=ray_cluster_gpus,
+                         ray_object_store_memory_cap_gigabytes=ray_object_store_memory_cap_gigabytes)
         self.env_class = env_class
         self.env_config = env_config
         self.trainer_class = trainer_class
@@ -65,7 +79,7 @@ class NFSPScenario(Scenario):
         self.checkpoint_every_n_iters = checkpoint_every_n_iters
 
 
-class PSROScenario(Scenario):
+class PSROScenario(RayScenario):
 
     def __init__(self,
                  name: str,
@@ -82,10 +96,10 @@ class PSROScenario(Scenario):
                  p2sro: bool,
                  get_trainer_config: Callable[[MultiAgentEnv], Dict[str, Any]],
                  psro_get_stopping_condition: Callable[[], StoppingCondition]):
-        super().__init__(name=name)
-        self.ray_cluster_cpus = ray_cluster_cpus
-        self.ray_cluster_gpus = ray_cluster_gpus
-        self.ray_object_store_memory_cap_gigabytes = ray_object_store_memory_cap_gigabytes
+        super().__init__(name=name,
+                         ray_cluster_cpus=ray_cluster_cpus,
+                         ray_cluster_gpus=ray_cluster_gpus,
+                         ray_object_store_memory_cap_gigabytes=ray_object_store_memory_cap_gigabytes)
         self.env_class = env_class
         self.env_config = env_config
         self.mix_metanash_with_uniform_dist_coeff = mix_metanash_with_uniform_dist_coeff
@@ -98,7 +112,7 @@ class PSROScenario(Scenario):
         self.psro_get_stopping_condition = psro_get_stopping_condition
 
 
-class NXDOScenario(Scenario):
+class NXDOScenario(RayScenario):
 
     def __init__(self,
                  name: str,
@@ -106,7 +120,7 @@ class NXDOScenario(Scenario):
                  ray_cluster_gpus: Union[int, float],
                  ray_object_store_memory_cap_gigabytes: Union[int, float],
                  use_openspiel_restricted_game: bool,
-                 restricted_game_custom_model: Union[None, Type[ModelV2]],
+                 get_restricted_game_custom_model: Union[None, Callable[[MultiAgentEnv], Type[ModelV2]]],
                  xdo_metanash_method: str,
                  get_restricted_game_solver: Callable[[Scenario], SolveRestrictedGame],
                  env_class: Type[MultiAgentEnv],
@@ -125,12 +139,12 @@ class NXDOScenario(Scenario):
                  calculate_openspiel_metanash_at_end: bool,
                  calc_metanash_every_n_iters: Union[None, int],
                  metanash_metrics_smoothing_episodes_override: Union[None, int]):
-        super().__init__(name=name)
-        self.ray_cluster_cpus = ray_cluster_cpus
-        self.ray_cluster_gpus = ray_cluster_gpus
-        self.ray_object_store_memory_cap_gigabytes = ray_object_store_memory_cap_gigabytes
+        super().__init__(name=name,
+                         ray_cluster_cpus=ray_cluster_cpus,
+                         ray_cluster_gpus=ray_cluster_gpus,
+                         ray_object_store_memory_cap_gigabytes=ray_object_store_memory_cap_gigabytes)
         self.use_openspiel_restricted_game = use_openspiel_restricted_game
-        self.restricted_game_custom_model = restricted_game_custom_model
+        self.get_restricted_game_custom_model = get_restricted_game_custom_model
         self.xdo_metanash_method = xdo_metanash_method
         self.get_restricted_game_solver = get_restricted_game_solver
         self.env_class = env_class

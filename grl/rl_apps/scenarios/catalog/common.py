@@ -1,7 +1,8 @@
 import os
 import urllib.parse
 
-GRL_SEED = int(os.getenv("GRL_SEED", 0))
+from grl.rl_apps import GRL_SEED
+
 _RAY_ADDRESS = os.getenv("RAY_ADDRESS")
 _CREATE_RAY_HEAD = _RAY_ADDRESS is not None and len(_RAY_ADDRESS) > 0
 
