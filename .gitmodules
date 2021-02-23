@@ -7,3 +7,6 @@
 [submodule "dependencies/multiagent-particle-envs"]
 	path = dependencies/multiagent-particle-envs
 	url = https://github.com/openai/multiagent-particle-envs
+[submodule "dependencies/open_spiel"]
+	path = dependencies/open_spiel
+	url = https://github.com/indylab/open_spiel.git
