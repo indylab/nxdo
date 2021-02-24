@@ -21,7 +21,8 @@ from grl.utils.common import pretty_dict_str
 from grl.utils.port_listings import get_client_port_for_service
 from grl.p2sro.p2sro_manager import RemoteP2SROManagerClient
 from grl.p2sro.p2sro_manager.utils import get_latest_metanash_strategies, PolicySpecDistribution
-from grl.rl_apps.scenarios import scenario_catalog, PSROScenario
+from grl.rl_apps.scenarios.catalog import scenario_catalog
+from grl.rl_apps.scenarios.psro_scenario import PSROScenario
 from grl.rl_apps.scenarios.stopping_conditions import StoppingCondition
 from grl.rl_apps import GRL_SEED
 

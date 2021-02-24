@@ -22,7 +22,7 @@ from ray.rllib.evaluation import MultiAgentEpisode, RolloutWorker
 from ray.rllib.env import BaseEnv
 from ray.rllib.policy import Policy
 from ray.rllib.policy.sample_batch import SampleBatch, MultiAgentBatch
-from grl.rl_apps.scenarios import NXDOScenario
+from grl.rl_apps.scenarios.nxdo_scenario import NXDOScenario
 from grl.utils.common import pretty_dict_str, datetime_str, ensure_dir, copy_attributes
 from grl.rllib_tools.stat_deque import StatDeque
 from grl.nfsp_rllib.nfsp import get_store_to_avg_policy_buffer_fn

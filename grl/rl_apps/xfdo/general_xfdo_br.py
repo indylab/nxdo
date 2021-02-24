@@ -29,7 +29,8 @@ from grl.xfdo.action_space_conversion import RestrictedToBaseGameActionSpaceConv
 from grl.xfdo.restricted_game import RestrictedGame
 from grl.rllib_tools.space_saving_logger import SpaceSavingLogger, get_trainer_logger_creator
 from grl.rllib_tools.policy_checkpoints import load_pure_strat, save_policy_checkpoint, create_get_pure_strat_cached
-from grl.rl_apps.scenarios import scenario_catalog, NXDOScenario
+from grl.rl_apps.scenarios.catalog import scenario_catalog
+from grl.rl_apps.scenarios.nxdo_scenario import NXDOScenario
 from grl.rl_apps.scenarios.ray_setup import init_ray_for_scenario
 from grl.rl_apps.scenarios.stopping_conditions import StoppingCondition
 from grl.xfdo.opnsl_restricted_game import OpenSpielRestrictedGame, get_restricted_game_obs_conversions

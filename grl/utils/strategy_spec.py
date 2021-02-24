@@ -1,3 +1,4 @@
+import os
 import json
 
 from grl.utils.common import check_if_jsonable
@@ -56,7 +57,7 @@ class StrategySpec(object):
         return json.dumps(self.serialize_to_dict())
 
     @classmethod
-    def from_dict(cls, serialized_dict):
+    def from_dict(cls, serialized_dict: dict):
         spec = StrategySpec(strategy_id=serialized_dict["id"],
                             metadata=serialized_dict["metadata"])
         for player, index in serialized_dict["pure_strategy_indexes"].items():
@@ -64,8 +65,14 @@ class StrategySpec(object):
         return spec
 
     @classmethod
-    def from_json(cls, json_string):
+    def from_json(cls, json_string: str):
         return StrategySpec.from_dict(json.loads(s=json_string))
+
+    @classmethod
+    def from_json_file(cls, json_file_path: str):
+        with open(json_file_path, "r") as json_file:
+            spec_json = json.load(json_file)
+            return StrategySpec.from_dict(spec_json)
 
     def __eq__(self, other):
         if not isinstance(other, StrategySpec):

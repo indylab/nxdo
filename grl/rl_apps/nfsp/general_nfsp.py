@@ -26,7 +26,8 @@ from grl.utils.common import pretty_dict_str, datetime_str, ensure_dir, copy_att
 from grl.nfsp_rllib.nfsp import get_store_to_avg_policy_buffer_fn
 from grl.rl_apps.nfsp.openspiel_utils import nfsp_measure_exploitability_nonlstm
 from grl.rllib_tools.space_saving_logger import SpaceSavingLogger
-from grl.rl_apps.scenarios import scenario_catalog, NFSPScenario
+from grl.rl_apps.scenarios.catalog import scenario_catalog
+from grl.rl_apps.scenarios.nfsp_scenario import NFSPScenario
 from grl.rl_apps.scenarios.ray_setup import init_ray_for_scenario
 from grl.rl_apps.scenarios.stopping_conditions import StoppingCondition
 from grl.utils.strategy_spec import StrategySpec

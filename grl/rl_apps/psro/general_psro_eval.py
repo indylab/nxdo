@@ -11,7 +11,8 @@ from ray.rllib.agents.trainer import with_common_config
 from ray.rllib.policy.policy import Policy
 
 from grl.p2sro.eval_dispatcher.remote import RemoteEvalDispatcherClient
-from grl.rl_apps.scenarios import scenario_catalog, PSROScenario
+from grl.rl_apps.scenarios.catalog import scenario_catalog
+from grl.rl_apps.scenarios.psro_scenario import PSROScenario
 from grl.rl_apps.scenarios.ray_setup import init_ray_for_scenario
 from grl.utils.strategy_spec import StrategySpec
 from grl.utils.port_listings import get_client_port_for_service

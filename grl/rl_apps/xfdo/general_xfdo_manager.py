@@ -10,7 +10,8 @@ import grl
 from grl.xfdo.xfdo_manager.remote import XFDOManagerWithServer
 from grl.xfdo.xfdo_manager.manager import SolveRestrictedGame
 from grl.utils.common import datetime_str, ensure_dir
-from grl.rl_apps.scenarios import scenario_catalog, NXDOScenario
+from grl.rl_apps.scenarios.catalog import scenario_catalog
+from grl.rl_apps.scenarios.nxdo_scenario import NXDOScenario
 from grl.rl_apps.scenarios.ray_setup import init_ray_for_scenario
 from grl.utils.port_listings import establish_new_server_port_for_service
 from grl.rl_apps import GRL_SEED

@@ -19,33 +19,14 @@ from ray.rllib.policy import Policy
 
 from grl.utils.strategy_spec import StrategySpec
 from grl.utils.common import pretty_dict_str, datetime_str, ensure_dir
-from grl.rllib_tools.space_saving_logger import SpaceSavingLogger
-from grl.rl_apps.scenarios.poker import scenarios
+from grl.rllib_tools.space_saving_logger import SpaceSavingLogger, get_trainer_logger_creator
+from grl.rl_apps.scenarios.catalog import scenario_catalog
+from grl.rl_apps.scenarios.psro_scenario import PSROScenario
 from grl.rl_apps.scenarios.stopping_conditions import StoppingCondition
 
 from grl.rl_apps.scenarios.ray_setup import init_ray_for_scenario
 
 logger = logging.getLogger(__name__)
-
-
-def get_trainer_logger_creator(base_dir: str, scenario_name: str):
-    logdir_prefix = f"{scenario_name}_sparse_{datetime_str()}"
-
-    def trainer_logger_creator(config):
-        """Creates a Unified logger with a default logdir prefix
-        containing the agent name and the env id
-        """
-        if not os.path.exists(base_dir):
-            os.makedirs(base_dir)
-        logdir = tempfile.mkdtemp(
-            prefix=logdir_prefix, dir=base_dir)
-
-        def _should_log(result: dict) -> bool:
-            return result["training_iteration"] % 100 == 0
-
-        return SpaceSavingLogger(config=config, logdir=logdir, should_log_result_fn=_should_log, print_log_dir=False)
-
-    return trainer_logger_creator
 
 
 def checkpoint_dir(trainer):
@@ -137,21 +118,16 @@ def train_poker_approx_best_response_psro(br_player,
                                           metanash_weights,
                                           results_dir,
                                           print_train_results=True):
-    try:
-        scenario = scenarios[scenario_name]
-    except KeyError:
-        raise NotImplementedError(f"Unknown scenario name: \'{scenario_name}\'. Existing scenarios are:\n"
-                                  f"{list(scenarios.keys())}")
+    scenario: PSROScenario = scenario_catalog.get(scenario_name=scenario_name)
 
-    env_class = scenario["env_class"]
-    env_config = scenario["env_config"]
-    trainer_class = scenario["trainer_class"]
-    policy_classes: Dict[str, Type[Policy]] = scenario["policy_classes"]
-    default_psro_port = scenario["psro_port"]
-    p2sro = scenario["p2sro"]
-    get_trainer_config = scenario["get_trainer_config"]
-    psro_get_stopping_condition = scenario["psro_get_stopping_condition"]
-    mix_metanash_with_uniform_dist_coeff = scenario["mix_metanash_with_uniform_dist_coeff"]
+    env_class = scenario.env_class
+    env_config = scenario.env_config
+    trainer_class = scenario.trainer_class
+    policy_classes: Dict[str, Type[Policy]] = scenario.policy_classes
+    p2sro = scenario.p2sro
+    get_trainer_config = scenario.get_trainer_config
+    psro_get_stopping_condition = scenario.psro_get_stopping_condition
+    mix_metanash_with_uniform_dist_coeff = scenario.mix_metanash_with_uniform_dist_coeff
 
     other_player = 1 - br_player
 
@@ -192,13 +168,13 @@ def train_poker_approx_best_response_psro(br_player,
         },
     }
 
-    trainer_config = merge_dicts(trainer_config, get_trainer_config(action_space=tmp_env.action_space))
+    trainer_config = merge_dicts(trainer_config, get_trainer_config(tmp_env))
     trainer_config = merge_dicts(trainer_config, general_trainer_config_overrrides)
 
     # trainer_config["rollout_fragment_length"] = trainer_config["rollout_fragment_length"] // max(1, trainer_config["num_workers"] * trainer_config["num_envs_per_worker"] )
 
     trainer = trainer_class(config=trainer_config,
-                            logger_creator=get_trainer_logger_creator(base_dir=results_dir, scenario_name="approx_br"))
+                            logger_creator=get_trainer_logger_creator(base_dir=results_dir, scenario_name="approx_br", should_log_result_fn=lambda result: result["training_iteration"] % 100 == 0))
 
     update_all_workers_to_latest_metanash(trainer=trainer,
                                           metanash_policy_specs=metanash_policy_specs,

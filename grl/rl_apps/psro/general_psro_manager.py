@@ -5,7 +5,8 @@ import os
 import grl
 from grl.p2sro.p2sro_manager import P2SROManagerWithServer
 from grl.rl_apps.psro.general_psro_eval import launch_evals
-from grl.rl_apps.scenarios import scenario_catalog, PSROScenario
+from grl.rl_apps.scenarios.catalog import scenario_catalog
+from grl.rl_apps.scenarios.psro_scenario import PSROScenario
 from grl.rl_apps.scenarios.ray_setup import init_ray_for_scenario
 from grl.rl_apps import GRL_SEED
 from grl.utils.common import datetime_str, ensure_dir

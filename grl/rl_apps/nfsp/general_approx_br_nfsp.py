@@ -80,18 +80,18 @@ def train_poker_approx_best_response_nfsp(br_player,
                                           avg_policy_specs_for_players: Dict[int, StrategySpec],
                                           results_dir: str,
                                           print_train_results: bool = True):
-    env_class = scenario["env_class"]
-    env_config = scenario["env_config"]
-    trainer_class = scenario["trainer_class"]
-    avg_trainer_class = scenario["avg_trainer_class"]
-    policy_classes: Dict[str, Type[Policy]] = scenario["policy_classes"]
-    anticipatory_param: float = scenario["anticipatory_param"]
-    get_trainer_config = scenario["get_trainer_config"]
-    get_avg_trainer_config = scenario["get_avg_trainer_config"]
-    calculate_openspiel_metanash: bool = scenario["calculate_openspiel_metanash"]
-    calc_metanash_every_n_iters: int = scenario["calc_metanash_every_n_iters"]
-    checkpoint_every_n_iters: Union[int, None] = scenario["checkpoint_every_n_iters"]
-    nfsp_get_stopping_condition = scenario["nfsp_get_stopping_condition"]
+    env_class = scenario.env_class
+    env_config = scenario.env_config
+    trainer_class = scenario.trainer_class
+    avg_trainer_class = scenario.avg_trainer_class
+    policy_classes: Dict[str, Type[Policy]] = scenario.policy_classes
+    anticipatory_param: float = scenario.anticipatory_param
+    get_trainer_config = scenario.get_trainer_config
+    get_avg_trainer_config = scenario.get_avg_trainer_config
+    calculate_openspiel_metanash: bool = scenario.calculate_openspiel_metanash
+    calc_metanash_every_n_iters: int = scenario.calc_metanash_every_n_iters
+    checkpoint_every_n_iters: Union[int, None] = scenario.checkpoint_every_n_iters
+    nfsp_get_stopping_condition = scenario.nfsp_get_stopping_condition
 
     init_ray_for_scenario(scenario=scenario, head_address=ray_head_address, logging_level=logging.INFO)
 
@@ -111,7 +111,7 @@ def train_poker_approx_best_response_nfsp(br_player,
     tmp_env = env_class(env_config=env_config)
     open_spiel_env_config = tmp_env.open_spiel_env_config if calculate_openspiel_metanash else None
 
-    avg_policy_model_config = get_trainer_config(action_space=tmp_env.action_space)["model"]
+    avg_policy_model_config = get_trainer_config(tmp_env)["model"]
 
     br_trainer_config = {
         "log_level": "DEBUG",
@@ -138,7 +138,7 @@ def train_poker_approx_best_response_nfsp(br_player,
             "policy_mapping_fn": select_policy,
         },
     }
-    br_trainer_config = merge_dicts(br_trainer_config, get_trainer_config(tmp_env.action_space))
+    br_trainer_config = merge_dicts(br_trainer_config, get_trainer_config(tmp_env))
 
     br_trainer_config = merge_dicts(br_trainer_config, general_trainer_config_overrrides)
 

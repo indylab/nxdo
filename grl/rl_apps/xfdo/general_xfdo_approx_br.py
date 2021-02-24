@@ -169,15 +169,15 @@ def train_poker_approx_best_response_xdfo(br_player: int,
                                           delegate_specs_for_players: Dict[int, List[StrategySpec]],
                                           results_dir: str,
                                           print_train_results: bool = True):
-    use_openspiel_restricted_game: bool = scenario["use_openspiel_restricted_game"]
-    restricted_game_custom_model = scenario["restricted_game_custom_model"]
+    use_openspiel_restricted_game: bool = scenario.use_openspiel_restricted_game
+    get_restricted_game_custom_model = scenario.get_restricted_game_custom_model
 
-    env_class = scenario["env_class"]
-    base_env_config = scenario["env_config"]
-    trainer_class = scenario["trainer_class_br"]
-    policy_classes: Dict[str, Type[Policy]] = scenario["policy_classes_br"]
-    get_trainer_config = scenario["get_trainer_config_br"]
-    xfdo_metanash_method: str = scenario["xfdo_metanash_method"]
+    env_class = scenario.env_class
+    base_env_config = scenario.env_config
+    trainer_class = scenario.trainer_class_br
+    policy_classes: Dict[str, Type[Policy]] = scenario.policy_classes_br
+    get_trainer_config = scenario.get_trainer_config_br
+    xfdo_metanash_method: str = scenario.xdo_metanash_method
     use_cfp_metanash = (xfdo_metanash_method == "cfp")
 
     if metanash_specs_for_players is not None and use_cfp_metanash:
@@ -207,7 +207,7 @@ def train_poker_approx_best_response_xdfo(br_player: int,
         "create_env_fn": lambda: env_class(env_config=base_env_config),
         "raise_if_no_restricted_players": metanash_specs_for_players is not None
     }
-    tmp_base_eny = env_class(env_config=base_env_config)
+    tmp_base_env = env_class(env_config=base_env_config)
 
     if use_openspiel_restricted_game:
         restricted_game_class = OpenSpielRestrictedGame
@@ -252,10 +252,15 @@ def train_poker_approx_best_response_xdfo(br_player: int,
     }
 
     if metanash_specs_for_players is not None:
+        if get_restricted_game_custom_model is not None:
+            restricted_game_custom_model = get_restricted_game_custom_model(tmp_base_env)
+        else:
+            restricted_game_custom_model = None
+
         trainer_config["multiagent"]["policies"]["metanash"][3]["model"] = {
             "custom_model": restricted_game_custom_model}
 
-    trainer_config = merge_dicts(trainer_config, get_trainer_config(action_space=tmp_env.base_action_space))
+    trainer_config = merge_dicts(trainer_config, get_trainer_config(tmp_base_env))
 
     trainer_config = merge_dicts(trainer_config, general_trainer_config_overrrides)
 
@@ -283,7 +288,7 @@ def train_poker_approx_best_response_xdfo(br_player: int,
     if delegate_specs_for_players:
         if use_openspiel_restricted_game:
             set_restricted_game_conversions_for_all_workers_openspiel(trainer=trainer,
-                                                                      tmp_base_env=tmp_base_eny,
+                                                                      tmp_base_env=tmp_base_env,
                                                                       delegate_policy_id="metanash_delegate",
                                                                       agent_id_to_restricted_game_specs={
                                                                           other_player: delegate_specs_for_players[
