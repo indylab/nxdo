@@ -124,8 +124,8 @@ dependencies:
     - tables==3.6.1
     - tabulate==0.8.7
     - tensorboardx==2.1
-    - torch==1.7.1+cu110
+    - torch==1.7.1
     - torchaudio==0.7.2
-    - torchvision==0.8.2+cu110
+    - torchvision==0.8.2
     - yarl==1.6.3
     - zipp==3.4.0
