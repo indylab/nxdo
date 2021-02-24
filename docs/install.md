@@ -10,7 +10,7 @@
 
 ### Clone repo with git submodules
 ```shell script
-git clone --recursive https://github.com/indylab/grl.git
+git clone --recursive git@github.com:JBLanier/grl.git
 cd grl
 ```
 If you've already cloned this repo but not the [submodules](/dependencies), you can clone them with:
