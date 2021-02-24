@@ -4,7 +4,7 @@ from typing import Union
 
 import ray
 
-from grl.rl_apps.scenarios import RayScenario
+from grl.rl_apps.scenarios.scenario import RayScenario
 
 
 def init_ray_for_scenario(scenario: RayScenario, head_address: str = None, logging_level=logging.INFO) -> Union[str, None]:

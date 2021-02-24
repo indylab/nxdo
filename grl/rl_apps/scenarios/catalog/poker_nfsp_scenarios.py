@@ -2,7 +2,7 @@ from ray.rllib.agents.dqn import DQNTrainer
 
 from grl.envs.poker_multi_agent_env import PokerMultiAgentEnv
 from grl.nfsp_rllib.nfsp import NFSPTrainer, NFSPTorchAveragePolicy
-from grl.rl_apps.scenarios.scenario import NFSPScenario
+from grl.rl_apps.scenarios.nfsp_scenario import NFSPScenario
 from grl.rl_apps.scenarios.catalog import scenario_catalog
 from grl.rl_apps.scenarios.catalog.common import default_if_creating_ray_head
 from grl.rl_apps.scenarios.stopping_conditions import NoStoppingCondition
@@ -97,7 +97,7 @@ for dummy_action_multiplier in [20, 40, 80]:
 # 12_no_limit_leduc_nfsp_dqn
 # 30_no_limit_leduc_nfsp_dqn
 # 60_no_limit_leduc_nfsp_dqn
-for stack_size in [12, 30, 60]:
+for stack_size in [12, 30, 60, 100, 1000]:
     scenario_catalog.add(NFSPScenario(
         name=f"{stack_size}_no_limit_leduc_nfsp_dqn",
         ray_cluster_cpus=default_if_creating_ray_head(default=4),

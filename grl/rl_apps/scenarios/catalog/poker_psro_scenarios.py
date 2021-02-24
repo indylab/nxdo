@@ -1,7 +1,7 @@
 from ray.rllib.agents.dqn import DQNTrainer
 
 from grl.envs.poker_multi_agent_env import PokerMultiAgentEnv
-from grl.rl_apps.scenarios.scenario import PSROScenario
+from grl.rl_apps.scenarios.psro_scenario import PSROScenario
 from grl.rl_apps.scenarios.catalog import scenario_catalog
 from grl.rl_apps.scenarios.catalog.common import default_if_creating_ray_head
 from grl.rl_apps.scenarios.trainer_configs.poker_psro_configs import *
