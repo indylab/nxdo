@@ -5,12 +5,8 @@ from ray.rllib.env import MultiAgentEnv
 
 class ValidActionsMultiAgentEnv(MultiAgentEnv):
 
-    @property
     @abstractmethod
-    def observation_length(self):
-        pass
-
-    @observation_length.setter
-    @abstractmethod
-    def observation_length(self, value):
-        pass
+    def __init__(self):
+        super(ValidActionsMultiAgentEnv, self).__init__()
+        self.observation_length = None
+        self.orig_observation_length = None

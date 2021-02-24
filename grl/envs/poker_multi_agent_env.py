@@ -115,11 +115,12 @@ class PokerMultiAgentEnv(ValidActionsMultiAgentEnv):
         else:
             self.action_space = Discrete(self.num_discrete_actions)
 
+        self.orig_observation_length = self.openspiel_env.observation_spec()["info_state"][0]
+
         if self._append_valid_actions_mask_to_obs:
-            self.observation_length = self.openspiel_env.observation_spec()["info_state"][
-                                          0] + self.base_num_discrete_actions
+            self.observation_length = self.orig_observation_length + self.base_num_discrete_actions
         else:
-            self.observation_length = self.openspiel_env.observation_spec()["info_state"][0]
+            self.observation_length = self.orig_observation_length
 
         self.observation_space = Box(low=0.0, high=1.0, shape=(self.observation_length,))
 

@@ -4,14 +4,16 @@ from typing import Tuple
 from ray.rllib.env.multi_agent_env import MultiAgentEnv
 from ray.rllib.utils.typing import MultiAgentDict, AgentID
 
+from grl.envs.valid_actions_multi_agent_env import ValidActionsMultiAgentEnv
 from grl.xfdo.action_space_conversion import RestrictedToBaseGameActionSpaceConverter
 
 RESTRICTED_GAME = "restricted_game"
 
 
-class RestrictedGame(MultiAgentEnv):
+class RestrictedGame(ValidActionsMultiAgentEnv):
 
     def __init__(self, env_config: dict):
+        super().__init__()
         self.base_env: MultiAgentEnv = env_config["create_env_fn"]()
 
         self._use_delegate_policy_exploration = env_config.get("use_delegate_policy_exploration", False)

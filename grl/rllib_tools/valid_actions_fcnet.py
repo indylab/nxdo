@@ -76,17 +76,17 @@ def get_valid_action_fcn_class(obs_len: int, action_space_n: int, dummy_actions_
 
 
 def get_valid_action_fcn_class_for_env(
-        env: MultiAgentEnv, policy_role: str = None) -> Union[None, Type[FullyConnectedNetwork]]:
+        env: MultiAgentEnv, policy_role: str = None, force_action_space_n: int = None) -> Union[None, Type[FullyConnectedNetwork]]:
     if not isinstance(env, ValidActionsMultiAgentEnv):
         raise TypeError("Valid actions fcns are made only to work with subclasses of ValidActionsMultiAgentEnv. "
                         f"This env is a {type(env)}.")
     if policy_role is None:
-        action_space = env.action_space
-        observation_length = env.observation_space.shape[0]
+        action_space = force_action_space_n if force_action_space_n else env.action_space
+        observation_length = env.orig_observation_length
     else:
         # In some multiagent settings, different spaces may be defined for different policies in a dictionary.
-        action_space = env.action_space[policy_role]
-        observation_length = env.observation_space[policy_role].shape[0]
+        action_space = force_action_space_n if force_action_space_n else env.action_space[policy_role]
+        observation_length = env.orig_observation_length[policy_role]
     if len(env.observation_space.shape) != 1:
         raise ValueError(f"Valid action fcn models require a 1D observation space (len(observation_space.shape) == 1). "
                          f"The shape of this observation space is {env.observation_space.shape}")
