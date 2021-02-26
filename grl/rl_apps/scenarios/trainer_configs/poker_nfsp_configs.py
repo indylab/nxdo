@@ -7,7 +7,7 @@ from ray.rllib.utils import merge_dicts
 
 from grl.rl_apps.scenarios.trainer_configs.defaults import GRL_DEFAULT_OPENSPIEL_POKER_DQN_PARAMS
 from grl.rllib_tools.valid_actions_epsilon_greedy import ValidActionsEpsilonGreedy
-from grl.rllib_tools.valid_actions_fcnet import get_valid_action_fcn_class_for_env
+from grl.rllib_tools.models.valid_actions_fcnet import get_valid_action_fcn_class_for_env
 
 
 def nfsp_kuhn_avg_policy_params_openspiel(env: MultiAgentEnv) -> Dict[str, Any]:

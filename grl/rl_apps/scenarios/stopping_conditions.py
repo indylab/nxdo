@@ -1,7 +1,7 @@
 import logging
 from abc import ABC, abstractmethod
-
-from ray.rllib.utils.typing import PolicyID
+from typing import Callable
+from ray.rllib.utils.typing import PolicyID, ResultDict
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +84,8 @@ class EpisodesSingleBRRewardPlateauStoppingCondition(StoppingCondition):
                  dont_check_plateau_before_n_episodes: int,
                  check_plateau_every_n_episodes: int,
                  minimum_reward_improvement_otherwise_plateaued: float,
-                 max_train_episodes: int = None):
+                 max_train_episodes: int = None,
+                 get_reward_to_measure: Callable[[ResultDict], float] = None):
 
         self.br_policy_id = br_policy_id
         self.dont_check_plateau_before_n_episodes = dont_check_plateau_before_n_episodes
@@ -95,7 +96,11 @@ class EpisodesSingleBRRewardPlateauStoppingCondition(StoppingCondition):
         self._next_check_after_n_episodes = self.dont_check_plateau_before_n_episodes
         self._last_saturation_check_reward = None
 
+        self._provided_reward_to_measure_fn = get_reward_to_measure
+
     def _get_reward_to_measure(self, latest_trainer_result):
+        if self._provided_reward_to_measure_fn is not None:
+            return self._provided_reward_to_measure_fn(latest_trainer_result)
         return latest_trainer_result["policy_reward_mean"][self.br_policy_id]
 
     def should_stop_this_iter(self, latest_trainer_result: dict, *args, **kwargs) -> bool:
