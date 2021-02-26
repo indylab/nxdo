@@ -10,7 +10,7 @@ from grl.rl_apps.scenarios.trainer_configs.poker_nfsp_configs import *
 from grl.rllib_tools.modified_policies.simple_q_torch_policy import SimpleQTorchPolicyPatched
 from grl.rl_apps.scenarios.stopping_conditions import *
 from grl.rl_apps.xfdo.solve_restricted_game_fns import *
-from grl.rllib_tools.valid_actions_fcnet import get_valid_action_fcn_class_for_env
+from grl.rllib_tools.models.valid_actions_fcnet import get_valid_action_fcn_class_for_env
 
 scenario_catalog.add(NXDOScenario(
     name="kuhn_xfdo_dqn_nfsp",
