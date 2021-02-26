@@ -1,6 +1,7 @@
 import json
 import socket
 import time
+import os
 from contextlib import closing
 from typing import Dict, Union
 
@@ -18,10 +19,14 @@ def _find_free_port():
 
 def establish_new_server_port_for_service(service_name: str) -> int:
     with FileLock(f"{PORT_LISTING_PATH}.lock"):
-        with open(PORT_LISTING_PATH, "r+") as port_listing_file:
+        file_mode = "r+" if os.path.exists(PORT_LISTING_PATH) else "w+"
+        with open(PORT_LISTING_PATH, file_mode) as port_listing_file:
             retries = 10
             for retry in range(retries):
-                port_listings: Dict[str, str] = json.load(port_listing_file)
+                file_is_empty = os.path.getsize(PORT_LISTING_PATH) == 0
+                port_listings: Dict[str, str] = {}
+                if not file_is_empty:
+                    port_listings: Dict[str, str] = json.load(port_listing_file)
                 claimed_ports_from_file = list(int(p) for p in port_listings.values())
                 free_port_from_os = _find_free_port()
                 if (free_port_from_os in claimed_ports_from_file
