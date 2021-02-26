@@ -210,7 +210,7 @@ GRL_DEFAULT_MULTI_GRID_PPO_PARAMS = {
     "train_batch_size": 2048,
     # Total SGD batch size across all devices for SGD. This defines the
     # minibatch size within each epoch.
-    "sgd_minibatch_size": 128,
+    "sgd_minibatch_size": 1024,
     # Whether to shuffle sequences in the batch when training (recommended).
     "shuffle_sequences": True,
     # Number of SGD iterations in each outer loop (i.e., number of epochs to
