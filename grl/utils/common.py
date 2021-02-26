@@ -10,16 +10,16 @@ import yaml
 
 def check_if_jsonable(check_dict):
     try:
-        json.dumps(check_dict)
+        json.dumps(check_dict, cls=SafeFallbackJSONEncoder)
     except (TypeError, OverflowError) as json_err:
         return False, json_err
     return True, None
 
 
-class _SafeFallbackEncoder(json.JSONEncoder):
+class SafeFallbackJSONEncoder(json.JSONEncoder):
 
     def __init__(self, nan_str="null", **kwargs):
-        super(_SafeFallbackEncoder, self).__init__(**kwargs)
+        super(SafeFallbackJSONEncoder, self).__init__(**kwargs)
         self.nan_str = nan_str
 
     def default(self, value):
@@ -36,7 +36,7 @@ class _SafeFallbackEncoder(json.JSONEncoder):
             if issubclass(type(value), numbers.Number):
                 return float(value)
 
-            return super(_SafeFallbackEncoder, self).default(value)
+            return super(SafeFallbackJSONEncoder, self).default(value)
 
         except Exception:
             return str(value)  # give up, just stringify it (ok for logs)
@@ -50,7 +50,7 @@ def pretty_dict_str(result):
         if v is not None:
             out[k] = v
 
-    cleaned = json.dumps(out, cls=_SafeFallbackEncoder)
+    cleaned = json.dumps(out, cls=SafeFallbackJSONEncoder)
     return yaml.safe_dump(json.loads(cleaned), default_flow_style=False)
 
 
