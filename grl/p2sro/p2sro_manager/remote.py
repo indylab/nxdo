@@ -16,6 +16,7 @@ from grl.p2sro.p2sro_manager.protobuf.p2sro_manager_pb2_grpc import P2SROManager
     P2SROManagerStub
 from grl.p2sro.payoff_table import PayoffTable
 from grl.utils.strategy_spec import StrategySpec
+from grl.utils.common import SafeFallbackJSONEncoder
 
 GRPC_MAX_MESSAGE_LENGTH = 1048576 * 40  # 40MiB
 
@@ -218,7 +219,7 @@ class RemoteP2SROManagerClient(P2SROManager):
 
     def set_active_policy_as_fixed(self, player, policy_num, final_metadata_dict) -> StrategySpec:
         try:
-            metadata_json = json.dumps(obj=final_metadata_dict)
+            metadata_json = json.dumps(obj=final_metadata_dict, cls=SafeFallbackJSONEncoder)
         except (TypeError, OverflowError) as json_err:
             raise ValueError(f"final_metadata_dict must be JSON serializable."
                              f"When attempting to serialize, got this error:\n{json_err}")
