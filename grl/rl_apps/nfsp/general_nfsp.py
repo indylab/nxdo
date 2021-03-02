@@ -23,7 +23,7 @@ from ray.rllib.policy.sample_batch import SampleBatch, MultiAgentBatch
 import grl
 from grl.utils.common import pretty_dict_str, datetime_str, ensure_dir, copy_attributes
 
-from grl.nfsp_rllib.nfsp import get_store_to_avg_policy_buffer_fn
+from grl.algos.nfsp_rllib.nfsp import get_store_to_avg_policy_buffer_fn
 from grl.rl_apps.nfsp.openspiel_utils import nfsp_measure_exploitability_nonlstm
 from grl.rllib_tools.space_saving_logger import SpaceSavingLogger
 from grl.rl_apps.scenarios.catalog import scenario_catalog

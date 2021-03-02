@@ -2,7 +2,7 @@ from typing import Dict, List
 
 import numpy as np
 
-from grl.p2sro.payoff_table import PayoffTable
+from grl.algos.p2sro.payoff_table import PayoffTable
 from grl.utils.strategy_spec import StrategySpec
 
 

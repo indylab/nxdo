@@ -25,14 +25,14 @@ from ray.rllib.policy.sample_batch import SampleBatch, MultiAgentBatch
 from grl.rl_apps.scenarios.nxdo_scenario import NXDOScenario
 from grl.utils.common import pretty_dict_str, datetime_str, ensure_dir, copy_attributes
 from grl.rllib_tools.stat_deque import StatDeque
-from grl.nfsp_rllib.nfsp import get_store_to_avg_policy_buffer_fn
+from grl.algos.nfsp_rllib.nfsp import get_store_to_avg_policy_buffer_fn
 from grl.rllib_tools.space_saving_logger import SpaceSavingLogger, get_trainer_logger_creator
 from grl.rl_apps.scenarios.stopping_conditions import StoppingCondition
 from grl.utils.strategy_spec import StrategySpec
-from grl.xfdo.restricted_game import RestrictedGame
-from grl.xfdo.action_space_conversion import RestrictedToBaseGameActionSpaceConverter
+from grl.algos.xfdo.restricted_game import RestrictedGame
+from grl.algos.xfdo.action_space_conversion import RestrictedToBaseGameActionSpaceConverter
 from grl.rl_apps.xfdo.poker_utils import xfdo_nfsp_measure_exploitability_nonlstm
-from grl.xfdo.opnsl_restricted_game import OpenSpielRestrictedGame, get_restricted_game_obs_conversions
+from grl.algos.xfdo.opnsl_restricted_game import OpenSpielRestrictedGame, get_restricted_game_obs_conversions
 from grl.rllib_tools.policy_checkpoints import save_policy_checkpoint, create_get_pure_strat_cached
 
 from grl.rl_apps.scenarios.ray_setup import init_ray_for_scenario

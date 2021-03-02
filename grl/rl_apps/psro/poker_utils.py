@@ -15,8 +15,8 @@ from ray.rllib.utils import try_import_torch
 from ray.rllib.utils.typing import TensorType
 
 from grl.envs.poker_multi_agent_env import PokerMultiAgentEnv
-from grl.p2sro.p2sro_manager.utils import get_latest_metanash_strategies
-from grl.p2sro.payoff_table import PayoffTable
+from grl.algos.p2sro.p2sro_manager.utils import get_latest_metanash_strategies
+from grl.algos.p2sro.payoff_table import PayoffTable
 from grl.utils.strategy_spec import StrategySpec
 
 torch, _ = try_import_torch()

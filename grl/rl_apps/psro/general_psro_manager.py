@@ -3,7 +3,7 @@ import logging
 import os
 
 import grl
-from grl.p2sro.p2sro_manager import P2SROManagerWithServer
+from grl.algos.p2sro.p2sro_manager import P2SROManagerWithServer
 from grl.rl_apps.psro.general_psro_eval import launch_evals
 from grl.rl_apps.scenarios.catalog import scenario_catalog
 from grl.rl_apps.scenarios.psro_scenario import PSROScenario

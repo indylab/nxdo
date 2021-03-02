@@ -24,16 +24,16 @@ from ray.rllib.policy import Policy
 from ray.rllib.utils.typing import AgentID, PolicyID
 from grl.utils.strategy_spec import StrategySpec
 from grl.utils.common import pretty_dict_str, datetime_str, ensure_dir
-from grl.xfdo.xfdo_manager.remote import RemoteXFDOManagerClient
-from grl.xfdo.action_space_conversion import RestrictedToBaseGameActionSpaceConverter
-from grl.xfdo.restricted_game import RestrictedGame
+from grl.algos.xfdo.xfdo_manager.remote import RemoteXFDOManagerClient
+from grl.algos.xfdo.action_space_conversion import RestrictedToBaseGameActionSpaceConverter
+from grl.algos.xfdo.restricted_game import RestrictedGame
 from grl.rllib_tools.space_saving_logger import SpaceSavingLogger, get_trainer_logger_creator
 from grl.rllib_tools.policy_checkpoints import load_pure_strat, save_policy_checkpoint, create_get_pure_strat_cached
 from grl.rl_apps.scenarios.catalog import scenario_catalog
 from grl.rl_apps.scenarios.nxdo_scenario import NXDOScenario
 from grl.rl_apps.scenarios.ray_setup import init_ray_for_scenario
 from grl.rl_apps.scenarios.stopping_conditions import StoppingCondition
-from grl.xfdo.opnsl_restricted_game import OpenSpielRestrictedGame, get_restricted_game_obs_conversions
+from grl.algos.xfdo.opnsl_restricted_game import OpenSpielRestrictedGame, get_restricted_game_obs_conversions
 from grl.utils.port_listings import get_client_port_for_service
 from grl.rl_apps import GRL_SEED
 

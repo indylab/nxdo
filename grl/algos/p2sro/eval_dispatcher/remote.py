@@ -5,9 +5,9 @@ from typing import Tuple, List, Union
 import grpc
 from google.protobuf.empty_pb2 import Empty
 
-from grl.p2sro.eval_dispatcher.eval_dispatcher import EvalDispatcher
-from grl.p2sro.eval_dispatcher.protobuf.eval_dispatcher_pb2 import EvalJob, EvalJobResult, EvalConfirmation
-from grl.p2sro.eval_dispatcher.protobuf.eval_dispatcher_pb2_grpc import EvalDispatcherServicer, \
+from grl.algos.p2sro.eval_dispatcher.eval_dispatcher import EvalDispatcher
+from grl.algos.p2sro.eval_dispatcher.protobuf.eval_dispatcher_pb2 import EvalJob, EvalJobResult, EvalConfirmation
+from grl.algos.p2sro.eval_dispatcher.protobuf.eval_dispatcher_pb2_grpc import EvalDispatcherServicer, \
     add_EvalDispatcherServicer_to_server, EvalDispatcherStub
 from grl.utils.strategy_spec import StrategySpec
 

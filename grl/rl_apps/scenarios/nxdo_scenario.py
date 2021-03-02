@@ -6,7 +6,7 @@ from ray.rllib.models import ModelV2
 
 from grl.rl_apps.scenarios.scenario import RayScenario, Scenario
 from grl.rl_apps.scenarios.stopping_conditions import StoppingCondition
-from grl.xfdo.xfdo_manager.manager import SolveRestrictedGame
+from grl.algos.xfdo.xfdo_manager.manager import SolveRestrictedGame
 
 
 class NXDOScenario(RayScenario):

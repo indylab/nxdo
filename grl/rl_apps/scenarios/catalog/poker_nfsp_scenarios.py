@@ -1,7 +1,7 @@
 from ray.rllib.agents.dqn import DQNTrainer
 
 from grl.envs.poker_multi_agent_env import PokerMultiAgentEnv
-from grl.nfsp_rllib.nfsp import NFSPTrainer, NFSPTorchAveragePolicy
+from grl.algos.nfsp_rllib.nfsp import NFSPTrainer, NFSPTorchAveragePolicy
 from grl.rl_apps.scenarios.nfsp_scenario import NFSPScenario
 from grl.rl_apps.scenarios.catalog import scenario_catalog
 from grl.rl_apps.scenarios.catalog.common import default_if_creating_ray_head

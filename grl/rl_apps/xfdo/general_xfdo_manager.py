@@ -7,8 +7,8 @@ import logging
 import argparse
 
 import grl
-from grl.xfdo.xfdo_manager.remote import XFDOManagerWithServer
-from grl.xfdo.xfdo_manager.manager import SolveRestrictedGame
+from grl.algos.xfdo.xfdo_manager.remote import XFDOManagerWithServer
+from grl.algos.xfdo.xfdo_manager.manager import SolveRestrictedGame
 from grl.utils.common import datetime_str, ensure_dir
 from grl.rl_apps.scenarios.catalog import scenario_catalog
 from grl.rl_apps.scenarios.nxdo_scenario import NXDOScenario

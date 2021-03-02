@@ -28,7 +28,7 @@ from grl.rl_apps.nfsp.openspiel_utils import snfsp_measure_exploitability_nonlst
 from grl.rllib_tools.space_saving_logger import SpaceSavingLogger
 from grl.rl_apps.scenarios.poker import scenarios
 from grl.rl_apps.scenarios.stopping_conditions import StoppingCondition
-from grl.nfsp_rllib.checkpoint_reservoir_buffer import ReservoirBuffer
+from grl.algos.nfsp_rllib.checkpoint_reservoir_buffer import ReservoirBuffer
 
 logger = logging.getLogger(__name__)
 

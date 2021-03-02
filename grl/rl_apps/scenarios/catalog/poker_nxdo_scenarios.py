@@ -4,7 +4,7 @@ from grl.envs.poker_multi_agent_env import PokerMultiAgentEnv
 from grl.rl_apps.scenarios.nxdo_scenario import NXDOScenario
 from grl.rl_apps.scenarios.catalog import scenario_catalog
 from grl.rl_apps.scenarios.catalog.common import default_if_creating_ray_head
-from grl.nfsp_rllib.nfsp import NFSPTrainer, NFSPTorchAveragePolicy
+from grl.algos.nfsp_rllib.nfsp import NFSPTrainer, NFSPTorchAveragePolicy
 from grl.rl_apps.scenarios.trainer_configs.poker_psro_configs import *
 from grl.rl_apps.scenarios.trainer_configs.poker_nfsp_configs import *
 from grl.rllib_tools.modified_policies.simple_q_torch_policy import SimpleQTorchPolicyPatched

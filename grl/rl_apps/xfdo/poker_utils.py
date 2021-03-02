@@ -9,8 +9,8 @@ from ray.rllib.policy import Policy
 
 from grl.envs.poker_multi_agent_env import parse_discrete_poker_action_from_continuous_space
 from grl.rl_apps.psro.poker_utils import tabular_policies_from_weighted_policies, JointPlayerPolicy, softmax
-from grl.xfdo.action_space_conversion import RestrictedToBaseGameActionSpaceConverter
-from grl.xfdo.opnsl_restricted_game import AgentRestrictedGameOpenSpielObsConversions
+from grl.algos.xfdo.action_space_conversion import RestrictedToBaseGameActionSpaceConverter
+from grl.algos.xfdo.opnsl_restricted_game import AgentRestrictedGameOpenSpielObsConversions
 
 
 def _parse_action_probs_from_action_info(action, action_info, legal_actions_list, total_num_discrete_actions):

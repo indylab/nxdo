@@ -6,15 +6,15 @@ from typing import Tuple, List
 import grpc
 from google.protobuf.empty_pb2 import Empty
 
-from grl.p2sro.p2sro_manager.p2sro_manager import P2SROManager, P2SROManagerLogger
-from grl.p2sro.p2sro_manager.protobuf.p2sro_manager_pb2 import NewActivePolicyRequest, PolicyMetadataRequest, \
+from grl.algos.p2sro.p2sro_manager.p2sro_manager import P2SROManager, P2SROManagerLogger
+from grl.algos.p2sro.p2sro_manager.protobuf.p2sro_manager_pb2 import NewActivePolicyRequest, PolicyMetadataRequest, \
     P2SROStatusResponse, \
     Confirmation, PolicySpecJson, NumPlayers, PayoffResult, EvalRequest, PlayerAndPolicyNum, PolicyNumList, String, \
     Metadata
-from grl.p2sro.p2sro_manager.protobuf.p2sro_manager_pb2_grpc import P2SROManagerServicer, \
+from grl.algos.p2sro.p2sro_manager.protobuf.p2sro_manager_pb2_grpc import P2SROManagerServicer, \
     add_P2SROManagerServicer_to_server, \
     P2SROManagerStub
-from grl.p2sro.payoff_table import PayoffTable
+from grl.algos.p2sro.payoff_table import PayoffTable
 from grl.utils.strategy_spec import StrategySpec
 from grl.utils.common import SafeFallbackJSONEncoder
 

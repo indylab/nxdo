@@ -8,11 +8,11 @@ import grpc
 from google.protobuf.empty_pb2 import Empty
 
 from grl.utils.strategy_spec import StrategySpec
-from grl.xfdo.xfdo_manager.manager import XFDOManager, SolveRestrictedGame
-from grl.xfdo.xfdo_manager.protobuf.xfdo_manager_pb2 import XFDOPolicyMetadataRequest, XFDONewBestResponseParams, \
+from grl.algos.xfdo.xfdo_manager.manager import XFDOManager, SolveRestrictedGame
+from grl.algos.xfdo.xfdo_manager.protobuf.xfdo_manager_pb2 import XFDOPolicyMetadataRequest, XFDONewBestResponseParams, \
     XFDOConfirmation, XFDOPolicySpecJson, XFDOPlayerAndPolicyNum, XFDOString, XFDOPlayer, XFDOPolicySpecList, \
     XFDOMetadata
-from grl.xfdo.xfdo_manager.protobuf.xfdo_manager_pb2_grpc import XFDOManagerServicer, add_XFDOManagerServicer_to_server, \
+from grl.algos.xfdo.xfdo_manager.protobuf.xfdo_manager_pb2_grpc import XFDOManagerServicer, add_XFDOManagerServicer_to_server, \
     XFDOManagerStub
 
 GRPC_MAX_MESSAGE_LENGTH = 1048576 * 40  # 40MiB

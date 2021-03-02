@@ -7,7 +7,7 @@ from grl.rl_apps.scenarios.stopping_conditions import TwoPlayerBRRewardsBelowAmt
 from grl.rl_apps.xfdo.general_xfdo_cfp_metanash import train_cfp_restricted_game
 from grl.rl_apps.xfdo.general_xfdo_nfsp_metanash import train_off_policy_rl_nfsp_restricted_game
 from grl.utils.strategy_spec import StrategySpec
-from grl.xfdo.xfdo_manager.manager import SolveRestrictedGame, RestrictedGameSolveResult
+from grl.algos.xfdo.xfdo_manager.manager import SolveRestrictedGame, RestrictedGameSolveResult
 
 
 def _solve_game(scenario: dict,

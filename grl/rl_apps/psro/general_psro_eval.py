@@ -10,7 +10,7 @@ import ray
 from ray.rllib.agents.trainer import with_common_config
 from ray.rllib.policy.policy import Policy
 
-from grl.p2sro.eval_dispatcher.remote import RemoteEvalDispatcherClient
+from grl.algos.p2sro.eval_dispatcher.remote import RemoteEvalDispatcherClient
 from grl.rl_apps.scenarios.catalog import scenario_catalog
 from grl.rl_apps.scenarios.psro_scenario import PSROScenario
 from grl.rl_apps.scenarios.ray_setup import init_ray_for_scenario

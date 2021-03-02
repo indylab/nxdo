@@ -4,9 +4,9 @@ from typing import List, Tuple
 
 import numpy as np
 
-from grl.p2sro.eval_dispatcher import EvalDispatcherWithServer, EvalResult
-from grl.p2sro.p2sro_manager.logger import P2SROManagerLogger, SimpleP2SROManagerLogger
-from grl.p2sro.payoff_table import PayoffTable
+from grl.algos.p2sro.eval_dispatcher import EvalDispatcherWithServer, EvalResult
+from grl.algos.p2sro.p2sro_manager.logger import P2SROManagerLogger, SimpleP2SROManagerLogger
+from grl.algos.p2sro.payoff_table import PayoffTable
 from grl.utils.common import datetime_str, check_if_jsonable
 from grl.utils.strategy_spec import StrategySpec
 

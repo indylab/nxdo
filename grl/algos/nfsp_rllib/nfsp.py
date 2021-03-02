@@ -14,8 +14,8 @@ from ray.rllib.utils.typing import TrainerConfigDict
 from ray.util.iter import LocalIterator, _NextValueNotReady
 from ray.util.iter_metrics import SharedMetrics
 
-from grl.nfsp_rllib.nfsp_torch_avg_policy import NFSPTorchAveragePolicy
-from grl.nfsp_rllib.reservoir_replay_buffer import ReservoirReplayActor
+from grl.algos.nfsp_rllib.nfsp_torch_avg_policy import NFSPTorchAveragePolicy
+from grl.algos.nfsp_rllib.reservoir_replay_buffer import ReservoirReplayActor
 
 logger = logging.getLogger(__name__)
 

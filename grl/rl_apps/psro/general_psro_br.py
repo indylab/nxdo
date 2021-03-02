@@ -19,8 +19,8 @@ from ray.rllib.policy import Policy
 from grl.utils.strategy_spec import StrategySpec
 from grl.utils.common import pretty_dict_str
 from grl.utils.port_listings import get_client_port_for_service
-from grl.p2sro.p2sro_manager import RemoteP2SROManagerClient
-from grl.p2sro.p2sro_manager.utils import get_latest_metanash_strategies, PolicySpecDistribution
+from grl.algos.p2sro.p2sro_manager import RemoteP2SROManagerClient
+from grl.algos.p2sro.p2sro_manager.utils import get_latest_metanash_strategies, PolicySpecDistribution
 from grl.rl_apps.scenarios.catalog import scenario_catalog
 from grl.rl_apps.scenarios.psro_scenario import PSROScenario
 from grl.rl_apps.scenarios.stopping_conditions import StoppingCondition

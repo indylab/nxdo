@@ -5,7 +5,7 @@ from ray.rllib.env.multi_agent_env import MultiAgentEnv
 from ray.rllib.utils.typing import MultiAgentDict, AgentID
 
 from grl.envs.valid_actions_multi_agent_env import ValidActionsMultiAgentEnv
-from grl.xfdo.action_space_conversion import RestrictedToBaseGameActionSpaceConverter
+from grl.algos.xfdo.action_space_conversion import RestrictedToBaseGameActionSpaceConverter
 
 RESTRICTED_GAME = "restricted_game"
 
