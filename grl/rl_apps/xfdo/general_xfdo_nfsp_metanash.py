@@ -95,7 +95,7 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
     calc_metanash_every_n_iters: int = scenario.calc_metanash_every_n_iters
     metrics_smoothing_episodes_override: int = scenario.metanash_metrics_smoothing_episodes_override
 
-    assert scenario["xfdo_metanash_method"] == "nfsp"
+    assert scenario.xdo_metanash_method == "nfsp"
 
     ray_head_address = manager_metadata["ray_head_address"]
     init_ray_for_scenario(scenario=scenario, head_address=ray_head_address, logging_level=logging.INFO)
