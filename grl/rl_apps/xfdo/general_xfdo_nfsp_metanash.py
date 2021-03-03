@@ -165,8 +165,9 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
 
     }, get_avg_trainer_config(tmp_env.base_action_space))
     for _policy_id in ["average_policy_0", "average_policy_1"]:
-        avg_trainer_config["multiagent"]["policies"][_policy_id][3]["model"] = {
-            "custom_model": get_restricted_game_custom_model(tmp_base_env)}
+        if get_restricted_game_custom_model is not None:
+            avg_trainer_config["multiagent"]["policies"][_policy_id][3]["model"] = {
+                "custom_model": get_restricted_game_custom_model(tmp_base_env)}
 
     avg_trainer = avg_trainer_class(config=avg_trainer_config,
                                     logger_creator=get_trainer_logger_creator(
@@ -332,8 +333,9 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
         "If not true, the line below with \"get_trainer_config\" may need to be changed to a better solution."
     br_trainer_config = merge_dicts(br_trainer_config, get_trainer_config(tmp_env.base_action_space))
     for _policy_id in ["average_policy_0", "average_policy_1", "best_response_0", "best_response_1"]:
-        br_trainer_config["multiagent"]["policies"][_policy_id][3]["model"] = {
-            "custom_model": get_restricted_game_custom_model(tmp_base_env)}
+        if get_restricted_game_custom_model is not None:
+            br_trainer_config["multiagent"]["policies"][_policy_id][3]["model"] = {
+                "custom_model": get_restricted_game_custom_model(tmp_base_env)}
 
     br_trainer_config["metrics_smoothing_episodes"] = metrics_smoothing_episodes_override
 
@@ -400,10 +402,7 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
         final_train_result = {"episodes_total": 0, "timesteps_total": 0, "training_iteration": 0}
         tmp_callback = NFSPBestResponseCallbacks()
         tmp_callback.on_train_result(trainer=br_trainer, result=final_train_result)
-        if "z_avg_policy_exploitability" in final_train_result:
-            print(f"\n\nexploitability: {final_train_result['z_avg_policy_exploitability']}\n\n")
     else:
-
         avg_weights = avg_trainer.get_weights(["average_policy_0", "average_policy_1"])
         br_trainer.workers.foreach_worker(lambda worker: worker.set_weights(avg_weights))
         while True:
@@ -442,6 +441,9 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
 
                 final_train_result = deepcopy(train_iter_results)
                 break
+
+    if "z_avg_policy_exploitability" in final_train_result:
+        print(f"\n\nexploitability: {final_train_result['z_avg_policy_exploitability']}\n\n")
 
     avg_policy_specs = []
     for player in range(2):

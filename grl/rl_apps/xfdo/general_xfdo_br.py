@@ -279,7 +279,7 @@ def train_nxdo_best_response(br_player: int,
         },
     }
 
-    if metanash_specs_for_players is not None:
+    if metanash_specs_for_players is not None and get_restricted_game_custom_model is not None:
         trainer_config["multiagent"]["policies"]["metanash"][3]["model"] = {
             "custom_model": get_restricted_game_custom_model(tmp_base_eny)}
 
