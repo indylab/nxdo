@@ -3,7 +3,8 @@ import random
 
 import numpy as np
 from gym.spaces import Discrete, Box
-from open_spiel.python.rl_environment import TimeStep, Environment
+from open_spiel.python.rl_environment import TimeStep, Environment, StepType
+from pyspiel import SpielError
 from ray.tune.registry import register_env
 
 from grl.envs.valid_actions_multi_agent_env import ValidActionsMultiAgentEnv
@@ -79,6 +80,7 @@ class PokerMultiAgentEnv(ValidActionsMultiAgentEnv):
 
         self._append_valid_actions_mask_to_obs = env_config["append_valid_actions_mask_to_obs"]
         self._is_universal_poker = False
+        self._stack_size = None
 
         if self.game_version in [KUHN_POKER, LEDUC_POKER]:
             self.open_spiel_env_config = {
@@ -86,6 +88,7 @@ class PokerMultiAgentEnv(ValidActionsMultiAgentEnv):
             }
         elif self.game_version == "universal_poker":
             self._is_universal_poker = True
+            self._stack_size = env_config['universal_poker_stack_size']
             betting_mode = env_config.get("universal_poker_betting_mode", "nolimit")
             max_raises = str(env_config.get("universal_poker_max_raises", ""))
             num_ranks = env_config.get("universal_poker_num_ranks", 3)
@@ -127,7 +130,6 @@ class PokerMultiAgentEnv(ValidActionsMultiAgentEnv):
         self.observation_space = Box(low=0.0, high=1.0, shape=(self.observation_length,))
 
         self.curr_time_step: TimeStep = None
-        self._step_counter = 0
         self.player_map = None
 
     def _get_current_obs(self):
@@ -166,7 +168,6 @@ class PokerMultiAgentEnv(ValidActionsMultiAgentEnv):
             obs (dict): New observations for each ready agent.
         """
         self.curr_time_step = self.openspiel_env.reset()
-        self._step_counter = 0
 
         if self._fixed_players:
             self.player_map = lambda p: p
@@ -227,14 +228,21 @@ class PokerMultiAgentEnv(ValidActionsMultiAgentEnv):
             # player_action = random.choice(legal_actions)
             # if self._apply_penalty_for_invalid_actions:
             #     self._invalid_action_penalties[curr_player_id] = True
-
-        self.curr_time_step = self.openspiel_env.step([player_action])
-        self._step_counter += 1
+        try:
+            self.curr_time_step = self.openspiel_env.step([player_action])
+        except SpielError:
+            if not self._is_universal_poker:
+                raise
+            # Enforce a time limit on universal poker if the infostate size becomes larger
+            # than the observation array size and throws an error.
+            self.curr_time_step = TimeStep(observations=self.curr_time_step.observations,
+                                           rewards=np.zeros_like(self.curr_time_step.rewards),
+                                           discounts=self.curr_time_step.discounts,
+                                           step_type=StepType.LAST)
 
         new_curr_player_id = self.curr_time_step.observations["current_player"]
         obs = self._get_current_obs()
-        done = self.curr_time_step.last() or (
-                self._is_universal_poker and self._step_counter >= self.openspiel_env.max_game_length - 1)
+        done = self.curr_time_step.last()
 
         dones = {self.player_map(new_curr_player_id): done, "__all__": done}
 
@@ -283,6 +291,10 @@ class PokerMultiAgentEnv(ValidActionsMultiAgentEnv):
                 if penalty and self.player_map(player_id) in rewards:
                     rewards[self.player_map(player_id)] -= 4.0
                     self._invalid_action_penalties[player_id] = False
+
+        if self._is_universal_poker:
+            # normalize magnitude of rewards for universal poker
+            rewards = {p: r / (self._stack_size * 0.1) for p, r in rewards.items()}
 
         return obs, rewards, dones, infos
 
