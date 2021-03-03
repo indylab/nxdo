@@ -397,8 +397,8 @@ if __name__ == "__main__":
 
     scenario_name = commandline_args.scenario
 
-    nxdo_host = commandline_args.psro_host
-    nxdo_port = commandline_args.psro_port
+    nxdo_host = commandline_args.nxdo_host
+    nxdo_port = commandline_args.nxdo_port
     if nxdo_port is None:
         nxdo_port = get_client_port_for_service(service_name=f"seed_{GRL_SEED}_{scenario_name}")
 

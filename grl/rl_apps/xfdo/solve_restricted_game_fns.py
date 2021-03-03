@@ -8,9 +8,9 @@ from grl.rl_apps.xfdo.general_xfdo_cfp_metanash import train_cfp_restricted_game
 from grl.rl_apps.xfdo.general_xfdo_nfsp_metanash import train_off_policy_rl_nfsp_restricted_game
 from grl.utils.strategy_spec import StrategySpec
 from grl.algos.xfdo.xfdo_manager.manager import SolveRestrictedGame, RestrictedGameSolveResult
+from grl.rl_apps.scenarios.nxdo_scenario import NXDOScenario
 
-
-def _solve_game(scenario: dict,
+def _solve_game(scenario: NXDOScenario,
                 log_dir: str,
                 br_spec_lists_for_each_player: Dict[int, List[StrategySpec]],
                 stopping_condition: StoppingCondition,
@@ -27,9 +27,9 @@ def _solve_game(scenario: dict,
             stopping_condition=stopping_condition, manager_metadata=manager_metadata, print_train_results=True
         )
     else:
-        raise NotImplementedError(f"Unknown xfdo_metanash_method: {scenario['xfdo_metanash_method']}")
+        raise NotImplementedError(f"Unknown xfdo_metanash_method: {scenario.xdo_metanash_method}")
 
-    if scenario["calculate_openspiel_metanash"]:
+    if scenario.calculate_openspiel_metanash:
         extra_data = {"exploitability": final_train_result["z_avg_policy_exploitability"]}
     else:
         extra_data = {}
@@ -42,7 +42,7 @@ def _solve_game(scenario: dict,
 
 class SolveRestrictedGameFixedRewardThreshold(SolveRestrictedGame):
 
-    def __init__(self, scenario: dict, br_reward_threshold: float, min_episodes: int, required_fields: List[str]):
+    def __init__(self, scenario: NXDOScenario, br_reward_threshold: float, min_episodes: int, required_fields: List[str]):
 
         self.scenario = scenario
         self.br_reward_threshold = br_reward_threshold
@@ -50,7 +50,7 @@ class SolveRestrictedGameFixedRewardThreshold(SolveRestrictedGame):
 
         if required_fields is None:
             required_fields = []
-        if scenario["calculate_openspiel_metanash"] and "z_avg_policy_exploitability" not in required_fields:
+        if scenario.calculate_openspiel_metanash and "z_avg_policy_exploitability" not in required_fields:
             required_fields.append("z_avg_policy_exploitability")
 
         self.required_fields = required_fields
@@ -75,7 +75,7 @@ class SolveRestrictedGameFixedRewardThreshold(SolveRestrictedGame):
 class SolveRestrictedGameDynamicRewardThreshold1(SolveRestrictedGame):
 
     def __init__(self,
-                 scenario: dict,
+                 scenario: NXDOScenario,
                  dont_solve_first_n_xfdo_iters: int,
                  starting_rew_threshold: float,
                  min_rew_threshold: float,
@@ -94,7 +94,7 @@ class SolveRestrictedGameDynamicRewardThreshold1(SolveRestrictedGame):
 
         if required_fields is None:
             required_fields = []
-        if scenario["calculate_openspiel_metanash"] and (not scenario["calculate_openspiel_metanash_at_end"]) \
+        if scenario.calculate_openspiel_metanash and (not scenario.calculate_openspiel_metanash_at_end) \
                 and ("z_avg_policy_exploitability" not in required_fields):
             required_fields.append("z_avg_policy_exploitability")
         self.required_fields = required_fields
@@ -142,7 +142,7 @@ class SolveRestrictedGameDynamicRewardThreshold1(SolveRestrictedGame):
 class SolveRestrictedGameDynamicRewardThresholdBinary(SolveRestrictedGame):
 
     def __init__(self,
-                 scenario: dict,
+                 scenario: NXDOScenario,
                  dont_solve_first_n_xfdo_iters: int,
                  required_fields: Union[List[str], None]):
 
@@ -153,7 +153,7 @@ class SolveRestrictedGameDynamicRewardThresholdBinary(SolveRestrictedGame):
 
         if required_fields is None:
             required_fields = []
-        if scenario["calculate_openspiel_metanash"] and (not scenario["calculate_openspiel_metanash_at_end"]) \
+        if scenario.calculate_openspiel_metanash and (not scenario.calculate_openspiel_metanash_at_end) \
                 and ("z_avg_policy_exploitability" not in required_fields):
             required_fields.append("z_avg_policy_exploitability")
         self.required_fields = required_fields

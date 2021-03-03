@@ -27,7 +27,7 @@ if __name__ == '__main__':
     scenario_name = commandline_args.scenario
     scenario: NXDOScenario = scenario_catalog.get(scenario_name=scenario_name)
 
-    nxdo_port = commandline_args.psro_port
+    nxdo_port = commandline_args.nxdo_port
     if nxdo_port is None:
         nxdo_port = establish_new_server_port_for_service(service_name=f"seed_{GRL_SEED}_{scenario.name}")
 
