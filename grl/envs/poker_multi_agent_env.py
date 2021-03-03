@@ -78,12 +78,14 @@ class PokerMultiAgentEnv(ValidActionsMultiAgentEnv):
         self._invalid_action_penalties = [False, False]
 
         self._append_valid_actions_mask_to_obs = env_config["append_valid_actions_mask_to_obs"]
+        self._is_universal_poker = False
 
         if self.game_version in [KUHN_POKER, LEDUC_POKER]:
             self.open_spiel_env_config = {
                 "players": 2
             }
         elif self.game_version == "universal_poker":
+            self._is_universal_poker = True
             betting_mode = env_config.get("universal_poker_betting_mode", "nolimit")
             max_raises = str(env_config.get("universal_poker_max_raises", ""))
             num_ranks = env_config.get("universal_poker_num_ranks", 3)
@@ -125,6 +127,7 @@ class PokerMultiAgentEnv(ValidActionsMultiAgentEnv):
         self.observation_space = Box(low=0.0, high=1.0, shape=(self.observation_length,))
 
         self.curr_time_step: TimeStep = None
+        self._step_counter = 0
         self.player_map = None
 
     def _get_current_obs(self):
@@ -163,6 +166,7 @@ class PokerMultiAgentEnv(ValidActionsMultiAgentEnv):
             obs (dict): New observations for each ready agent.
         """
         self.curr_time_step = self.openspiel_env.reset()
+        self._step_counter = 0
 
         if self._fixed_players:
             self.player_map = lambda p: p
@@ -225,10 +229,13 @@ class PokerMultiAgentEnv(ValidActionsMultiAgentEnv):
             #     self._invalid_action_penalties[curr_player_id] = True
 
         self.curr_time_step = self.openspiel_env.step([player_action])
+        self._step_counter += 1
 
         new_curr_player_id = self.curr_time_step.observations["current_player"]
         obs = self._get_current_obs()
-        done = self.curr_time_step.last()
+        done = self.curr_time_step.last() or (
+                self._is_universal_poker and self._step_counter >= self.openspiel_env.max_game_length - 1)
+
         dones = {self.player_map(new_curr_player_id): done, "__all__": done}
 
         if done:
