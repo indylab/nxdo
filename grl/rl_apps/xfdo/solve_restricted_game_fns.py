@@ -15,12 +15,12 @@ def _solve_game(scenario: NXDOScenario,
                 br_spec_lists_for_each_player: Dict[int, List[StrategySpec]],
                 stopping_condition: StoppingCondition,
                 manager_metadata: dict = None) -> RestrictedGameSolveResult:
-    if scenario["xfdo_metanash_method"] == "nfsp":
+    if scenario.xdo_metanash_method == "nfsp":
         avg_policy_specs, final_train_result = train_off_policy_rl_nfsp_restricted_game(
             results_dir=log_dir, scenario=scenario, player_to_base_game_action_specs=br_spec_lists_for_each_player,
             stopping_condition=stopping_condition, manager_metadata=manager_metadata, print_train_results=True
         )
-    elif scenario["xfdo_metanash_method"] == "cfp":
+    elif scenario.xdo_metanash_method == "cfp":
         avg_policy_specs, final_train_result = train_cfp_restricted_game(
             results_dir=log_dir, scenario=scenario,
             player_to_base_game_action_specs=br_spec_lists_for_each_player,
