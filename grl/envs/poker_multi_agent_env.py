@@ -90,7 +90,10 @@ class PokerMultiAgentEnv(ValidActionsMultiAgentEnv):
             self._is_universal_poker = True
             self._stack_size = env_config['universal_poker_stack_size']
             betting_mode = env_config.get("universal_poker_betting_mode", "nolimit")
-            max_raises = str(env_config.get("universal_poker_max_raises", ""))
+            max_raises = str(env_config.get("universal_poker_max_raises", 8))
+            if len(max_raises) == 0:
+                raise ValueError("universal_poker_max_raises must be an integer "
+                                 "in order to have a finite observation size.")
             num_ranks = env_config.get("universal_poker_num_ranks", 3)
             num_suits = env_config.get("universal_poker_num_suits", 2)
             self.open_spiel_env_config = {
@@ -231,14 +234,14 @@ class PokerMultiAgentEnv(ValidActionsMultiAgentEnv):
         try:
             self.curr_time_step = self.openspiel_env.step([player_action])
         except SpielError:
-            if not self._is_universal_poker:
-                raise
+            # if not self._is_universal_poker:
+            raise
             # Enforce a time limit on universal poker if the infostate size becomes larger
             # than the observation array size and throws an error.
-            self.curr_time_step = TimeStep(observations=self.curr_time_step.observations,
-                                           rewards=np.zeros_like(self.curr_time_step.rewards),
-                                           discounts=self.curr_time_step.discounts,
-                                           step_type=StepType.LAST)
+            # self.curr_time_step = TimeStep(observations=self.curr_time_step.observations,
+            #                                rewards=np.zeros_like(self.curr_time_step.rewards),
+            #                                discounts=self.curr_time_step.discounts,
+            #                                step_type=StepType.LAST)
 
         new_curr_player_id = self.curr_time_step.observations["current_player"]
         obs = self._get_current_obs()
