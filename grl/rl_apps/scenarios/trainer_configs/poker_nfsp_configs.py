@@ -154,3 +154,17 @@ def nfsp_leduc_dqn_params(env: MultiAgentEnv) -> Dict[str, Any]:
             "custom_model": get_valid_action_fcn_class_for_env(env=env),
         }),
     })
+
+
+def nfsp_leduc_dqn_params_two_layers_no_valid_actions_model(env: MultiAgentEnv) -> Dict[str, Any]:
+    params = nfsp_leduc_dqn_params(env=env)
+    params["model"]["custom_model"] = None
+    params["model"]["fcnet_hiddens"] = [128, 128]
+    return params
+
+
+def nfsp_leduc_avg_policy_params_two_layers_no_valid_actions_model(env: MultiAgentEnv) -> Dict[str, Any]:
+    params = nfsp_leduc_avg_policy_params(env=env)
+    params["model"]["custom_model"] = None
+    params["model"]["fcnet_hiddens"] = [128, 128]
+    return params

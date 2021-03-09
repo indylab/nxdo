@@ -97,6 +97,7 @@ for dummy_action_multiplier in [20, 40, 80]:
 # 12_no_limit_leduc_nfsp_dqn
 # 30_no_limit_leduc_nfsp_dqn
 # 60_no_limit_leduc_nfsp_dqn
+# 1000_no_limit_leduc_nfsp_dqn
 for stack_size in [12, 30, 60, 100, 1000]:
     scenario_catalog.add(NFSPScenario(
         name=f"{stack_size}_no_limit_leduc_nfsp_dqn",
@@ -123,5 +124,5 @@ for stack_size in [12, 30, 60, 100, 1000]:
         calculate_openspiel_metanash=False,
         calculate_openspiel_metanash_at_end=False,
         calc_metanash_every_n_iters=100,
-        checkpoint_every_n_iters=500
+        checkpoint_every_n_iters=1000
     ))
