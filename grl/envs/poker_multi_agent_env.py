@@ -89,6 +89,7 @@ class PokerMultiAgentEnv(ValidActionsMultiAgentEnv):
         elif self.game_version == "universal_poker":
             self._is_universal_poker = True
             self._stack_size = env_config['universal_poker_stack_size']
+            num_rounds = 2
             betting_mode = env_config.get("universal_poker_betting_mode", "nolimit")
             max_raises = str(env_config.get("universal_poker_max_raises", 8))
             if len(max_raises) == 0:
@@ -100,12 +101,12 @@ class PokerMultiAgentEnv(ValidActionsMultiAgentEnv):
                 "numPlayers": 2,
                 "betting": betting_mode,
                 "numRanks": num_ranks,
-                "numRounds": 2,
+                "numRounds": num_rounds,
                 "numSuits": num_suits,
                 "stack": f"{env_config['universal_poker_stack_size']} {env_config['universal_poker_stack_size']}",
                 "blind": "1 1",
                 "raiseSize": "1 1",
-                "maxRaises": max_raises,
+                "maxRaises": " ".join([max_raises for _ in range(num_rounds)]),
                 "bettingAbstraction": "fullgame",
             }
         else:
