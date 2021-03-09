@@ -54,7 +54,7 @@ If you need to compile/recompile OpenSpiel without pip installing it. Perform th
 export BUILD_WITH_ACPC=ON # to compile with the optional universal poker game variant
 mkdir build
 cd build
-CXX=g++ cmake -DPython_TARGET_VERSION=3.6 -DCMAKE_CXX_COMPILER=${CXX} -DPython3_FIND_VIRTUALENV=FIRST -DPython3_FIND_STRATEGY=LOCATION ../open_spiel
+CC=clang CXX=clang++ cmake -DPython_TARGET_VERSION=3.6 -DCMAKE_CXX_COMPILER=${CXX} -DPython3_FIND_VIRTUALENV=FIRST -DPython3_FIND_STRATEGY=LOCATION ../open_spiel
 make -j$(nproc)
 cd ../../..
 ```
