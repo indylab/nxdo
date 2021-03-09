@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Union, Type
 from copy import deepcopy
 
+
 class Scenario(ABC):
 
     @abstractmethod
@@ -19,6 +20,15 @@ class Scenario(ABC):
 
     def copy(self):
         return deepcopy(self)
+
+    def with_updates(self, **kwargs) -> 'Scenario':
+        new_copy = self.copy()
+        for k, v in kwargs.items():
+            if not hasattr(new_copy, k):
+                raise KeyError(f"{k} is not an attribute of {new_copy.__class__}")
+            setattr(new_copy, k, v)
+        return new_copy
+
 
 class RayScenario(Scenario, ABC):
 
