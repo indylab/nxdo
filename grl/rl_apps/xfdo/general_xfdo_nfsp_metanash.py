@@ -163,7 +163,7 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
             "policy_mapping_fn": assert_not_called,
         },
 
-    }, get_avg_trainer_config(tmp_env.base_action_space))
+    }, get_avg_trainer_config(tmp_base_env))
     for _policy_id in ["average_policy_0", "average_policy_1"]:
         if get_restricted_game_custom_model is not None:
             avg_trainer_config["multiagent"]["policies"][_policy_id][3]["model"] = {
@@ -331,7 +331,7 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
     }
     assert all(restricted_game_action_spaces[0] == space for space in restricted_game_action_spaces), \
         "If not true, the line below with \"get_trainer_config\" may need to be changed to a better solution."
-    br_trainer_config = merge_dicts(br_trainer_config, get_trainer_config(tmp_env.base_action_space))
+    br_trainer_config = merge_dicts(br_trainer_config, get_trainer_config(tmp_base_env))
     for _policy_id in ["average_policy_0", "average_policy_1", "best_response_0", "best_response_1"]:
         if get_restricted_game_custom_model is not None:
             br_trainer_config["multiagent"]["policies"][_policy_id][3]["model"] = {
