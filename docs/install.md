@@ -10,8 +10,8 @@
 
 ### Clone repo with git submodules
 ```shell script
-git clone --recursive git@github.com:indylab/grl.git
-cd grl
+git clone --recursive git@github.com:indylab/xdo.git
+cd xdo
 ```
 If you've already cloned this repo but not the [submodules](/dependencies), you can clone them with:
 ```shell script
@@ -22,7 +22,7 @@ git submodule update --init --recursive
 After installing [Anaconda](https://docs.anaconda.com/anaconda/install/), enter the repo directory and create the new environment:
 ```shell script
 conda env create -f environment.yml
-conda activate grl
+conda activate xdo
 ```
 
 ### Install Python modules
