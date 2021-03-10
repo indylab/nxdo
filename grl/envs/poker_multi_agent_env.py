@@ -177,7 +177,6 @@ class PokerMultiAgentEnv(ValidActionsMultiAgentEnv):
             self.player_map = lambda p: p
         else:
             # swap player mapping in half of the games
-            assert False, "debugging assert, ok to remove"
             self.player_map = random.choice((lambda p: p,
                                              lambda p: (1 - p)))
 

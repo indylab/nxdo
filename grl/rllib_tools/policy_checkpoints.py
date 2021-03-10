@@ -63,8 +63,18 @@ def load_pure_strat(policy: Policy, pure_strat_spec: StrategySpec = None, checkp
         pure_strat_checkpoint_path = pure_strat_spec.metadata["checkpoint_path"]
     else:
         pure_strat_checkpoint_path = checkpoint_path
-    checkpoint_data = deepdish.io.load(path=pure_strat_checkpoint_path)
-    weights = checkpoint_data["weights"]
+
+    weights = None
+    num_load_attempts = 5
+    for attempt in range(num_load_attempts):
+        try:
+            checkpoint_data = deepdish.io.load(path=pure_strat_checkpoint_path)
+            weights = checkpoint_data["weights"]
+            break
+        except (HDF5ExtError, KeyError):
+            if attempt + 1 == num_load_attempts:
+                raise
+            time.sleep(1.0)
     weights = {k.replace("_dot_", "."): v for k, v in weights.items()}
     policy.set_weights(weights=weights)
     policy.policy_spec = pure_strat_spec

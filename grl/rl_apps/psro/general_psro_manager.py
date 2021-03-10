@@ -34,9 +34,6 @@ if __name__ == '__main__':
 
     ray_head_address = init_ray_for_scenario(scenario=scenario, head_address=None, logging_level=logging.INFO)
 
-    if scenario.p2sro:
-        raise NotImplementedError("a little more setup is needed in configs to launch p2sro this way")
-
     log_dir = os.path.join(os.path.dirname(grl.__file__), "data", scenario_name, f"manager_{datetime_str()}")
 
     name_file_path = os.path.join(log_dir, "scenario_name.txt")
@@ -48,10 +45,10 @@ if __name__ == '__main__':
         port=psro_port,
         eval_dispatcher_port=eval_port,
         n_players=2,
-        is_two_player_symmetric_zero_sum=False,
+        is_two_player_symmetric_zero_sum=scenario.single_agent_symmetric_game,
         do_external_payoff_evals_for_new_fixed_policies=True,
         games_per_external_payoff_eval=scenario.games_per_payoff_eval,
-        payoff_table_exponential_average_coeff=None,
+        payoff_table_exponential_average_coeff=scenario.p2sro_payoff_table_exponential_avg_coeff,
         log_dir=log_dir,
         manager_metadata={"ray_head_address": ray_head_address},
     )

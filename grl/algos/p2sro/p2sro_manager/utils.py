@@ -32,7 +32,7 @@ def get_latest_metanash_strategies(payoff_table: PayoffTable,
                                    mix_with_uniform_dist_coeff: float = 0.0,
                                    print_matrix: bool = True) -> Dict[int, PolicySpecDistribution]:
     # Currently this function only handles 2-player games
-    if as_policy_num == None:
+    if as_policy_num is None:
         as_policy_num = payoff_table.shape()[as_player] - 1
 
     if not 0 <= as_player < payoff_table.n_players():

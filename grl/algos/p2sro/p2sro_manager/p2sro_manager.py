@@ -44,7 +44,7 @@ class _P2SROPlayerStats(object):
         assert len(set(self.fixed_policy_indexes)) == len(self.fixed_policy_indexes)
         all_indexes = list(set(self.active_policy_indexes).union(set(self.fixed_policy_indexes)))
         all_indexes.sort()
-        assert np.array_equal(all_indexes, list(range(0, policy_num + 1))), \
+        assert np.array_equal(self.fixed_policy_indexes, list(range(0, policy_num + 1))), \
             f"all_indexes: {all_indexes}\n" \
             f"list(range(0, policy_num+1)):{list(range(0, policy_num + 1))}\n" \
             f"self.active_policy_indexes:{self.active_policy_indexes}\n" \

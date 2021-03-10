@@ -22,6 +22,9 @@ class PSROScenario(RayScenario):
                  num_eval_workers: int,
                  games_per_payoff_eval: int,
                  p2sro: bool,
+                 p2sro_payoff_table_exponential_avg_coeff: Union[float, None],
+                 p2sro_sync_with_payoff_table_every_n_episodes: Union[int, None],
+                 single_agent_symmetric_game: bool,
                  get_trainer_config: Callable[[MultiAgentEnv], Dict[str, Any]],
                  psro_get_stopping_condition: Callable[[], StoppingCondition]):
         super().__init__(name=name,
@@ -36,5 +39,8 @@ class PSROScenario(RayScenario):
         self.num_eval_workers = num_eval_workers
         self.games_per_payoff_eval = games_per_payoff_eval
         self.p2sro = p2sro
+        self.p2sro_payoff_table_exponential_avg_coeff = p2sro_payoff_table_exponential_avg_coeff
+        self.p2sro_sync_with_payoff_table_every_n_episodes = p2sro_sync_with_payoff_table_every_n_episodes
+        self.single_agent_symmetric_game = single_agent_symmetric_game
         self.get_trainer_config = get_trainer_config
         self.psro_get_stopping_condition = psro_get_stopping_condition

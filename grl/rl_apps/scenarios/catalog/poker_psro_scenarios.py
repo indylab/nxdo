@@ -29,6 +29,9 @@ scenario_catalog.add(PSROScenario(
     num_eval_workers=8,
     games_per_payoff_eval=20000,
     p2sro=False,
+    p2sro_payoff_table_exponential_avg_coeff=None,
+    p2sro_sync_with_payoff_table_every_n_episodes=None,
+    single_agent_symmetric_game=False,
     get_trainer_config=psro_kuhn_dqn_params,
     psro_get_stopping_condition=lambda: EpisodesSingleBRRewardPlateauStoppingCondition(
         br_policy_id="best_response",
@@ -39,7 +42,7 @@ scenario_catalog.add(PSROScenario(
     ),
 ))
 
-scenario_catalog.add(PSROScenario(
+leduc_psro_dqn = PSROScenario(
     name="leduc_psro_dqn",
     ray_cluster_cpus=default_if_creating_ray_head(default=8),
     ray_cluster_gpus=default_if_creating_ray_head(default=0),
@@ -60,11 +63,55 @@ scenario_catalog.add(PSROScenario(
     num_eval_workers=8,
     games_per_payoff_eval=3000,
     p2sro=False,
+    p2sro_payoff_table_exponential_avg_coeff=None,
+    p2sro_sync_with_payoff_table_every_n_episodes=None,
+    single_agent_symmetric_game=False,
     get_trainer_config=psro_leduc_dqn_params,
     psro_get_stopping_condition=lambda: EpisodesSingleBRRewardPlateauStoppingCondition(
         br_policy_id="best_response",
         dont_check_plateau_before_n_episodes=int(2e4),
         check_plateau_every_n_episodes=int(2e4),
+        minimum_reward_improvement_otherwise_plateaued=0.01,
+        max_train_episodes=int(1e5),
+    ),
+)
+scenario_catalog.add(leduc_psro_dqn)
+
+scenario_catalog.add(leduc_psro_dqn.with_updates(
+    name="symmetric_leduc_psro_dqn",
+    env_config={
+        'version': "leduc_poker",
+        "fixed_players": False,
+        "append_valid_actions_mask_to_obs": True,
+    },
+    mix_metanash_with_uniform_dist_coeff=0.1,
+    single_agent_symmetric_game=True,
+    psro_get_stopping_condition=lambda: EpisodesSingleBRRewardPlateauStoppingCondition(
+        br_policy_id="best_response",
+        dont_check_plateau_before_n_episodes=int(5e3),
+        check_plateau_every_n_episodes=int(5e3),
+        minimum_reward_improvement_otherwise_plateaued=0.01,
+        max_train_episodes=int(1e5),
+    ),
+))
+
+scenario_catalog.add(leduc_psro_dqn.with_updates(
+    name="symmetric_leduc_p2sro_dqn_3_br_learners",
+    ray_cluster_cpus=default_if_creating_ray_head(default=4 * 3),  # 4 cpus for each of 3 workers
+    env_config={
+        'version': "leduc_poker",
+        "fixed_players": False,
+        "append_valid_actions_mask_to_obs": True,
+    },
+    mix_metanash_with_uniform_dist_coeff=0.1,
+    p2sro=True,
+    p2sro_payoff_table_exponential_avg_coeff=1.0/3000,
+    p2sro_sync_with_payoff_table_every_n_episodes=100,
+    single_agent_symmetric_game=True,
+    psro_get_stopping_condition=lambda: EpisodesSingleBRRewardPlateauStoppingCondition(
+        br_policy_id="best_response",
+        dont_check_plateau_before_n_episodes=int(5e3),
+        check_plateau_every_n_episodes=int(5e3),
         minimum_reward_improvement_otherwise_plateaued=0.01,
         max_train_episodes=int(1e5),
     ),
@@ -97,6 +144,9 @@ for dummy_action_multiplier in [20, 40, 80]:
         num_eval_workers=8,
         games_per_payoff_eval=3000,
         p2sro=False,
+        p2sro_payoff_table_exponential_avg_coeff=None,
+        p2sro_sync_with_payoff_table_every_n_episodes=None,
+        single_agent_symmetric_game=False,
         get_trainer_config=psro_leduc_dqn_params,
         psro_get_stopping_condition=lambda: EpisodesSingleBRRewardPlateauStoppingCondition(
             br_policy_id="best_response",
@@ -136,6 +186,9 @@ for stack_size in [12, 30, 60, 100, 1000]:
         num_eval_workers=8,
         games_per_payoff_eval=3000,
         p2sro=False,
+        p2sro_payoff_table_exponential_avg_coeff=None,
+        p2sro_sync_with_payoff_table_every_n_episodes=None,
+        single_agent_symmetric_game=False,
         get_trainer_config=psro_leduc_dqn_params,
         psro_get_stopping_condition=lambda: EpisodesSingleBRRewardPlateauStoppingCondition(
             br_policy_id="best_response",
@@ -169,6 +222,9 @@ for stack_size in [12, 30, 60, 100, 1000]:
         num_eval_workers=8,
         games_per_payoff_eval=10000,
         p2sro=False,
+        p2sro_payoff_table_exponential_avg_coeff=None,
+        p2sro_sync_with_payoff_table_every_n_episodes=None,
+        single_agent_symmetric_game=False,
         get_trainer_config=psro_leduc_ppo_params,
         psro_get_stopping_condition=lambda: EpisodesSingleBRRewardPlateauStoppingCondition(
             br_policy_id="best_response",
