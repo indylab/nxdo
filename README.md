@@ -9,4 +9,4 @@ Included are Deep RL implementations for NXDO, PSRO, and NFSP.
 
 Check this [repo](https://github.com/indylab/tabular_xdo) for tabular experiment code.
 
-For questions and assistance, email johnblanier@gmail.com.
+For questions and assistance, email jblanier@uci.edu
