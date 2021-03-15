@@ -46,6 +46,7 @@ pip install -e .
 ```
 
 Installation is now done!
+See [Running Experiments](/docs/experiments.md).
 
 ### Advanced Installation Notes (Optional)
 
