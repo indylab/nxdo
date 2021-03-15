@@ -1,14 +1,12 @@
 
-## Code for XDO: A Double Oracle Algorithm for Extensive-Form Games
+## Code for [XDO: A Double Oracle Algorithm for Extensive-Form Games](https://arxiv.org/abs/2103.06426)
 
 
-Included are Deep RL implementations for NXDO, PSRO/P2SRO, and NFSP.
+Included are Deep RL implementations for NXDO, PSRO, and NFSP.
 
-For RL, we build on top of [RLlib](https://docs.ray.io/en/master/rllib.html). However, much of the code for [NXDO](grl/algos/xfdo) and [PSRO](grl/algos/p2sro) is agnostic to the RL implementation.
+1. [Installation](docs/install.md)
+2. [Running Experiments](docs/experiments.md)
 
 Check this [repo](https://github.com/indylab/tabular_xdo) for tabular experiment code.
 
-
-
-1. [Installation](docs/install.md)
-2. [Running Paper Experiments](docs/experiments.md)
+For questions and assistance, email jblanier@uci.edu
