@@ -5,7 +5,7 @@
 Included are Deep RL implementations for NXDO, PSRO, and NFSP.
 
 1. [Installation](docs/install.md)
-2. [Running Paper Experiments](docs/experiments.md)
+2. [Running Experiments](docs/experiments.md)
 
 Check this [repo](https://github.com/indylab/tabular_xdo) for tabular experiment code.
 
