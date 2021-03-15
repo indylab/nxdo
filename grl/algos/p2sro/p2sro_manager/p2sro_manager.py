@@ -60,7 +60,7 @@ class P2SROManager(object):
                  games_per_external_payoff_eval: int,
                  eval_dispatcher_port: int = 4536,
                  payoff_table_exponential_average_coeff: float = None,
-                 manager_logger: P2SROManagerLogger = None,
+                 get_manager_logger=None,
                  log_dir: str = None,
                  manager_metadata: dict = None):
 
@@ -91,9 +91,10 @@ class P2SROManager(object):
         self.log_dir = log_dir
         print(f"Manager log dir is {self.log_dir}")
 
-        if manager_logger is None:
-            manager_logger = SimpleP2SROManagerLogger(p2sro_manger=self, log_dir=self.log_dir)
-        self._manager_logger = manager_logger
+        if get_manager_logger is None:
+            self._manager_logger = SimpleP2SROManagerLogger(p2sro_manger=self, log_dir=self.log_dir)
+        else:
+            self._manager_logger = get_manager_logger(self)
 
         if manager_metadata is None:
             manager_metadata = {}

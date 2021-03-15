@@ -50,12 +50,14 @@ class SimpleP2SROManagerLogger(P2SROManagerLogger):
         self._payoff_table_checkpoint_dir = os.path.join(self._log_dir, "payoff_table_checkpoints")
         self._payoff_table_checkpoint_count = 0
 
+        self._latest_numbered_payoff_table_checkpoint_path = None
+        self._latest_numbered_policy_nums_path = None
+
     def on_new_active_policy(self, player: int, new_policy_num: int, new_policy_spec: StrategySpec):
         logger.info(f"Player {player} active policy {new_policy_num} claimed")
 
     def on_new_active_policy_metadata(self, player: int, policy_num: int, new_policy_spec: StrategySpec):
         pass
-        # logger.info(f"Player {player} active policy {policy_num} new metadata: {new_policy_spec.metadata}")
 
     def on_active_policy_moved_to_fixed(self, player: int, policy_num: int, fixed_policy_spec: StrategySpec):
         logger.info(f"Player {player} policy {policy_num} moved to fixed.")
@@ -64,15 +66,15 @@ class SimpleP2SROManagerLogger(P2SROManagerLogger):
         data = self._manager.get_copy_of_latest_data()
         latest_payoff_table, active_policy_nums_per_player, fixed_policy_nums_per_player = data
 
-        numbered_pt_checkpoint_path = os.path.join(self._payoff_table_checkpoint_dir,
+        self._latest_numbered_payoff_table_checkpoint_path = os.path.join(self._payoff_table_checkpoint_dir,
                                                    f"payoff_table_checkpoint_{self._payoff_table_checkpoint_count}.json")
-        numbered_policy_nums_path = os.path.join(self._payoff_table_checkpoint_dir,
+        self._latest_numbered_policy_nums_path = os.path.join(self._payoff_table_checkpoint_dir,
                                                  f"policy_nums_checkpoint_{self._payoff_table_checkpoint_count}.json")
 
         pt_checkpoint_paths = [os.path.join(self._payoff_table_checkpoint_dir, f"payoff_table_checkpoint_latest.json"),
-                               numbered_pt_checkpoint_path]
+                               self._latest_numbered_payoff_table_checkpoint_path]
         policy_nums_paths = [os.path.join(self._payoff_table_checkpoint_dir, f"policy_nums_checkpoint_latest.json"),
-                             numbered_policy_nums_path]
+                             self._latest_numbered_policy_nums_path]
 
         for pt_checkpoint_path, policy_nums_path in zip(pt_checkpoint_paths, policy_nums_paths):
             ensure_dir(file_path=pt_checkpoint_path)
@@ -104,8 +106,8 @@ class SimpleP2SROManagerLogger(P2SROManagerLogger):
                 highest_fixed_policies_for_all_players = None
             manifest_json_line = json.dumps({"payoff_table_checkpoint_num": self._payoff_table_checkpoint_count,
                                              "highest_fixed_policies_for_all_players": highest_fixed_policies_for_all_players,
-                                             "payoff_table_json_path": numbered_pt_checkpoint_path,
-                                             "policy_nums_json_path": numbered_policy_nums_path})
+                                             "payoff_table_json_path": self._latest_numbered_payoff_table_checkpoint_path,
+                                             "policy_nums_json_path": self._latest_numbered_policy_nums_path})
             manifest_file.write(f"{manifest_json_line}\n")
 
         self._payoff_table_checkpoint_count += 1
@@ -129,3 +131,12 @@ class SimpleP2SROManagerLogger(P2SROManagerLogger):
         # print("Player 1 matrix ---------------------------------------")
         # print(latest_payoff_table.get_payoff_matrix_for_player(1))
         # print("------------------------------------------------------")
+
+    def get_current_checkpoint_num(self):
+        return self._payoff_table_checkpoint_count
+
+    def get_latest_numbered_payoff_table_checkpoint_path(self):
+        return self._latest_numbered_payoff_table_checkpoint_path
+
+    def get_latest_numbered_policy_nums_path(self):
+        return self._latest_numbered_policy_nums_path

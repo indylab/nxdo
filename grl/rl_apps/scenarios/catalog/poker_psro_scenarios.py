@@ -20,6 +20,7 @@ scenario_catalog.add(PSROScenario(
         "fixed_players": True,
     },
     mix_metanash_with_uniform_dist_coeff=0.0,
+    allow_stochastic_best_responses=False,
     trainer_class=DQNTrainer,
     policy_classes={
         "metanash": SimpleQTorchPolicyPatched,
@@ -40,6 +41,7 @@ scenario_catalog.add(PSROScenario(
         minimum_reward_improvement_otherwise_plateaued=0.01,
         max_train_episodes=int(1e5),
     ),
+    calc_exploitability_for_openspiel_env=True,
 ))
 
 leduc_psro_dqn = PSROScenario(
@@ -54,6 +56,7 @@ leduc_psro_dqn = PSROScenario(
         "append_valid_actions_mask_to_obs": True,
     },
     mix_metanash_with_uniform_dist_coeff=0.0,
+    allow_stochastic_best_responses=False,
     trainer_class=DQNTrainer,
     policy_classes={
         "metanash": SimpleQTorchPolicyPatched,
@@ -74,6 +77,7 @@ leduc_psro_dqn = PSROScenario(
         minimum_reward_improvement_otherwise_plateaued=0.01,
         max_train_episodes=int(1e5),
     ),
+    calc_exploitability_for_openspiel_env=True,
 )
 scenario_catalog.add(leduc_psro_dqn)
 
@@ -135,6 +139,7 @@ for dummy_action_multiplier in [20, 40, 80]:
             "dummy_action_multiplier": dummy_action_multiplier,
         },
         mix_metanash_with_uniform_dist_coeff=0.0,
+        allow_stochastic_best_responses=False,
         trainer_class=DQNTrainer,
         policy_classes={
             "metanash": SimpleQTorchPolicyPatched,
@@ -155,6 +160,7 @@ for dummy_action_multiplier in [20, 40, 80]:
             minimum_reward_improvement_otherwise_plateaued=0.01,
             max_train_episodes=int(1e5),
         ),
+        calc_exploitability_for_openspiel_env=True,
     ))
 
 # 12_no_limit_leduc_psro_dqn
@@ -162,75 +168,83 @@ for dummy_action_multiplier in [20, 40, 80]:
 # 60_no_limit_leduc_psro_dqn
 
 # 1000_no_limit_leduc_psro_ppo
+# 1000_no_limit_leduc_psro_ppo_stochastic
 
 for stack_size in [12, 30, 60, 100, 1000]:
-    scenario_catalog.add(PSROScenario(
-        name=f"{stack_size}_no_limit_leduc_psro_dqn",
-        ray_cluster_cpus=default_if_creating_ray_head(default=8),
-        ray_cluster_gpus=default_if_creating_ray_head(default=0),
-        ray_object_store_memory_cap_gigabytes=1,
-        env_class=PokerMultiAgentEnv,
-        env_config={
-            'version': "universal_poker",
-            "fixed_players": True,
-            "append_valid_actions_mask_to_obs": True,
-            "universal_poker_stack_size": stack_size,
-        },
-        mix_metanash_with_uniform_dist_coeff=0.0,
-        trainer_class=DQNTrainer,
-        policy_classes={
-            "metanash": SimpleQTorchPolicyPatched,
-            "best_response": SimpleQTorchPolicyPatched,
-            "eval": SimpleQTorchPolicyPatched,
-        },
-        num_eval_workers=8,
-        games_per_payoff_eval=3000,
-        p2sro=False,
-        p2sro_payoff_table_exponential_avg_coeff=None,
-        p2sro_sync_with_payoff_table_every_n_episodes=None,
-        single_agent_symmetric_game=False,
-        get_trainer_config=psro_leduc_dqn_params,
-        psro_get_stopping_condition=lambda: EpisodesSingleBRRewardPlateauStoppingCondition(
-            br_policy_id="best_response",
-            dont_check_plateau_before_n_episodes=int(2e4),
-            check_plateau_every_n_episodes=int(2e4),
-            minimum_reward_improvement_otherwise_plateaued=0.01,
-            max_train_episodes=int(1e5),
-        ),
-    ))
+    for allow_stochastic_best_responses in [True, False]:
+        stochastic_str = "_stochastic" if allow_stochastic_best_responses else ""
 
-    scenario_catalog.add(PSROScenario(
-        name=f"{stack_size}_no_limit_leduc_psro_ppo",
-        ray_cluster_cpus=default_if_creating_ray_head(default=8),
-        ray_cluster_gpus=default_if_creating_ray_head(default=0),
-        ray_object_store_memory_cap_gigabytes=1,
-        env_class=PokerMultiAgentEnv,
-        env_config={
-            'version': "universal_poker",
-            "fixed_players": True,
-            "append_valid_actions_mask_to_obs": False,
-            "universal_poker_stack_size": stack_size,
-            "continuous_action_space": True,
-        },
-        mix_metanash_with_uniform_dist_coeff=0.0,
-        trainer_class=PPOTrainer,
-        policy_classes={
-            "metanash": PPOTorchPolicy,
-            "best_response": PPOTorchPolicy,
-            "eval": PPOTorchPolicy,
-        },
-        num_eval_workers=8,
-        games_per_payoff_eval=10000,
-        p2sro=False,
-        p2sro_payoff_table_exponential_avg_coeff=None,
-        p2sro_sync_with_payoff_table_every_n_episodes=None,
-        single_agent_symmetric_game=False,
-        get_trainer_config=psro_leduc_ppo_params,
-        psro_get_stopping_condition=lambda: EpisodesSingleBRRewardPlateauStoppingCondition(
-            br_policy_id="best_response",
-            dont_check_plateau_before_n_episodes=int(2e4),
-            check_plateau_every_n_episodes=int(2e4),
-            minimum_reward_improvement_otherwise_plateaued=0.01,
-            max_train_episodes=int(1e5),
-        ),
-    ))
+        scenario_catalog.add(PSROScenario(
+            name=f"{stack_size}_no_limit_leduc_psro_dqn{stochastic_str}",
+            ray_cluster_cpus=default_if_creating_ray_head(default=8),
+            ray_cluster_gpus=default_if_creating_ray_head(default=0),
+            ray_object_store_memory_cap_gigabytes=1,
+            env_class=PokerMultiAgentEnv,
+            env_config={
+                'version': "universal_poker",
+                "fixed_players": True,
+                "append_valid_actions_mask_to_obs": True,
+                "universal_poker_stack_size": stack_size,
+            },
+            mix_metanash_with_uniform_dist_coeff=0.0,
+            allow_stochastic_best_responses=allow_stochastic_best_responses,
+            trainer_class=DQNTrainer,
+            policy_classes={
+                "metanash": SimpleQTorchPolicyPatched,
+                "best_response": SimpleQTorchPolicyPatched,
+                "eval": SimpleQTorchPolicyPatched,
+            },
+            num_eval_workers=8,
+            games_per_payoff_eval=3000,
+            p2sro=False,
+            p2sro_payoff_table_exponential_avg_coeff=None,
+            p2sro_sync_with_payoff_table_every_n_episodes=None,
+            single_agent_symmetric_game=False,
+            get_trainer_config=psro_leduc_dqn_params,
+            psro_get_stopping_condition=lambda: EpisodesSingleBRRewardPlateauStoppingCondition(
+                br_policy_id="best_response",
+                dont_check_plateau_before_n_episodes=int(2e4),
+                check_plateau_every_n_episodes=int(2e4),
+                minimum_reward_improvement_otherwise_plateaued=0.01,
+                max_train_episodes=int(1e5),
+            ),
+            calc_exploitability_for_openspiel_env=False,
+        ))
+
+        scenario_catalog.add(PSROScenario(
+            name=f"{stack_size}_no_limit_leduc_psro_ppo{stochastic_str}",
+            ray_cluster_cpus=default_if_creating_ray_head(default=8),
+            ray_cluster_gpus=default_if_creating_ray_head(default=0),
+            ray_object_store_memory_cap_gigabytes=1,
+            env_class=PokerMultiAgentEnv,
+            env_config={
+                'version': "universal_poker",
+                "fixed_players": True,
+                "append_valid_actions_mask_to_obs": False,
+                "universal_poker_stack_size": stack_size,
+                "continuous_action_space": True,
+            },
+            mix_metanash_with_uniform_dist_coeff=0.0,
+            allow_stochastic_best_responses=allow_stochastic_best_responses,
+            trainer_class=PPOTrainer,
+            policy_classes={
+                "metanash": PPOTorchPolicy,
+                "best_response": PPOTorchPolicy,
+                "eval": PPOTorchPolicy,
+            },
+            num_eval_workers=8,
+            games_per_payoff_eval=10000,
+            p2sro=False,
+            p2sro_payoff_table_exponential_avg_coeff=None,
+            p2sro_sync_with_payoff_table_every_n_episodes=None,
+            single_agent_symmetric_game=False,
+            get_trainer_config=psro_leduc_ppo_params,
+            psro_get_stopping_condition=lambda: EpisodesSingleBRRewardPlateauStoppingCondition(
+                br_policy_id="best_response",
+                dont_check_plateau_before_n_episodes=int(2e4),
+                check_plateau_every_n_episodes=int(2e4),
+                minimum_reward_improvement_otherwise_plateaued=0.01,
+                max_train_episodes=int(1e5),
+            ),
+            calc_exploitability_for_openspiel_env=False,
+        ))

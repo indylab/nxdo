@@ -7,6 +7,12 @@ from typing import Tuple
 import numpy as np
 import yaml
 
+import grl
+
+
+def data_dir() -> str:
+    return os.path.join(os.path.dirname(grl.__file__), "data")
+
 
 def check_if_jsonable(check_dict):
     try:

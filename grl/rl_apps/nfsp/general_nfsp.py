@@ -6,6 +6,7 @@ import tempfile
 import time
 from typing import Any, Tuple, Type, Dict, Union
 
+from termcolor import colored
 import deepdish
 import numpy as np
 import ray
@@ -303,6 +304,9 @@ def train_off_policy_rl_nfsp(results_dir: str,
                     open_spiel_env_config=open_spiel_env_config
                 )
                 result["z_avg_policy_exploitability"] = exploitability
+                logger.info(colored(
+                    f"(Graph this in a notebook) Exploitability: {exploitability} - Saving exploitability stats "
+                    f"to {os.path.join(trainer.logdir, 'result.json')}", "green"))
 
             if checkpoint_every_n_iters and training_iteration % checkpoint_every_n_iters == 0:
                 for player in range(2):
@@ -329,8 +333,6 @@ def train_off_policy_rl_nfsp(results_dir: str,
         "env": env_class,
         "env_config": env_config,
         "gamma": 1.0,
-        # Use GPUs iff `RLLIB_NUM_GPUS` env var set to > 0.
-        # "num_gpus": int(os.environ.get("RLLIB_NUM_GPUS", "0")),
         "num_gpus": 0.0,
         "num_workers": 0,
         "num_gpus_per_worker": 0.0,
@@ -371,11 +373,6 @@ def train_off_policy_rl_nfsp(results_dir: str,
     br_trainer.workers.foreach_worker(_set_avg_br_rew_deque)
     br_trainer.avg_br_reward_deque = avg_br_reward_deque
 
-    # assert isinstance(br_trainer.workers.local_worker().policy_map["average_policy_1"].model, LeducDQNFullyConnectedNetwork)
-    # assert isinstance(br_trainer.workers.local_worker().policy_map["average_policy_0"].model, LeducDQNFullyConnectedNetwork)
-    # assert isinstance(avg_trainer.workers.local_worker().policy_map["average_policy_0"].model, LeducDQNFullyConnectedNetwork)
-    # assert isinstance(avg_trainer.workers.local_worker().policy_map["average_policy_0"].model, LeducDQNFullyConnectedNetwork)
-
     # scenario_name logged in on_train_result_callback
     br_trainer.scenario_name = scenario_name
 
@@ -386,8 +383,6 @@ def train_off_policy_rl_nfsp(results_dir: str,
         for policy_id, policy in trainer.workers.local_worker().policy_map.items():
             policy.policy_id = policy_id
 
-    # br_trainer.workers.local_worker().policy_map["average_policy_0"] = avg_trainer.workers.local_worker().policy_map["average_policy_0"]
-    # br_trainer.workers.local_worker().policy_map["average_policy_1"] = avg_trainer.workers.local_worker().policy_map["average_policy_1"]
     avg_weights = avg_trainer.get_weights(["average_policy_0", "average_policy_1"])
     br_trainer.workers.foreach_worker(lambda worker: worker.set_weights(avg_weights))
 

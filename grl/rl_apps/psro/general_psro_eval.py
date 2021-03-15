@@ -62,7 +62,7 @@ def run_poker_evaluation_loop(scenario_name: str, eval_dispatcher_port: int, eva
     num_players = 2
 
     trainer_config = scenario.get_trainer_config(env)
-    trainer_config["explore"] = False
+    trainer_config["explore"] = scenario.allow_stochastic_best_responses
 
     policies = [scenario.policy_classes["eval"](env.observation_space,
                                                 env.action_space,

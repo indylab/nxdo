@@ -129,3 +129,4 @@ dependencies:
     - torchvision==0.8.2
     - yarl==1.6.3
     - zipp==3.4.0
+    - termcolor==1.1.0

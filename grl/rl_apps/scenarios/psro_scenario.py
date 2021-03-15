@@ -17,6 +17,7 @@ class PSROScenario(RayScenario):
                  env_class: Type[MultiAgentEnv],
                  env_config: Dict[str, Any],
                  mix_metanash_with_uniform_dist_coeff: float,
+                 allow_stochastic_best_responses: bool,
                  trainer_class: Type[Trainer],
                  policy_classes: Dict[str, Type[Policy]],
                  num_eval_workers: int,
@@ -26,7 +27,8 @@ class PSROScenario(RayScenario):
                  p2sro_sync_with_payoff_table_every_n_episodes: Union[int, None],
                  single_agent_symmetric_game: bool,
                  get_trainer_config: Callable[[MultiAgentEnv], Dict[str, Any]],
-                 psro_get_stopping_condition: Callable[[], StoppingCondition]):
+                 psro_get_stopping_condition: Callable[[], StoppingCondition],
+                 calc_exploitability_for_openspiel_env: bool):
         super().__init__(name=name,
                          ray_cluster_cpus=ray_cluster_cpus,
                          ray_cluster_gpus=ray_cluster_gpus,
@@ -34,6 +36,7 @@ class PSROScenario(RayScenario):
         self.env_class = env_class
         self.env_config = env_config
         self.mix_metanash_with_uniform_dist_coeff = mix_metanash_with_uniform_dist_coeff
+        self.allow_stochastic_best_responses = allow_stochastic_best_responses
         self.trainer_class = trainer_class
         self.policy_classes = policy_classes
         self.num_eval_workers = num_eval_workers
@@ -43,4 +46,5 @@ class PSROScenario(RayScenario):
         self.p2sro_sync_with_payoff_table_every_n_episodes = p2sro_sync_with_payoff_table_every_n_episodes
         self.single_agent_symmetric_game = single_agent_symmetric_game
         self.get_trainer_config = get_trainer_config
-        self.psro_get_stopping_condition = psro_get_stopping_condition
+        self.psro_get_stopping_condition = psro_get_stopping_condition,
+        self.calc_exploitability_for_openspiel_env = calc_exploitability_for_openspiel_env

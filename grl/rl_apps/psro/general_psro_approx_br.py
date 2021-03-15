@@ -160,7 +160,7 @@ def train_poker_approx_best_response_psro(br_player,
             "policies_to_train": [f"best_response"],
             "policies": {
                 f"metanash": (
-                policy_classes["metanash"], tmp_env.observation_space, tmp_env.action_space, {"explore": False}),
+                policy_classes["metanash"], tmp_env.observation_space, tmp_env.action_space, {"explore": scenario.allow_stochastic_best_responses}),
                 f"best_response": (policy_classes["best_response"], tmp_env.observation_space, tmp_env.action_space,
                                    br_policy_config_overrides),
             },

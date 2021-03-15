@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+
+message NXDOString {
+    string string = 1;
+}
+
+message NXDOPlayerAndPolicyNum {
+    int64 player = 1;
+    int64 policy_num = 2;
+}
+
+message NXDOPlayer {
+    int64 player = 1;
+}
+
+message NXDOPolicySpecJson {
+    string policy_spec_json = 1;
+}
+
+message NXDOPolicySpecList {
+    repeated NXDOPolicySpecJson policy_spec_list = 1;
+}
+
+message NXDONewBestResponseParams {
+    NXDOPolicySpecList metanash_specs_for_players = 1;
+    repeated NXDOPolicySpecList delegate_specs_for_players = 2;
+    int64 policy_num = 3;
+}
+
+message NXDOPolicyMetadataRequest {
+    int64 player = 1;
+    int64 policy_num = 2;
+    string metadata_json = 3;
+}
+
+message NXDOConfirmation {
+    bool result = 1;
+}
+
+message NXDOMetadata {
+    string json_metadata = 1;
+}
+
+service NXDOManager {
+    rpc GetLogDir (google.protobuf.Empty) returns (NXDOString) {}
+    rpc GetManagerMetaData (google.protobuf.Empty) returns (NXDOMetadata) {}
+    rpc ClaimNewActivePolicyForPlayer (NXDOPlayer) returns (NXDONewBestResponseParams) {}
+    rpc SubmitFinalBRPolicy (NXDOPolicyMetadataRequest) returns (NXDOConfirmation) {}
+    rpc IsPolicyFixed (NXDOPlayerAndPolicyNum) returns (NXDOConfirmation) {}
+}

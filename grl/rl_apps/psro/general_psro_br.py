@@ -142,14 +142,18 @@ def train_psro_best_response(player, results_dir, scenario_name, psro_manager_po
     policy_classes: Dict[str, Type[Policy]] = scenario.policy_classes
     single_agent_symmetric_game = scenario.single_agent_symmetric_game
     if single_agent_symmetric_game and player != 0:
-        raise ValueError(f"Only use player 0 if treating the game as single agent symmetric "
-                         f"(one agent plays all sides).")
+        if player is None:
+            player = 0
+        else:
+            raise ValueError(f"Only use player 0 if treating the game as single agent symmetric "
+                             f"(one agent plays all sides).")
 
     p2sro = scenario.p2sro
     p2sro_sync_with_payoff_table_every_n_episodes = scenario.p2sro_sync_with_payoff_table_every_n_episodes
     get_trainer_config = scenario.get_trainer_config
     psro_get_stopping_condition = scenario.psro_get_stopping_condition
     mix_metanash_with_uniform_dist_coeff = scenario.mix_metanash_with_uniform_dist_coeff
+    allow_stochastic_best_response = scenario.allow_stochastic_best_responses
 
     class P2SROPreAndPostEpisodeCallbacks(DefaultCallbacks):
 
@@ -247,7 +251,7 @@ def train_psro_best_response(player, results_dir, scenario_name, psro_manager_po
             "policies_to_train": [f"best_response"],
             "policies": {
                 f"metanash": (
-                policy_classes["metanash"], tmp_env.observation_space, tmp_env.action_space, {"explore": False}),
+                policy_classes["metanash"], tmp_env.observation_space, tmp_env.action_space, {"explore": allow_stochastic_best_response}),
                 f"best_response": (
                 policy_classes["best_response"], tmp_env.observation_space, tmp_env.action_space, {}),
             },

@@ -123,7 +123,7 @@ class P2SROManagerWithServer(P2SROManager):
                  do_external_payoff_evals_for_new_fixed_policies: bool,
                  games_per_external_payoff_eval: int,
                  eval_dispatcher_port: int = 4536,
-                 manager_logger: P2SROManagerLogger = None,
+                 get_manager_logger=None,
                  log_dir: str = None,
                  manager_metadata: dict = None,
                  payoff_table_exponential_average_coeff: float = None,
@@ -134,7 +134,7 @@ class P2SROManagerWithServer(P2SROManager):
             do_external_payoff_evals_for_new_fixed_policies=do_external_payoff_evals_for_new_fixed_policies,
             games_per_external_payoff_eval=games_per_external_payoff_eval,
             eval_dispatcher_port=eval_dispatcher_port,
-            manager_logger=manager_logger,
+            get_manager_logger=get_manager_logger,
             log_dir=log_dir,
             manager_metadata=manager_metadata,
             payoff_table_exponential_average_coeff=payoff_table_exponential_average_coeff

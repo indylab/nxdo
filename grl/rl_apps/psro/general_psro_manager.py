@@ -3,12 +3,13 @@ import logging
 import os
 
 import grl
-from grl.algos.p2sro.p2sro_manager import P2SROManagerWithServer
+from grl.algos.p2sro.p2sro_manager import P2SROManagerWithServer, P2SROManager
 from grl.rl_apps.psro.general_psro_eval import launch_evals
 from grl.rl_apps.scenarios.catalog import scenario_catalog
 from grl.rl_apps.scenarios.psro_scenario import PSROScenario
 from grl.rl_apps.scenarios.ray_setup import init_ray_for_scenario
 from grl.rl_apps import GRL_SEED
+from grl.rl_apps.psro.exploitability_psro_logger import ExploitabilityP2SROManagerLogger
 from grl.utils.common import datetime_str, ensure_dir
 from grl.utils.port_listings import establish_new_server_port_for_service
 
@@ -41,6 +42,11 @@ if __name__ == '__main__':
     with open(name_file_path, "w+") as name_file:
         name_file.write(scenario_name)
 
+    get_manager_logger = None
+    if scenario.calc_exploitability_for_openspiel_env:
+        def get_manager_logger(_manager: P2SROManager):
+            return ExploitabilityP2SROManagerLogger(p2sro_manger=_manager, log_dir=_manager.log_dir, scenario=scenario)
+
     manager = P2SROManagerWithServer(
         port=psro_port,
         eval_dispatcher_port=eval_port,
@@ -51,6 +57,7 @@ if __name__ == '__main__':
         payoff_table_exponential_average_coeff=scenario.p2sro_payoff_table_exponential_avg_coeff,
         log_dir=log_dir,
         manager_metadata={"ray_head_address": ray_head_address},
+        get_manager_logger=get_manager_logger
     )
     print(f"Launched P2SRO Manager with server.")
 

@@ -380,7 +380,7 @@ def psro_measure_exploitability_nonlstm(br_checkpoint_path_tuple_list: List[Tupl
             openspiel_policies = []
             for player, player_rllib_policy in enumerate(rllib_policies):
                 checkpoint_path = checkpoint_path_tuple[player]
-                set_policy_weights_fn(player_rllib_policy, checkpoint_path)
+                set_policy_weights_fn(player_rllib_policy, checkpoint_path=checkpoint_path)
 
                 single_openspiel_policy = openspiel_policy_from_nonlstm_rllib_policy(openspiel_game=openspiel_game,
                                                                                      rllib_policy=player_rllib_policy)
@@ -417,8 +417,10 @@ def write_exploitability_to_cache(cache_dir: str, policy_num: int, exploitabilit
 
 
 def get_stats_for_single_payoff_table(payoff_table: PayoffTable, highest_policy_num: int, poker_env_config,
-                                      policy_class, policy_config, cache_dir: str, eval_every_nth_entry=1):
+                                      policy_class, policy_config, cache_dir: str, eval_every_nth_entry=1, is_symmetric_two_player=False):
     ray.init(ignore_reinit_error=True, local_mode=True, num_cpus=1, num_gpus=0)
+
+
 
     poker_game_version = poker_env_config["version"]
     temp_env = PokerMultiAgentEnv(env_config=poker_env_config)
@@ -486,20 +488,23 @@ def get_stats_for_single_payoff_table(payoff_table: PayoffTable, highest_policy_
                                                               mix_with_uniform_dist_coeff=0.0,
                                                               print_matrix=False)[0].probabilities_for_each_strategy()
 
-            metanash_probs_1 = get_latest_metanash_strategies(payoff_table=payoff_table,
-                                                              as_player=0,
-                                                              as_policy_num=n_policies,
-                                                              fictitious_play_iters=2000,
-                                                              mix_with_uniform_dist_coeff=0.0,
-                                                              print_matrix=False)[1].probabilities_for_each_strategy()
+            if is_symmetric_two_player:
+                metanash_probs_1 = metanash_probs_0
+            else:
+                metanash_probs_1 = get_latest_metanash_strategies(payoff_table=payoff_table,
+                                                                  as_player=0,
+                                                                  as_policy_num=n_policies,
+                                                                  fictitious_play_iters=2000,
+                                                                  mix_with_uniform_dist_coeff=0.0,
+                                                                  print_matrix=False)[1].probabilities_for_each_strategy()
 
-            pure_strat_index = get_latest_metanash_strategies(payoff_table=payoff_table,
-                                                              as_player=0,
-                                                              as_policy_num=n_policies,
-                                                              fictitious_play_iters=2000,
-                                                              mix_with_uniform_dist_coeff=0.0,
-                                                              print_matrix=False)[
-                1].sample_policy_spec().get_pure_strat_indexes()
+            # pure_strat_index = get_latest_metanash_strategies(payoff_table=payoff_table,
+            #                                                   as_player=0,
+            #                                                   as_policy_num=n_policies,
+            #                                                   fictitious_play_iters=2000,
+            #                                                   mix_with_uniform_dist_coeff=0.0,
+            #                                                   print_matrix=False)[
+            #     1].sample_policy_spec().get_pure_strat_indexes()
             # print(f"pure strat index: {pure_strat_index}")
 
             policy_specs_0 = payoff_table.get_ordered_spec_list_for_player(player=0)[:n_policies]

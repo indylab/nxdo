@@ -37,7 +37,7 @@ def get_latest_metanash_strategies(payoff_table: PayoffTable,
 
     if not 0 <= as_player < payoff_table.n_players():
         raise ValueError(f"as_player {as_player} should be in the range [0, {payoff_table.n_players()}).")
-    if payoff_table.shape()[as_player] <= as_policy_num:
+    if payoff_table.shape()[as_player] < as_policy_num:
         raise ValueError(f"In the payoff table, policy_num {as_policy_num} is out of range for player {as_player}.")
 
     if payoff_table.n_players() != 2:

@@ -52,6 +52,11 @@ VALID_ACTIONS_MASK = 'valid_actions_mask'
 
 def parse_discrete_poker_action_from_continuous_space(continuous_action, legal_actions_list,
                                                       total_num_discrete_actions_including_dummy):
+    assert isinstance(continuous_action, (float, np.floating)) or \
+           isinstance(continuous_action, np.ndarray) and isinstance(continuous_action[0], np.floating), \
+        f"action {continuous_action} is a {type(continuous_action)}. " \
+        f"If the action is an int, something is likely wrong with the continuous policy output."
+
     # player action is between -1 and 1, normalize to 0 and 1 and then quantize to a discrete action
     player_action = (np.clip(continuous_action, a_min=-1.0, a_max=1.0) + 1.0) / 2.0
     assert 0.0 - 1e-9 <= player_action <= 1.0 + 1e-9, f"action was: {player_action} before normalization: {continuous_action}"
@@ -250,8 +255,6 @@ class PokerMultiAgentEnv(ValidActionsMultiAgentEnv):
         dones = {self.player_map(new_curr_player_id): done, "__all__": done}
 
         if done:
-            # dones = {0: True, 1: True, "__all__": True}
-
             rewards = {self.player_map(0): self.curr_time_step.rewards[0],
                        self.player_map(1): self.curr_time_step.rewards[1]}
 
@@ -284,7 +287,6 @@ class PokerMultiAgentEnv(ValidActionsMultiAgentEnv):
                 self.curr_time_step.rewards)
             assert self.curr_time_step.rewards[-(new_curr_player_id - 1)] == 0
 
-            # dones = {self.player_map(new_curr_player_id): False, "__all__": False}
             rewards = {self.player_map(new_curr_player_id): self.curr_time_step.rewards[new_curr_player_id]}
             assert self.curr_time_step.rewards[1 - new_curr_player_id] == 0.0
             infos = {}
