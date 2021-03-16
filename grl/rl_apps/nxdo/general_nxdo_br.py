@@ -233,7 +233,7 @@ def train_nxdo_best_response(br_player: int,
         "create_env_fn": lambda: env_class(env_config=base_env_config),
         "raise_if_no_restricted_players": metanash_specs_for_players is not None
     }
-    tmp_base_eny = env_class(env_config=base_env_config)
+    tmp_base_env = env_class(env_config=base_env_config)
 
     if use_openspiel_restricted_game:
         restricted_game_class = OpenSpielRestrictedGame
@@ -282,9 +282,9 @@ def train_nxdo_best_response(br_player: int,
 
     if metanash_specs_for_players is not None and get_restricted_game_custom_model is not None:
         trainer_config["multiagent"]["policies"]["metanash"][3]["model"] = {
-            "custom_model": get_restricted_game_custom_model(tmp_base_eny)}
+            "custom_model": get_restricted_game_custom_model(tmp_base_env)}
 
-    trainer_config = merge_dicts(trainer_config, get_trainer_config(tmp_env))
+    trainer_config = merge_dicts(trainer_config, get_trainer_config(tmp_base_env))
 
     ray_head_address = manager_metadata["ray_head_address"]
     init_ray_for_scenario(scenario=scenario, head_address=ray_head_address, logging_level=logging.INFO)
@@ -312,7 +312,7 @@ def train_nxdo_best_response(br_player: int,
     if delegate_specs_for_players:
         if use_openspiel_restricted_game:
             set_restricted_game_conversions_for_all_workers_openspiel(trainer=trainer,
-                                                                      tmp_base_env=tmp_base_eny,
+                                                                      tmp_base_env=tmp_base_env,
                                                                       delegate_policy_id="metanash_delegate",
                                                                       agent_id_to_restricted_game_specs={
                                                                           other_player: delegate_specs_for_players[
