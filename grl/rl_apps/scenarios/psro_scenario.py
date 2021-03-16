@@ -46,5 +46,5 @@ class PSROScenario(RayScenario):
         self.p2sro_sync_with_payoff_table_every_n_episodes = p2sro_sync_with_payoff_table_every_n_episodes
         self.single_agent_symmetric_game = single_agent_symmetric_game
         self.get_trainer_config = get_trainer_config
-        self.psro_get_stopping_condition = psro_get_stopping_condition,
+        self.psro_get_stopping_condition = psro_get_stopping_condition
         self.calc_exploitability_for_openspiel_env = calc_exploitability_for_openspiel_env
