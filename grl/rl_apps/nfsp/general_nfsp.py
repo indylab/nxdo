@@ -2,59 +2,36 @@ import argparse
 import copy
 import logging
 import os
-import tempfile
 import time
 from typing import Any, Tuple, Type, Dict, Union
 
-from termcolor import colored
 import deepdish
 import numpy as np
 import ray
-from ray.rllib.utils import merge_dicts, try_import_torch
-
-torch, _ = try_import_torch()
-
 from ray.rllib.agents import Trainer
-from ray.rllib.utils.typing import AgentID, PolicyID
 from ray.rllib.agents.callbacks import DefaultCallbacks
-from ray.rllib.evaluation import MultiAgentEpisode, RolloutWorker
 from ray.rllib.env import BaseEnv
+from ray.rllib.evaluation import MultiAgentEpisode, RolloutWorker
 from ray.rllib.policy import Policy
 from ray.rllib.policy.sample_batch import SampleBatch, MultiAgentBatch
-import grl
-from grl.utils.common import pretty_dict_str, datetime_str, ensure_dir, copy_attributes
+from ray.rllib.utils import merge_dicts, try_import_torch
+from ray.rllib.utils.typing import AgentID, PolicyID
+from termcolor import colored
 
+import grl
 from grl.algos.nfsp_rllib.nfsp import get_store_to_avg_policy_buffer_fn
 from grl.rl_apps.nfsp.openspiel_utils import nfsp_measure_exploitability_nonlstm
-from grl.rllib_tools.space_saving_logger import SpaceSavingLogger
 from grl.rl_apps.scenarios.catalog import scenario_catalog
 from grl.rl_apps.scenarios.nfsp_scenario import NFSPScenario
 from grl.rl_apps.scenarios.ray_setup import init_ray_for_scenario
 from grl.rl_apps.scenarios.stopping_conditions import StoppingCondition
+from grl.rllib_tools.space_saving_logger import get_trainer_logger_creator
+from grl.utils.common import pretty_dict_str, datetime_str, ensure_dir, copy_attributes
 from grl.utils.strategy_spec import StrategySpec
 
+torch, _ = try_import_torch()
+
 logger = logging.getLogger(__name__)
-
-
-def get_trainer_logger_creator(base_dir: str, scenario_name: str):
-    logdir_prefix = f"{scenario_name}_sparse_{datetime_str()}"
-
-    def trainer_logger_creator(config):
-        """Creates a Unified logger with a default logdir prefix
-        containing the agent name and the env id
-        """
-        if not os.path.exists(base_dir):
-            os.makedirs(base_dir)
-        logdir = tempfile.mkdtemp(
-            prefix=logdir_prefix, dir=base_dir)
-
-        def _should_log(result: dict) -> bool:
-            return ("z_avg_policy_exploitability" in result or
-                    result["training_iteration"] % 1000 == 0)
-
-        return SpaceSavingLogger(config=config, logdir=logdir, should_log_result_fn=_should_log)
-
-    return trainer_logger_creator
 
 
 def checkpoint_dir(trainer: Trainer):
@@ -129,6 +106,8 @@ def train_off_policy_rl_nfsp(results_dir: str,
                              print_train_results: bool = True):
     
     scenario: NFSPScenario = scenario_catalog.get(scenario_name=scenario_name)
+    if not isinstance(scenario, NFSPScenario):
+        raise TypeError(f"Only instances of {NFSPScenario} can be used here. {scenario.name} is a {type(scenario)}.")
 
     env_class = scenario.env_class
     env_config = scenario.env_config
@@ -142,6 +121,7 @@ def train_off_policy_rl_nfsp(results_dir: str,
     calc_metanash_every_n_iters: int = scenario.calc_metanash_every_n_iters
     checkpoint_every_n_iters: Union[int, None] = scenario.checkpoint_every_n_iters
     nfsp_get_stopping_condition = scenario.nfsp_get_stopping_condition
+    should_log_result_fn = scenario.ray_should_log_result_filter
 
     init_ray_for_scenario(scenario=scenario, head_address=None, logging_level=logging.INFO)
 
@@ -165,7 +145,9 @@ def train_off_policy_rl_nfsp(results_dir: str,
         assert False, "This function should never be called."
 
     tmp_env = env_class(env_config=env_config)
-    open_spiel_env_config = tmp_env.open_spiel_env_config if calculate_openspiel_metanash else None
+
+    def _create_env():
+        return env_class(env_config=env_config)
 
     avg_policy_model_config = get_trainer_config(tmp_env)["model"]
 
@@ -196,8 +178,10 @@ def train_off_policy_rl_nfsp(results_dir: str,
     }, get_avg_trainer_config(tmp_env))
 
     avg_trainer = avg_trainer_class(config=avg_trainer_config,
-                                    logger_creator=get_trainer_logger_creator(base_dir=results_dir,
-                                                                              scenario_name=f"{scenario_name}_avg_trainer"))
+                                    logger_creator=get_trainer_logger_creator(
+                                        base_dir=results_dir,
+                                        scenario_name=f"{scenario_name}_avg_trainer",
+                                        should_log_result_fn=should_log_result_fn))
 
     store_to_avg_policy_buffer = get_store_to_avg_policy_buffer_fn(nfsp_trainer=avg_trainer)
 
@@ -285,17 +269,14 @@ def train_off_policy_rl_nfsp(results_dir: str,
         def on_train_result(self, *, trainer, result: dict, **kwargs):
             super().on_train_result(trainer=trainer, result=result, **kwargs)
             result["scenario_name"] = trainer.scenario_name
-
             result["avg_br_reward_both_players"] = ray.get(trainer.avg_br_reward_deque.get_mean.remote())
 
-            # print(trainer.latest_avg_trainer_result.keys())
-            # log(pretty_dict_str(trainer.latest_avg_trainer_result))
-            # if trainer.latest_avg_trainer_result is not None:
-            #     result["avg_trainer_info"] = trainer.latest_avg_trainer_result.get("info", {})
             training_iteration = result["training_iteration"]
             if (calculate_openspiel_metanash and
                     (training_iteration == 1 or training_iteration % calc_metanash_every_n_iters == 0)):
-                openspiel_game_version = env_config["version"]
+                base_env = _create_env()
+                open_spiel_env_config = base_env.open_spiel_env_config
+                openspiel_game_version = base_env.game_version
                 local_avg_policy_0 = trainer.workers.local_worker().policy_map["average_policy_0"]
                 local_avg_policy_1 = trainer.workers.local_worker().policy_map["average_policy_1"]
                 exploitability = nfsp_measure_exploitability_nonlstm(
@@ -303,12 +284,12 @@ def train_off_policy_rl_nfsp(results_dir: str,
                     poker_game_version=openspiel_game_version,
                     open_spiel_env_config=open_spiel_env_config
                 )
-                result["z_avg_policy_exploitability"] = exploitability
+                result["avg_policy_exploitability"] = exploitability
                 logger.info(colored(
                     f"(Graph this in a notebook) Exploitability: {exploitability} - Saving exploitability stats "
                     f"to {os.path.join(trainer.logdir, 'result.json')}", "green"))
 
-            if checkpoint_every_n_iters and training_iteration % checkpoint_every_n_iters == 0:
+            if checkpoint_every_n_iters and (training_iteration % checkpoint_every_n_iters == 0 or training_iteration == 1):
                 for player in range(2):
                     checkpoint_metadata = create_metadata_with_new_checkpoint(
                         policy_id_to_save=f"average_policy_{player}",
@@ -363,7 +344,8 @@ def train_off_policy_rl_nfsp(results_dir: str,
 
     br_trainer = trainer_class(config=br_trainer_config,
                                logger_creator=get_trainer_logger_creator(base_dir=results_dir,
-                                                                         scenario_name=scenario_name))
+                                                                         scenario_name=scenario_name,
+                                                                         should_log_result_fn=should_log_result_fn))
 
     avg_br_reward_deque = StatDeque.remote(max_items=br_trainer_config["metrics_smoothing_episodes"])
 

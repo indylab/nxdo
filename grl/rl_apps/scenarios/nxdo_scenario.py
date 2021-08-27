@@ -3,10 +3,15 @@ from typing import Union, Callable, Type, Dict, Any
 from ray.rllib import MultiAgentEnv, Policy
 from ray.rllib.agents import Trainer
 from ray.rllib.models import ModelV2
+from ray.rllib.utils.typing import ResultDict
 
+from grl.algos.nxdo.nxdo_manager.manager import SolveRestrictedGame
 from grl.rl_apps.scenarios.scenario import RayScenario, Scenario
 from grl.rl_apps.scenarios.stopping_conditions import StoppingCondition
-from grl.algos.nxdo.nxdo_manager.manager import SolveRestrictedGame
+
+
+def nxdo_default_log_filter(result: ResultDict) -> bool:
+    return "avg_policy_exploitability" in result or result["training_iteration"] % 10 == 0
 
 
 class NXDOScenario(RayScenario):
@@ -17,7 +22,7 @@ class NXDOScenario(RayScenario):
                  ray_cluster_gpus: Union[int, float],
                  ray_object_store_memory_cap_gigabytes: Union[int, float],
                  use_openspiel_restricted_game: bool,
-                 get_restricted_game_custom_model: Union[None, Callable[[MultiAgentEnv], Type[ModelV2]]],
+                 get_restricted_game_custom_model: Union[None, Callable[[MultiAgentEnv], Union[None, Type[ModelV2]]]],
                  xdo_metanash_method: str,
                  allow_stochastic_best_responses: bool,
                  get_restricted_game_solver: Callable[[Scenario], SolveRestrictedGame],
@@ -36,11 +41,13 @@ class NXDOScenario(RayScenario):
                  calculate_openspiel_metanash: bool,
                  calculate_openspiel_metanash_at_end: bool,
                  calc_metanash_every_n_iters: Union[None, int],
-                 metanash_metrics_smoothing_episodes_override: Union[None, int]):
+                 metanash_metrics_smoothing_episodes_override: Union[None, int],
+                 ray_should_log_result_filter: Callable[[ResultDict], bool] = nxdo_default_log_filter):
         super().__init__(name=name,
                          ray_cluster_cpus=ray_cluster_cpus,
                          ray_cluster_gpus=ray_cluster_gpus,
-                         ray_object_store_memory_cap_gigabytes=ray_object_store_memory_cap_gigabytes)
+                         ray_object_store_memory_cap_gigabytes=ray_object_store_memory_cap_gigabytes,
+                         ray_should_log_result_filter=ray_should_log_result_filter)
         self.use_openspiel_restricted_game = use_openspiel_restricted_game
         self.get_restricted_game_custom_model = get_restricted_game_custom_model
         self.xdo_metanash_method = xdo_metanash_method

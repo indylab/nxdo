@@ -58,8 +58,13 @@ class NXDOManager(object):
         self._br_spec_lists_for_each_player: Dict[int, List[StrategySpec]] = {p: [] for p in
                                                                               range(self._n_players)}
 
-        self._episodes_count = 0
-        self._timesteps_count = 0
+        self._episodes_total = 0
+        self._timesteps_total = 0
+
+        self._br_episodes_this_iter = 0
+        self._br_timesteps_this_iter = 0
+        self._restricted_game_episodes_this_iter = 0
+        self._restricted_game_timesteps_this_iter = 0
 
         self._next_iter_br_spec_lists_for_each_player = deepcopy(self._br_spec_lists_for_each_player)
 
@@ -121,34 +126,51 @@ class NXDOManager(object):
                 pure_strategy_indexes={player: policy_num}
             )
 
-            self._episodes_count += metadata_dict["episodes_training_br"]
-            self._timesteps_count += metadata_dict["timesteps_training_br"]
+            self._br_episodes_this_iter += metadata_dict["episodes_training_br"]
+            self._br_timesteps_this_iter += metadata_dict["timesteps_training_br"]
 
             self._next_iter_br_spec_lists_for_each_player[player].append(br_policy_spec)
             self._player_brs_are_finished_this_iter[player] = True
 
             all_players_finished_brs_this_ter = all(self._player_brs_are_finished_this_iter.values())
             if all_players_finished_brs_this_ter:
-                self._br_spec_lists_for_each_player = deepcopy(self._next_iter_br_spec_lists_for_each_player)
-
                 print("Solving restricted game")
-                game_solve_result = self._solve_restricted_game(
+                restricted_game_solve_result = self._solve_restricted_game(
                     log_dir=self.log_dir, br_spec_lists_for_each_player=self._next_iter_br_spec_lists_for_each_player,
                     manager_metadata=self.get_manager_metadata()
                 )
+                self._latest_metanash_spec_for_each_player = restricted_game_solve_result.latest_metanash_spec_for_each_player
 
-                self._latest_metanash_spec_for_each_player = game_solve_result.latest_metanash_spec_for_each_player
-                self._episodes_count += game_solve_result.episodes_spent_in_solve
-                self._timesteps_count += game_solve_result.timesteps_spent_in_solve
+                self._restricted_game_episodes_this_iter += restricted_game_solve_result.episodes_spent_in_solve
+                self._restricted_game_timesteps_this_iter += restricted_game_solve_result.timesteps_spent_in_solve
+
+                self._episodes_total += (self._br_episodes_this_iter + self._restricted_game_episodes_this_iter)
+                self._timesteps_total += (self._br_timesteps_this_iter + self._restricted_game_timesteps_this_iter)
+
+                br_specs_added_this_iter = {player: player_br_spec_list[-1] for player, player_br_spec_list
+                                            in self._next_iter_br_spec_lists_for_each_player.items()}
 
                 data_to_log = {
-                    "episodes_total": self._episodes_count,
-                    "timesteps_total": self._timesteps_count,
-                    "metanash_specs": [spec.to_json() for spec in self._latest_metanash_spec_for_each_player]
+                    "episodes_total": self._episodes_total,
+                    "timesteps_total": self._timesteps_total,
+                    "br_episodes_this_iter": self._br_episodes_this_iter,
+                    "br_timesteps_this_iter": self._br_timesteps_this_iter,
+                    "restricted_game_episodes_this_iter": self._restricted_game_episodes_this_iter,
+                    "restricted_game_timesteps_this_iter": self._restricted_game_timesteps_this_iter,
+                    "br_specs_added_this_iter": {player: spec.to_json() for player, spec
+                                                 in br_specs_added_this_iter.items()},
+                    "metanash_specs": [spec.to_json() for spec in self._latest_metanash_spec_for_each_player],
                 }
-                assert "episodes_total" not in game_solve_result.extra_data_to_log
-                assert "timesteps_total" not in game_solve_result.extra_data_to_log
-                data_to_log.update(game_solve_result.extra_data_to_log)
+                if all("average_br_reward" in br_spec.metadata for br_spec in br_specs_added_this_iter.values()):
+                    data_to_log["player_br_rewards_vs_previous_metanash"] = {
+                        player: br_spec.metadata["average_br_reward"] for player, br_spec
+                        in br_specs_added_this_iter.items()
+                    }
+
+                assert "episodes_total" not in restricted_game_solve_result.extra_data_to_log
+                assert "timesteps_total" not in restricted_game_solve_result.extra_data_to_log
+                data_to_log.update(restricted_game_solve_result.extra_data_to_log)
+
                 with open(self._json_log_path, "+a") as json_file:
                     json_file.writelines([json.dumps(data_to_log) + '\n'])
                 print(colored(
@@ -156,7 +178,7 @@ class NXDOManager(object):
                     f"to {self._json_log_path}", "green"))
 
                 for checkpoint_player, player_metanash_spec in enumerate(
-                        game_solve_result.latest_metanash_spec_for_each_player):
+                        restricted_game_solve_result.latest_metanash_spec_for_each_player):
                     checkpoint_path = os.path.join(
                         self.log_dir, "xfdo_metanash_specs",
                         f"{checkpoint_player}_metanash_{self._current_double_oracle_iteration}.json")
@@ -164,8 +186,16 @@ class NXDOManager(object):
                     with open(checkpoint_path, "+w") as checkpoint_spec_file:
                         checkpoint_spec_file.write(player_metanash_spec.to_json())
 
+                # Start the next double oracle iteration here.
+                # A double oracle iteration is considered to be training BRs
+                # followed by solving the new restricted game.
                 self._current_double_oracle_iteration += 1
+                self._br_episodes_this_iter = 0
+                self._br_timesteps_this_iter = 0
+                self._restricted_game_episodes_this_iter = 0
+                self._restricted_game_timesteps_this_iter = 0
                 self._player_brs_are_finished_this_iter = {p: False for p in range(self._n_players)}
+                self._br_spec_lists_for_each_player = deepcopy(self._next_iter_br_spec_lists_for_each_player)
 
     def is_policy_fixed(self, player, policy_num) -> bool:
         with self.modification_lock:

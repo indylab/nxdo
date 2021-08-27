@@ -8,14 +8,16 @@ from ray.rllib.models.modelv2 import ModelV2
 from ray.rllib.models.tf.tf_action_dist import (Categorical)
 from ray.rllib.models.torch.torch_action_dist import TorchCategorical
 from ray.rllib.models.torch.torch_action_dist import TorchDistributionWrapper
-from ray.rllib.policy import Policy
+from ray.rllib.policy.policy import Policy
 from ray.rllib.policy.sample_batch import SampleBatch
 from ray.rllib.policy.torch_policy_template import build_torch_policy
 from ray.rllib.utils.error import UnsupportedSpaceException
 from ray.rllib.utils.framework import try_import_torch
+from ray.rllib.utils.schedules import ConstantSchedule, PiecewiseSchedule
 from ray.rllib.utils.typing import TensorType, TrainerConfigDict
 
 import grl
+from grl.rllib_tools.modified_policies.safe_set_weights_policy_mixin import SafeSetWeightsPolicyMixin
 
 AVG_POL_SCOPE = "avg_pol"
 
@@ -128,15 +130,6 @@ def behaviour_logits_fetches(
     }
 
 
-# actions, logp, state_out = self.action_sampler_fn(
-#                 self,
-#                 self.model,
-#                 input_dict,
-#                 state_out,
-#                 explore=explore,
-#                 timestep=timestep)
-
-
 def action_sampler(policy, model, input_dict, state, explore, timestep):
     obs: np.ndarray = input_dict['obs']
     is_training = False
@@ -157,7 +150,6 @@ def action_sampler(policy, model, input_dict, state, explore, timestep):
         logps.append(logp)
     state_out = state
     return np.asarray(actions, dtype=np.int32), None, state_out
-    # return np.asarray(actions, dtype=np.int32), np.asarray(logps, dtype=np.float32), state_out
 
 
 def sgd_optimizer(policy: Policy,
@@ -170,6 +162,30 @@ def build_avg_policy_stats(policy: Policy, batch) -> Dict[str, TensorType]:
     return {"loss": policy.loss}
 
 
+class ManualLearningRateSchedule:
+    """Mixin for TFPolicy that adds a learning rate schedule."""
+
+    def __init__(self, lr, lr_schedule):
+        self.cur_lr = lr
+        if lr_schedule is None:
+            self.lr_schedule = ConstantSchedule(lr, framework=None)
+        else:
+            self.lr_schedule = PiecewiseSchedule(
+                lr_schedule, outside_value=lr_schedule[-1][-1], framework=None)
+
+    # not called automatically by any rllib logic, call this in your training script or a trainer callback
+    def update_lr(self, timesteps_total):
+        print(f"cur lr {self.cur_lr}")
+        self.cur_lr = self.lr_schedule.value(timesteps_total)
+        for opt in self._optimizers:
+            for p in opt.param_groups:
+                p["lr"] = self.cur_lr
+
+
+def setup_mixins(policy, obs_space, action_space, config):
+    ManualLearningRateSchedule.__init__(policy, config["lr"], config["lr_schedule"])
+
+
 NFSPTorchAveragePolicy = build_torch_policy(
     name="NFSPAveragePolicy",
     extra_action_out_fn=behaviour_logits_fetches,
@@ -177,8 +193,10 @@ NFSPTorchAveragePolicy = build_torch_policy(
     get_default_config=lambda: grl.algos.nfsp_rllib.nfsp.DEFAULT_CONFIG,
     make_model_and_action_dist=build_avg_model_and_distribution,
     action_sampler_fn=action_sampler,
+    before_init=setup_mixins,
     extra_learn_fetches_fn=lambda policy: {"sl_loss": policy.loss},
     optimizer_fn=sgd_optimizer,
     stats_fn=build_avg_policy_stats,
+    mixins=[ManualLearningRateSchedule, SafeSetWeightsPolicyMixin],
     # action_distribution_fn=get_distribution_inputs_and_class,
 )

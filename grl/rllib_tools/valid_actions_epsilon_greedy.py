@@ -107,7 +107,7 @@ class ValidActionsEpsilonGreedy(Exploration):
             # We compare to 0.1 * ILLEGAL_ACTION_LOGITS_PENALTY instead of just ILLEGAL_ACTION_LOGITS_PENALTY to avoid
             # any ambiguity with floating point precision on extremely low numbers.
             random_valid_action_logits = torch.where(
-                q_values <= 0.1 * ILLEGAL_ACTION_LOGITS_PENALTY,
+                q_values <= 0.01 * ILLEGAL_ACTION_LOGITS_PENALTY,
                 torch.ones_like(q_values) * 0.0, torch.ones_like(q_values))
             # A random action.
             random_actions = torch.squeeze(

@@ -5,17 +5,16 @@ from gym.spaces import Box, Discrete
 
 from ray.rllib.utils.annotations import override
 from ray.rllib.utils.framework import try_import_torch
-
 from ray.rllib.models.torch.fcnet import FullyConnectedNetwork
 from ray.rllib.env import MultiAgentEnv
-from ray.rllib.models import ModelV2
+
 from grl.envs.valid_actions_multi_agent_env import ValidActionsMultiAgentEnv
 
 torch, nn = try_import_torch()
 
 logger = logging.getLogger(__name__)
 
-ILLEGAL_ACTION_LOGITS_PENALTY = -1e9
+ILLEGAL_ACTION_LOGITS_PENALTY = -1e24
 
 
 def get_valid_action_fcn_class(obs_len: int, action_space_n: int, dummy_actions_multiplier: int = 1) -> Type[
@@ -42,11 +41,8 @@ def get_valid_action_fcn_class(obs_len: int, action_space_n: int, dummy_actions_
                 f"action space n: {action_space_n}\n" \
                 f"obs: {obs}"
 
-            # print(f"torch obs: {obs}")
             obs = obs[:, :-non_dummy_action_space_n]
-            self.valid_actions_mask = input_dict['obs_flat'][:, -non_dummy_action_space_n:].repeat(1,
-                                                                                                   dummy_actions_multiplier)
-            # print(f"amt: {-VALID_ACTIONS_SHAPES[LEDUC_POKER][0]}")
+            self.valid_actions_mask = input_dict['obs_flat'][:, -non_dummy_action_space_n:].repeat(1, dummy_actions_multiplier)
 
             self._last_flat_in = obs.reshape(obs.shape[0], -1)
             self._features = self._hidden_layers(self._last_flat_in)
@@ -55,28 +51,26 @@ def get_valid_action_fcn_class(obs_len: int, action_space_n: int, dummy_actions_
 
             if self.free_log_std:
                 raise NotImplementedError
-                # logits = self._append_free_log_std(logits)
 
             illegal_actions = 1 - self.valid_actions_mask
             illegal_logit_penalties = illegal_actions * ILLEGAL_ACTION_LOGITS_PENALTY
 
-            masked_logits = logits + illegal_logit_penalties
-
-            # print(logits)
-            # print(self.valid_actions_mask)
-            # print(masked_logits)
+            masked_logits = (logits * self.valid_actions_mask) + illegal_logit_penalties
 
             return masked_logits, state
 
         @override(FullyConnectedNetwork)
         def value_function(self):
-            raise NotImplementedError
-
+            if not self._value_branch_separate:
+                raise NotImplementedError
+            return super(ValidActionFullyConnectedNetwork, self).value_function()
+            
     return ValidActionFullyConnectedNetwork
 
 
-def get_valid_action_fcn_class_for_env(
-        env: MultiAgentEnv, policy_role: str = None, force_action_space_n: int = None) -> Union[None, Type[FullyConnectedNetwork]]:
+def get_valid_action_fcn_class_for_env(env: MultiAgentEnv, policy_role: str = None,
+                                       force_action_space_n: int = None) -> Union[None, Type[FullyConnectedNetwork]]:
+
     if not isinstance(env, ValidActionsMultiAgentEnv):
         raise TypeError("Valid actions fcns are made only to work with subclasses of ValidActionsMultiAgentEnv. "
                         f"This env is a {type(env)}.")

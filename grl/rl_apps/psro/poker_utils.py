@@ -17,10 +17,13 @@ from ray.rllib.utils.typing import TensorType
 from grl.envs.poker_multi_agent_env import PokerMultiAgentEnv
 from grl.algos.p2sro.p2sro_manager.utils import get_latest_metanash_strategies
 from grl.algos.p2sro.payoff_table import PayoffTable
-from grl.utils.strategy_spec import StrategySpec
+from grl.envs.oshi_zumo_multi_agent_env import get_oshi_zumo_obs
 
 torch, _ = try_import_torch()
 
+CACHE_PSRO_TABULAR_POLICIES = bool(os.getenv("CACHE_PSRO_TABULAR_POLICIES", True))
+
+_psro_tabular_policies_cache = {}
 
 def softmax(x):
     """
@@ -133,7 +136,6 @@ def _recursively_update_average_policies(state, avg_reach_probs, br_reach_probs,
                                                  delta_tolerance=delta_tolerance)
         # Now, do the updates.
         if infostate_key not in avg_policy_tables[player]:
-            # alpha = 1 / (self._iterations + 1)
             avg_policy_tables[player][infostate_key] = {}
             pr_sum = 0.0
 
@@ -144,8 +146,6 @@ def _recursively_update_average_policies(state, avg_reach_probs, br_reach_probs,
                     assert isinstance(alpha[player], float), f"alpha[player]: {alpha[player]}"
                     assert isinstance(br_reach_probs[player],
                                       float), f"br_reach_probs[player]: {br_reach_probs[player]}"
-                    # assert br_reach_probs[player] != 0, f"br_reach_probs[player]: {br_reach_probs[player]}"
-
                     pr = (
                             avg_policy[action] + (alpha[player] * br_reach_probs[player] *
                                                   (br_policy[action] - avg_policy[action])) /
@@ -157,7 +157,6 @@ def _recursively_update_average_policies(state, avg_reach_probs, br_reach_probs,
 
                     avg_policy_tables[player][infostate_key][action] = pr
                     pr_sum += pr
-                # print(f"pr_sum: {pr_sum}")
                 assert (1.0 - delta_tolerance <= pr_sum <= 1.0 + delta_tolerance)
             else:
                 for action in legal_actions:
@@ -172,7 +171,7 @@ def tabular_policies_from_weighted_policies(game: OpenSpielGame,
     Args:
       game: The game for which we want a TabularPolicy.
       policy_iterable: for each player, an iterable that returns tuples of Openspiel policies
-      weights: for each player, probabilities of selecting actions from each policy
+      weights: for each player, probabilities of selecting each policy
 
     Returns:
       A averaged OpenSpiel Policy over the policy_iterable.
@@ -184,8 +183,6 @@ def tabular_policies_from_weighted_policies(game: OpenSpielGame,
     total_weights_added = np.zeros(num_players)
     for index, (best_responses, weights_for_each_br) in enumerate(zip(policy_iterable, weights)):
         weights_for_each_br = np.asarray(weights_for_each_br, dtype=np.float64)
-        # print(f"best responses: {best_responses}")
-        # print(f"total_weights_added: {total_weights_added}, weights_for_each_br: {weights_for_each_br}")
         total_weights_added += weights_for_each_br
         if index == 0:
             for i in range(num_players):
@@ -207,11 +204,12 @@ def tabular_policies_from_weighted_policies(game: OpenSpielGame,
     for i in range(num_players):
         avg_policies[i] = tabular_policy_from_callable(game=game, callable_policy=avg_policies[i], players=[i])
 
-    # print(f"avg_policies: {avg_policies}")
     return avg_policies
 
 
 def openspiel_policy_from_nonlstm_rllib_policy(openspiel_game: OpenSpielGame,
+                                               game_version: str,
+                                               game_parameters: dict,
                                                rllib_policy: Policy):
     if openspiel_game.get_type().short_name == "universal_poker":
         print("Converting universal_poker rllib policy to tabular. This will take a while...")
@@ -220,15 +218,17 @@ def openspiel_policy_from_nonlstm_rllib_policy(openspiel_game: OpenSpielGame,
 
         valid_actions_mask = state.legal_actions_mask()
         legal_actions_list = state.legal_actions()
+        # assert np.array_equal(valid_actions, np.ones_like(valid_actions)) # should be always true for Kuhn Poker
+        try:
+            info_state_vector = state.information_state_tensor()
+        except pyspiel.SpielError:
+            assert openspiel_game.get_type().short_name == "turn_based_simultaneous_game"
+            assert game_version == "oshi_zumo", game_version
+            info_state_vector = state.observation_tensor(state.current_player())[4:]
+            info_state_vector = get_oshi_zumo_obs(openspiel_observation_tensor=info_state_vector,
+                                                  starting_coins=int(str(game_parameters["coins"])))
 
-        # assert np.array_equal(valid_actions, np.ones_like(valid_actions)) # should be always true at least for Kuhn
-
-        info_state_vector = state.information_state_tensor()
-
-        if openspiel_game.get_type().short_name in ["leduc_poker", "oshi_zumo", "oshi_zumo_tiny", "universal_poker"]:
-            # Observation includes both the info_state and legal actions, but agent isn't forced to take legal actions.
-            # Taking an illegal action will result in a random legal action being played.
-            # Allows easy compatibility with standard RL implementations for small action-space games like this one.
+        if game_version in ["leduc_poker", "oshi_zumo", "oshi_zumo_tiny", "universal_poker"]:
             obs = np.concatenate(
                 (np.asarray(info_state_vector, dtype=np.float32), np.asarray(valid_actions_mask, dtype=np.float32)),
                 axis=0)
@@ -254,14 +254,6 @@ def openspiel_policy_from_nonlstm_rllib_policy(openspiel_game: OpenSpielGame,
                 action_probs[i % len(valid_actions_mask)] += action_prob
             assert np.isclose(sum(action_probs), 1.0), sum(action_probs)
 
-        # Since the rl env will execute a random legal action if an illegal action is chosen, redistribute probability
-        # of choosing an illegal action evenly across all legal actions.
-        # num_legal_actions = sum(valid_actions_mask)
-        # if num_legal_actions > 0:
-        #     total_legal_action_probability = sum(action_probs * valid_actions_mask)
-        #     total_illegal_action_probability = 1.0 - total_legal_action_probability
-        #     action_probs = (action_probs + (total_illegal_action_probability / num_legal_actions)) * valid_actions_mask
-
         assert np.isclose(sum(action_probs), 1.0)
 
         legal_action_probs = []
@@ -273,54 +265,15 @@ def openspiel_policy_from_nonlstm_rllib_policy(openspiel_game: OpenSpielGame,
         assert np.isclose(valid_action_prob_sum, 1.0), (
         action_probs, valid_actions_mask, action_info.get('behaviour_logits'))
 
+        # avoid triggering any downstream assertions due to tiny near-zero amounts
+        for i in range(len(legal_action_probs)):
+            if np.isclose(legal_action_probs[i], 0.0):
+                legal_action_probs[i] = 0.0
+
         return {action_name: action_prob for action_name, action_prob in zip(legal_actions_list, legal_action_probs)}
 
-    # callable_policy = PolicyFromCallable(game=openspiel_game, callable_policy=policy_callable)
-
-    # convert to tabular policy in case the rllib policy changes after this function is called
+    # defensive copy to tabular policy in case the rllib policy changes after this function is called
     return tabular_policy_from_callable(game=openspiel_game, callable_policy=policy_callable)
-
-
-def measure_exploitability_nonlstm(rllib_policy: Policy,
-                                   poker_game_version: str,
-                                   policy_mixture_dict: Dict[StrategySpec, float] = None,
-                                   set_policy_weights_fn: Callable[[StrategySpec], None] = None,
-                                   open_spiel_env_config: dict = None):
-    if open_spiel_env_config is None:
-        if poker_game_version in ["kuhn_poker", "leduc_poker"]:
-            open_spiel_env_config = {
-                "players": pyspiel.GameParameter(2)
-            }
-        else:
-            open_spiel_env_config = {}
-
-    open_spiel_env_config = {k: pyspiel.GameParameter(v) if not isinstance(v, pyspiel.GameParameter) else v for k, v in
-                             open_spiel_env_config.items()}
-
-    openspiel_game = pyspiel.load_game(poker_game_version, open_spiel_env_config)
-
-    if policy_mixture_dict is None:
-        openspiel_policy = openspiel_policy_from_nonlstm_rllib_policy(openspiel_game=openspiel_game,
-                                                                      rllib_policy=rllib_policy)
-    else:
-        if set_policy_weights_fn is None:
-            raise ValueError(
-                "If policy_mixture_dict is passed a value, a set_policy_weights_fn must be passed as well.")
-
-        def policy_iterable():
-            for policy_spec in policy_mixture_dict.keys():
-                set_policy_weights_fn(policy_spec)
-
-                single_openspiel_policy = openspiel_policy_from_nonlstm_rllib_policy(openspiel_game=openspiel_game,
-                                                                                     rllib_policy=rllib_policy)
-                yield single_openspiel_policy
-
-        openspiel_policy = tabular_policy_from_weighted_policies(game=openspiel_game,
-                                                                 policy_iterable=policy_iterable(),
-                                                                 weights=policy_mixture_dict.values())
-    # Exploitability is NashConv / num_players
-    exploitability_result = exploitability(game=openspiel_game, policy=openspiel_policy)
-    return exploitability_result
 
 
 class JointPlayerPolicy(OpenSpielPolicy):
@@ -334,18 +287,7 @@ class JointPlayerPolicy(OpenSpielPolicy):
 
     def action_probabilities(self, state, player_id=None):
         cur_player = state.current_player()
-        legal_actions = state.legal_actions(cur_player)
-
-        self._obs["current_player"] = cur_player
-        self._obs["info_state"][cur_player] = (
-            state.information_state_tensor(cur_player))
-        self._obs["legal_actions"][cur_player] = legal_actions
-
-        info_state = rl_environment.TimeStep(
-            observations=self._obs, rewards=None, discounts=None, step_type=None)
-
         player_policy: OpenSpielPolicy = self._policies[cur_player]
-
         return player_policy.action_probabilities(state=state, player_id=cur_player)
 
 
@@ -360,13 +302,6 @@ def psro_measure_exploitability_nonlstm(br_checkpoint_path_tuple_list: List[Tupl
             open_spiel_env_config = {
                 "players": pyspiel.GameParameter(2)
             }
-        elif poker_game_version in ["oshi_zumo_tiny"]:
-            poker_game_version = "oshi_zumo"
-            open_spiel_env_config = {
-                "coins": pyspiel.GameParameter(6),
-                "size": pyspiel.GameParameter(2),
-                "horizon": pyspiel.GameParameter(8),
-            }
         else:
             open_spiel_env_config = {}
 
@@ -374,31 +309,39 @@ def psro_measure_exploitability_nonlstm(br_checkpoint_path_tuple_list: List[Tupl
                              open_spiel_env_config.items()}
 
     openspiel_game = pyspiel.load_game(poker_game_version, open_spiel_env_config)
+    if poker_game_version == "oshi_zumo":
+        openspiel_game = pyspiel.convert_to_turn_based(openspiel_game)
 
     def policy_iterable():
         for checkpoint_path_tuple in br_checkpoint_path_tuple_list:
             openspiel_policies = []
             for player, player_rllib_policy in enumerate(rllib_policies):
                 checkpoint_path = checkpoint_path_tuple[player]
-                set_policy_weights_fn(player_rllib_policy, checkpoint_path=checkpoint_path)
+                if checkpoint_path not in _psro_tabular_policies_cache:
+                    set_policy_weights_fn(player_rllib_policy, checkpoint_path=checkpoint_path)
+                    single_openspiel_policy = openspiel_policy_from_nonlstm_rllib_policy(openspiel_game=openspiel_game,
+                                                                                         rllib_policy=player_rllib_policy,
+                                                                                         game_version=poker_game_version,
+                                                                                         game_parameters=open_spiel_env_config,
+                                                                                         )
+                    if CACHE_PSRO_TABULAR_POLICIES:
+                        _psro_tabular_policies_cache[checkpoint_path] = single_openspiel_policy
+                else:
+                    single_openspiel_policy = _psro_tabular_policies_cache[checkpoint_path]
 
-                single_openspiel_policy = openspiel_policy_from_nonlstm_rllib_policy(openspiel_game=openspiel_game,
-                                                                                     rllib_policy=player_rllib_policy)
                 openspiel_policies.append(single_openspiel_policy)
             yield openspiel_policies
-
-    # print(f"weights: {metanash_weights}")
 
     avg_policies = tabular_policies_from_weighted_policies(game=openspiel_game,
                                                            policy_iterable=policy_iterable(),
                                                            weights=metanash_weights)
 
-    nfsp_policy = JointPlayerPolicy(game=openspiel_game, policies=avg_policies)
+    joint_player_policy = JointPlayerPolicy(game=openspiel_game, policies=avg_policies)
 
     # Exploitability is NashConv / num_players
     if poker_game_version == "universal_poker":
         print("Measuring exploitability for universal_poker policy. This will take a while...")
-    exploitability_result = exploitability(game=openspiel_game, policy=nfsp_policy)
+    exploitability_result = exploitability(game=openspiel_game, policy=joint_player_policy)
     return exploitability_result
 
 
@@ -451,21 +394,7 @@ def get_stats_for_single_payoff_table(payoff_table: PayoffTable, highest_policy_
         action_space=temp_env.action_space,
         config=policy_config) for _ in range(2)]
 
-    # config=with_common_config({
-    #     'model': model_config,
-    #     'env': PokerMultiAgentEnv,
-    #     'env_config': poker_env_config
-    # }
-    # )
-    # ) for _ in range(2)]
-
-    # if poker_game_version == "leduc_poker":
-    #     assert isinstance(policies[0].model, LeducDQNFullyConnectedNetwork)
-
     def set_policy_weights(policy: Policy, checkpoint_path: str):
-
-        checkpoint_path = checkpoint_path.replace("/home/jblanier/", "/home/jb/")
-
         checkpoint_data = deepdish.io.load(path=checkpoint_path)
         weights = checkpoint_data["weights"]
         weights = {k.replace("_dot_", "."): v for k, v in weights.items()}
@@ -498,17 +427,7 @@ def get_stats_for_single_payoff_table(payoff_table: PayoffTable, highest_policy_
                                                                   mix_with_uniform_dist_coeff=0.0,
                                                                   print_matrix=False)[1].probabilities_for_each_strategy()
 
-            # pure_strat_index = get_latest_metanash_strategies(payoff_table=payoff_table,
-            #                                                   as_player=0,
-            #                                                   as_policy_num=n_policies,
-            #                                                   fictitious_play_iters=2000,
-            #                                                   mix_with_uniform_dist_coeff=0.0,
-            #                                                   print_matrix=False)[
-            #     1].sample_policy_spec().get_pure_strat_indexes()
-            # print(f"pure strat index: {pure_strat_index}")
-
             policy_specs_0 = payoff_table.get_ordered_spec_list_for_player(player=0)[:n_policies]
-
             policy_specs_1 = payoff_table.get_ordered_spec_list_for_player(player=1)[:n_policies]
 
             assert len(metanash_probs_1) == len(
@@ -518,11 +437,6 @@ def get_stats_for_single_payoff_table(payoff_table: PayoffTable, highest_policy_
 
             br_checkpoint_paths = []
             metanash_weights = []
-
-            # print(policy_specs_0)
-            # print(metanash_probs_0)
-            # print(policy_specs_1)
-            # print(metanash_probs_1)
 
             for spec_0, prob_0, spec_1, prob_1 in zip(policy_specs_0, metanash_probs_0, policy_specs_1,
                                                       metanash_probs_1):

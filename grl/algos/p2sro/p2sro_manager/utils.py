@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Union
 
 import numpy as np
 
@@ -30,15 +30,18 @@ def get_latest_metanash_strategies(payoff_table: PayoffTable,
                                    as_policy_num: int,
                                    fictitious_play_iters: int,
                                    mix_with_uniform_dist_coeff: float = 0.0,
-                                   print_matrix: bool = True) -> Dict[int, PolicySpecDistribution]:
+                                   print_matrix: bool = True) -> Union[None, Dict[int, PolicySpecDistribution]]:
     # Currently this function only handles 2-player games
     if as_policy_num is None:
         as_policy_num = payoff_table.shape()[as_player] - 1
 
     if not 0 <= as_player < payoff_table.n_players():
         raise ValueError(f"as_player {as_player} should be in the range [0, {payoff_table.n_players()}).")
-    if payoff_table.shape()[as_player] < as_policy_num:
-        raise ValueError(f"In the payoff table, policy_num {as_policy_num} is out of range for player {as_player}.")
+
+    if (payoff_table.shape() == (0,) and as_policy_num != 0) or \
+            (payoff_table.shape() != (0,) and payoff_table.shape()[as_player] < as_policy_num):
+        raise ValueError(f"In the payoff table, policy_num {as_policy_num} is out of range for player {as_player}. "
+                         f"Payoff table shape is {payoff_table.shape()}.")
 
     if payoff_table.n_players() != 2:
         raise NotImplemented("Solving normal form Nash equilibrium strats for >2 player games not implemented.")

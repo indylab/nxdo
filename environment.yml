@@ -1,132 +1,42 @@
-name: xdo
+name: grl
 channels:
   - pytorch
+  - nvidia
   - conda-forge
   - defaults
 dependencies:
-  - _libgcc_mutex=0.1
-  - blas=1.0
-  - brotlipy=0.7.0
-  - bzip2=1.0.8
-  - ca-certificates=2021.1.19
-  - certifi=2020.12.5
-  - cffi=1.14.4
   - cmake=3.18.2
-  - cryptography=3.3.1
-  - dataclasses=0.7
-  - expat=2.2.10
-  - future=0.18.2
-  - idna=2.10
-  - intel-openmp=2020.2
-  - krb5=1.18.2
-  - ld_impl_linux-64=2.33.1
-  - libcurl=7.71.1
-  - libedit=3.1.20191231
-  - libffi=3.3
-  - libgcc-ng=9.1.0
-  - libssh2=1.9.0
-  - libstdcxx-ng=9.1.0
-  - libuv=1.40.0
-  - lz4-c=1.9.2
-  - magma-cuda111=2.5.2
-  - mkl=2020.2
-  - mkl-include=2020.2
-  - mkl-service=2.3.0
-  - mkl_fft=1.2.0
-  - mkl_random=1.1.1
-  - ncurses=6.2
-  - ninja=1.10.2
-  - numpy=1.19.2
-  - numpy-base=1.19.2
-  - openssl=1.1.1i
   - pip=20.3.3
-  - pycparser=2.20
-  - pyopenssl=20.0.1
-  - pysocks=1.7.1
   - python=3.6.12
-  - pyyaml=5.3.1
-  - readline=8.0
-  - requests=2.25.1
-  - rhash=1.4.0
-  - setuptools=51.3.3
-  - six=1.15.0
-  - sqlite=3.33.0
-  - tk=8.6.10
-  - typing_extensions=3.7.4.3
-  - urllib3=1.26.2
-  - wheel=0.36.2
-  - xz=5.2.5
-  - yaml=0.2.5
-  - zlib=1.2.11
-  - zstd=1.4.5
+  - pytorch=1.9
+  - torchvision
+  - torchaudio
+  - cudatoolkit=11.1
   - pip:
     - absl-py==0.11.0
-    - aiohttp==3.7.3
-    - aiohttp-cors==0.7.0
-    - aioredis==1.3.1
-    - async-timeout==3.0.1
-    - atari-py==0.2.6
-    - attrs==20.3.0
-    - beautifulsoup4==4.9.3
-    - blessings==1.7
-    - cachetools==4.2.0
-    - chardet==3.0.4
-    - click==7.1.2
+    - bayesian-optimization==1.2.0
     - cloudpickle==1.6.0
-    - colorama==0.4.4
     - colorful==0.5.4
-    - contextvars==2.4
     - deepdish==0.3.6
     - dm-tree==0.1.5
     - filelock==3.0.12
-    - google==3.0.0
-    - google-api-core==1.25.0
-    - google-auth==1.24.0
-    - googleapis-common-protos==1.52.0
     - gpustat==0.6.0
     - grpcio==1.35.0
     - grpcio-tools==1.35.0
     - gym==0.18.0
-    - hiredis==1.1.0
-    - idna-ssl==1.1.0
-    - immutables==0.14
-    - importlib-metadata==3.4.0
-    - jsonschema==3.2.0
-    - lz4==3.1.3
-    - msgpack==1.0.2
-    - multidict==5.1.0
-    - numexpr==2.7.2
-    - numpy-stl==2.13.1
-    - nvidia-ml-py3==7.352.0
-    - opencensus==0.7.12
-    - opencensus-context==0.1.2
     - opencv-python==4.5.1.48
     - opencv-python-headless==4.3.0.36
     - pandas==1.1.5
     - pillow==7.2.0
-    - prometheus-client==0.9.0
     - protobuf==3.14.0
     - psutil==5.8.0
-    - py-spy==0.3.4
-    - pyasn1==0.4.8
-    - pyasn1-modules==0.2.8
-    - pyglet==1.5.0
-    - pyrsistent==0.17.3
-    - python-dateutil==2.8.1
-    - python-utils==2.5.2
-    - pytz==2020.5
-    - ray==1.0.1.post1
-    - redis==3.4.1
-    - rsa==4.7
     - scipy==1.5.4
-    - soupsieve==2.1
-    - svgwrite==1.4.1
-    - tables==3.6.1
-    - tabulate==0.8.7
+    - scikit-learn==0.24.1
+    - ray[rllib]==1.0.1.post1
     - tensorboardx==2.1
-    - torch==1.7.1
-    - torchaudio==0.7.2
-    - torchvision==0.8.2
-    - yarl==1.6.3
-    - zipp==3.4.0
     - termcolor==1.1.0
+    - plotly==4.14.0
+    - matplotlib==3.3.4
+    - gym-minigrid==1.0.2
+    - networkx==2.5
+    - pyreap==0.9.1

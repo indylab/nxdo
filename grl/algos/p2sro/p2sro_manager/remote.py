@@ -267,14 +267,6 @@ class RemoteP2SROManagerClient(P2SROManager):
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
 
-    # manager = P2SROManagerWithServer(
-    #     n_players=2,
-    #     is_two_player_symmetric_zero_sum=True,
-    #     do_external_payoff_evals_for_new_fixed_policies=True,
-    #     games_per_external_payoff_eval=3000,
-    #     payoff_table_exponential_average_coeff=0.001
-    # )
-
     manager = P2SROManagerWithServer(
         n_players=2,
         is_two_player_symmetric_zero_sum=True,

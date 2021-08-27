@@ -20,9 +20,9 @@ class _ScenarioCatalog:
         try:
             return self._catalog[scenario_name]
         except KeyError:
-            raise KeyError(f"Scenario name {scenario_name} not found.\n"
-                           f"Available scenarios are:\n"
-                           f"\n".join(name for name in self._catalog.keys()))
+            available_scenarios = '\n'.join(name for name in self._catalog.keys())
+            raise ValueError(f"Scenario name {scenario_name} not found. "
+                             f"Available scenarios are:\n{available_scenarios}")
 
     def list(self):
         return list(self._catalog.keys())

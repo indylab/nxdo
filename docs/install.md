@@ -10,8 +10,8 @@
 
 ### Clone repo with git submodules
 ```shell script
-git clone --recursive git@github.com:indylab/xdo.git
-cd xdo
+git clone --recursive https://github.com/indylab/nxdo
+cd nxdo
 ```
 If you've already cloned this repo but not the [submodules](/dependencies), you can clone them with:
 ```shell script
@@ -22,20 +22,21 @@ git submodule update --init --recursive
 After installing [Anaconda](https://docs.anaconda.com/anaconda/install/), enter the repo directory and create the new environment:
 ```shell script
 conda env create -f environment.yml
-conda activate xdo
+conda activate grl
 ```
 
 ### Install Python modules
 
 #### 1. DeepMind OpenSpiel (included dependency)
 DeepMind's [OpenSpiel](https://github.com/deepmind/open_spiel) is used for poker game logic as well as tabular game utilities.
+We include a slightly modified [fork](https://github.com/indylab/open_spiel) as a dependency.
 
+With the new conda env active:
 ```shell script
 # Starting from the repo root
 cd dependencies/open_spiel
-export BUILD_WITH_ACPC=ON # to compile with the optional universal poker game variant
-./install.sh
-pip install -e . # This will start a compilation process. Will take a few minutes.
+./install.sh # git clones and apt installs additional dependencies
+pip install -e . # This will start a compilation process. May take a few minutes.
 cd ../..
 ```
 
@@ -46,13 +47,11 @@ pip install -e .
 ```
 
 Installation is now done!
-See [Running Experiments](/docs/experiments.md).
 
 ### Advanced Installation Notes (Optional)
 
-If you need to compile/recompile OpenSpiel without pip installing it. Perform the following steps with your conda env *active*. (The conda env needs to be active so that OpenSpiel can find and compile against the python development headers in the env. Python version related issues may occur otherwise):
+If you need to compile/recompile OpenSpiel without pip installing it, perform the following steps with your conda env *active*. (The conda env needs to be active so that OpenSpiel can find and compile against the python development headers in the env. Python version related issues may occur otherwise):
 ```shell script
-export BUILD_WITH_ACPC=ON # to compile with the optional universal poker game variant
 mkdir build
 cd build
 CC=clang CXX=clang++ cmake -DPython_TARGET_VERSION=3.6 -DCMAKE_CXX_COMPILER=${CXX} -DPython3_FIND_VIRTUALENV=FIRST -DPython3_FIND_STRATEGY=LOCATION ../open_spiel
@@ -68,3 +67,8 @@ export PYTHONPATH=$PYTHONPATH:/<path_to_open_spiel_submodule>
 # For the Python bindings of Pyspiel
 export PYTHONPATH=$PYTHONPATH:/<path_to_open_spiel_submodule>/build/python
 ```
+
+### Next Steps
+
+See [Running Experiments](/docs/experiments.md)
+

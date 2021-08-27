@@ -1,6 +1,11 @@
+import os
+
 from ray.rllib.models import MODEL_DEFAULTS
 from ray.rllib.utils import merge_dicts
+
 from grl.rllib_tools.stochastic_sampling_ignore_kwargs import StochasticSamplingIgnoreKwargs
+from grl.rllib_tools.valid_actions_epsilon_greedy import ValidActionsEpsilonGreedy
+
 # To use different params, please make define a mutation of these master parameters
 # instead of changing the constants already defined here.
 
@@ -116,7 +121,7 @@ GRL_DEFAULT_POKER_PPO_PARAMS = {
     # Should use a critic as a baseline (otherwise don't use value baseline;
     # required for using GAE).
     "use_critic": True,
-    # If true, use the Generalized Advantage Estimator (GAE)
+    # If True, use the Generalized Advantage Estimator (GAE)
     # with a value function, see https://arxiv.org/pdf/1506.02438.pdf.
     "use_gae": True,
     # The GAE(lambda) parameter.
@@ -199,118 +204,106 @@ GRL_DEFAULT_POKER_PPO_PARAMS = {
     }),
 }
 
+GRL_DEFAULT_OSHI_ZUMO_MEDIUM_DQN_PARAMS = {
 
-
-GRL_DEFAULT_MULTI_GRID_PPO_PARAMS = {
-    "framework": "torch",
-    # Should use a critic as a baseline (otherwise don't use value baseline;
-    # required for using GAE).
-    "use_critic": True,
-    # If true, use the Generalized Advantage Estimator (GAE)
-    # with a value function, see https://arxiv.org/pdf/1506.02438.pdf.
-    "use_gae": True,
-    # The GAE(lambda) parameter.
-    "lambda": 1.0,
-    # Initial coefficient for KL divergence.
-    "kl_coeff": 0.2,
-    # Size of batches collected from each worker.
-    "rollout_fragment_length": 256,
-    # Number of timesteps collected for each SGD round. This defines the size
-    # of each SGD epoch.
-    "train_batch_size": 2048,
-    # Total SGD batch size across all devices for SGD. This defines the
-    # minibatch size within each epoch.
-    "sgd_minibatch_size": 1024,
-    # Whether to shuffle sequences in the batch when training (recommended).
-    "shuffle_sequences": True,
-    # Number of SGD iterations in each outer loop (i.e., number of epochs to
-    # execute per train batch).
-    "num_sgd_iter": 30,
-    # Stepsize of SGD.
-    "lr": 5e-5,
-    # Learning rate schedule.
-    "lr_schedule": None,
-    # Share layers for value function. If you set this to True, it's important
-    # to tune vf_loss_coeff.
-    "vf_share_layers": False,
-    # Coefficient of the value function loss. IMPORTANT: you must tune this if
-    # you set vf_share_layers: True.
-    "vf_loss_coeff": 1.0,
-    # Coefficient of the entropy regularizer.
-    "entropy_coeff": 0.0,
-    # Decay schedule for the entropy regularizer.
-    "entropy_coeff_schedule": None,
-    # PPO clip parameter.
-    "clip_param": 0.3,
-    # Clip param for the value function. Note that this is sensitive to the
-    # scale of the rewards. If your expected V is large, increase this.
-    "vf_clip_param": 10.0,
-    # If specified, clip the global norm of gradients by this amount.
-    "grad_clip": None,
-    # Target value for KL divergence.
-    "kl_target": 0.01,
-    # Whether to rollout "complete_episodes" or "truncate_episodes".
-    "batch_mode": "complete_episodes",
-    # Which observation filter to apply to the observation.
-    "observation_filter": "NoFilter",
-    # Uses the sync samples optimizer instead of the multi-gpu one. This is
-    # usually slower, but you might want to try it if you run into issues with
-    # the default optimizer.
-    "simple_optimizer": False,
-    # Whether to fake GPUs (using CPUs).
-    # Set this to True for debugging on non-GPU machines (set `num_gpus` > 0).
-    "_fake_gpus": False,
-    # Switch on Trajectory View API for PPO by default.
-    # NOTE: Only supported for PyTorch so far.
-    "_use_trajectory_view_api": True,
-
-    # Prevent iterations from going lower than this time span
-    "min_iter_time_s": 0,
-    # Minimum env steps to optimize for per train call. This value does
-    # not affect learning (JB: this is a lie!), only the length of train iterations.
-    "timesteps_per_iteration": 0,
-
-    "num_envs_per_worker": 1,
-
-    "exploration_config": {
-        # The Exploration class to use. In the simplest case, this is the name
-        # (str) of any class present in the `rllib.utils.exploration` package.
-        # You can also provide the python class directly or the full location
-        # of your class (e.g. "ray.rllib.utils.exploration.epsilon_greedy.
-        # EpsilonGreedy").
-        "type": StochasticSamplingIgnoreKwargs,
-        # Add constructor kwargs here (if any).
+    "adam_epsilon": 0.01,
+    "batch_mode": "truncate_episodes",
+    "buffer_size": 50000,
+    "compress_observations": False,
+    "double_q": True,
+    "dueling": False,
+    "evaluation_config": {
+        "explore": False
     },
+    "exploration_config": {
+        "epsilon_timesteps": 200000,
+        "final_epsilon": 0.001,
+        "initial_epsilon": 0.06,
+        "type": ValidActionsEpsilonGreedy
+    },
+    "explore": True,
+    "final_prioritized_replay_beta": 0.0,
+    "framework": "torch",
+    "gamma": 1.0,
+    "grad_clip": None,
+    "hiddens": [
+        256
+    ],
+    "learning_starts": 16000,
+    "lr": 0.01,
+    "lr_schedule": None,
+    "metrics_smoothing_episodes": 5000,
+    "min_iter_time_s": 0,
 
-    "model": merge_dicts(MODEL_DEFAULTS, {
-            # === Built-in options ===
-            # Number of hidden layers for fully connected net
-            "fcnet_hiddens": [32, 32],
-            # Nonlinearity for fully connected net (tanh, relu)
-            "fcnet_activation": "tanh",
-            # Filter config. List of [out_channels, kernel, stride] for each filter
-            "conv_filters": [[16, [3, 3], 2], [16, [3, 3], 2]],
-            # Nonlinearity for built-in convnet
-            "conv_activation": "relu",
-            # For DiagGaussian action distributions, make the second half of the model
-            # outputs floating bias variables instead of state-dependent. This only
-            # has an effect is using the default fully connected net.
-            "free_log_std": False,
-            # Whether to skip the final linear layer used to resize the hidden layer
-            # outputs to size `num_outputs`. If True, then the last hidden layer
-            # should already match num_outputs.
-            "no_final_linear": False,
-            # Whether layers should be shared for the value function.
-            "vf_share_layers": False,
+    "n_step": 1,
+    "noisy": False,
+    "num_atoms": 1,
+    "num_envs_per_worker": 32,
+    "num_gpus": 0.0,
+    "num_gpus_per_worker": 0.0,
+    "num_workers": 4,
+    "prioritized_replay": False,
+    "prioritized_replay_alpha": 0.0,
+    "prioritized_replay_beta": 0.0,
+    "prioritized_replay_beta_annealing_timesteps": 20000,
+    "prioritized_replay_eps": 0.0,
+    "rollout_fragment_length": 16,
+    "sigma0": 0.5,
+    "target_network_update_freq": 10000,
+    "timesteps_per_iteration": 0,
+    "train_batch_size": 2048,
+    "training_intensity": None,
+    "v_max": 10.0,
+}
 
-            # == LSTM ==
-            # Whether to wrap the model with an LSTM.
-            "use_lstm": True,
-            # Max seq len for training the LSTM, defaults to 20.
-            "max_seq_len": 20,
-            # Size of the LSTM cell.
-            "lstm_cell_size": 256,
-            # Whether to feed a_{t-1}, r_{t-1} to LSTM.
-            "lstm_use_prev_action_reward": True,
-    }),
+GRL_DEFAULT_OSHI_ZUMO_TINY_DQN_PARAMS = {
+
+    "adam_epsilon": 0.0001,
+    "batch_mode": "truncate_episodes",
+    "buffer_size": 200000,
+    "compress_observations": False,
+    "double_q": True,
+    "dueling": False,
+    "evaluation_config": {
+        "explore": False
+    },
+    "exploration_config": {
+        "epsilon_timesteps": 200000,
+        "final_epsilon": 0.001,
+        "initial_epsilon": 0.06,
+        "type": ValidActionsEpsilonGreedy
+    },
+    "explore": True,
+    "final_prioritized_replay_beta": 0.0,
+    "framework": "torch",
+    "gamma": 1.0,
+    "grad_clip": None,
+    "hiddens": [
+        256
+    ],
+    "learning_starts": 16000,
+    "lr": 0.01,
+    "lr_schedule": None,
+    "metrics_smoothing_episodes": 5000,
+    "min_iter_time_s": 0,
+
+    "n_step": 1,
+    "noisy": False,
+    "num_atoms": 1,
+    "num_envs_per_worker": 32,
+    "num_gpus": 0.0,
+    "num_gpus_per_worker": 0.0,
+    "num_workers": 4,
+    "prioritized_replay": False,
+    "prioritized_replay_alpha": 0.0,
+    "prioritized_replay_beta": 0.0,
+    "prioritized_replay_beta_annealing_timesteps": 20000,
+    "prioritized_replay_eps": 0.0,
+    "rollout_fragment_length": 4,
+    "sigma0": 0.5,
+    "target_network_update_freq": 10000,
+    "timesteps_per_iteration": 0,
+    "train_batch_size": 4096,
+    "training_intensity": None,
+    "v_max": 10.0,
 }

@@ -1,21 +1,21 @@
+import logging
 import os
 import time
-import logging
-
 from typing import Dict, Any
-from tables.exceptions import HDF5ExtError
-import deepdish
 
+import cloudpickle
+import deepdish
+from ray.rllib.agents import Trainer
+from ray.rllib.policy import Policy, TorchPolicy
 from ray.rllib.utils import try_import_torch
+from ray.rllib.utils.typing import PolicyID
+from tables.exceptions import HDF5ExtError
+
+from grl.rllib_tools.safe_convert_to_torch_tensor import safe_convert_to_torch_tensor
+from grl.utils.common import datetime_str, ensure_dir
+from grl.utils.strategy_spec import StrategySpec
 
 torch, _ = try_import_torch()
-from ray.rllib.agents import Trainer
-from ray.rllib.utils.typing import PolicyID
-from ray.rllib.policy import Policy, TorchPolicy
-
-from grl.utils.strategy_spec import StrategySpec
-from grl.utils.common import datetime_str, ensure_dir
-from grl.rllib_tools.safe_convert_to_torch_tensor import safe_convert_to_torch_tensor
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +54,7 @@ def save_policy_checkpoint(trainer: Trainer,
     return checkpoint_path
 
 
-def load_pure_strat(policy: Policy, pure_strat_spec: StrategySpec = None, checkpoint_path: str = None):
+def load_pure_strat(policy: Policy, pure_strat_spec: StrategySpec = None, checkpoint_path: str = None, weights_key: str = "weights"):
     if pure_strat_spec is not None and checkpoint_path is not None:
         raise ValueError("Can only pass pure_strat_spec or checkpoint_path but not both")
     if checkpoint_path is None:
@@ -65,16 +65,25 @@ def load_pure_strat(policy: Policy, pure_strat_spec: StrategySpec = None, checkp
         pure_strat_checkpoint_path = checkpoint_path
 
     weights = None
-    num_load_attempts = 5
-    for attempt in range(num_load_attempts):
-        try:
-            checkpoint_data = deepdish.io.load(path=pure_strat_checkpoint_path)
-            weights = checkpoint_data["weights"]
-            break
-        except (HDF5ExtError, KeyError):
-            if attempt + 1 == num_load_attempts:
-                raise
-            time.sleep(1.0)
+
+    try:
+        num_load_attempts = 5
+        for attempt in range(num_load_attempts):
+            try:
+                checkpoint_data = deepdish.io.load(path=pure_strat_checkpoint_path)
+                weights = checkpoint_data[weights_key]
+                break
+            except (HDF5ExtError, KeyError):
+                if attempt + 1 == num_load_attempts:
+                    raise
+                time.sleep(1.0)
+
+    #TODO use correct exception
+    except Exception:
+        with open(pure_strat_checkpoint_path, "rb") as pickle_file:
+            checkpoint_data = cloudpickle.load(pickle_file)
+            weights = checkpoint_data[weights_key]
+
     weights = {k.replace("_dot_", "."): v for k, v in weights.items()}
     policy.set_weights(weights=weights)
     policy.policy_spec = pure_strat_spec

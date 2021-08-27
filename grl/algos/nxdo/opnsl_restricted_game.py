@@ -10,7 +10,7 @@ from ray.rllib.utils.typing import MultiAgentDict, AgentID
 
 from grl.rl_apps.psro.poker_utils import softmax
 from grl.utils.strategy_spec import StrategySpec
-
+from grl.envs.valid_actions_multi_agent_env import ValidActionsMultiAgentEnv
 
 class AgentRestrictedGameOpenSpielObsConversions:
 
@@ -40,9 +40,7 @@ def get_restricted_game_obs_conversions(
         load_policy_spec_fn(delegate_policy, policy_spec)
 
         for state_index, state in enumerate(empty_tabular_policy.states):
-            # if state.current_player() != player and state.current_player() != -2:
             assert state.current_player() in [0, 1], state.current_player()
-            # continue
 
             valid_actions_mask = state.legal_actions_mask()
             info_state_vector = state.information_state_tensor()
@@ -120,7 +118,7 @@ def get_restricted_game_obs_conversions(
     )
 
 
-class OpenSpielRestrictedGame(MultiAgentEnv):
+class OpenSpielRestrictedGame(ValidActionsMultiAgentEnv):
 
     def __init__(self, env_config: dict):
         self.base_env: MultiAgentEnv = env_config["create_env_fn"]()
@@ -140,6 +138,8 @@ class OpenSpielRestrictedGame(MultiAgentEnv):
                                      )
         self.base_observation_space = self.base_env.observation_space
         self.base_action_space = self.base_env.action_space
+        self.action_space = self.base_env.action_space
+        self.orig_observation_length = self.base_env.orig_observation_length
 
         self._agents_to_current_valid_actions_mask = {}
 

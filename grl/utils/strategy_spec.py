@@ -1,4 +1,3 @@
-import os
 import json
 
 from grl.utils.common import check_if_jsonable

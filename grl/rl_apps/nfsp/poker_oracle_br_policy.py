@@ -15,7 +15,7 @@ from ray.rllib.utils.annotations import override
 
 from grl.envs.poker_multi_agent_env import OBS_SHAPES, VALID_ACTIONS_SHAPES
 from grl.rl_apps.psro.poker_utils import openspiel_policy_from_nonlstm_rllib_policy, \
-    tabular_policy_from_weighted_policies
+    tabular_policies_from_weighted_policies, JointPlayerPolicy
 
 # Used to return tuple actions as a list of batches per tuple element
 TupleActions = namedtuple("TupleActions", ["batches"])
@@ -123,9 +123,11 @@ class PokerOracleBestResponsePolicy(Policy):
                     print("made policy")
                     yield single_openspiel_policy
 
-            openspiel_policy_to_exploit = tabular_policy_from_weighted_policies(game=self.game,
-                                                                                policy_iterable=policy_iterable(),
-                                                                                weights=policy_mixture_dict.values())
+            openspiel_policy_to_exploit = JointPlayerPolicy(
+                game=self.game, policies=tabular_policies_from_weighted_policies(game=self.game,
+                                                                                 policy_iterable=policy_iterable(),
+                                                                                 weights=policy_mixture_dict.values())
+            )
             print("made policy average")
 
         br_player_ids = [br_only_as_player_id] if br_only_as_player_id is not None else [0, 1]
@@ -181,36 +183,20 @@ class PokerOracleBestResponsePolicy(Policy):
             info (dict): dictionary of extra feature batches, if any, with
                 shape like {"f1": [BATCH_SIZE, ...], "f2": [BATCH_SIZE, ...]}.
         """
-
-        # print("\n\n\n\n\n\ngame type provides info state: ", self.tabular_policy.game_type.provides_information_state)
-        # print("game type provides observation: ", self.tabular_policy.game_type.provides_observation)
-
         info_state_length = OBS_SHAPES[self.game_version][0]
-        valid_action_mask_length = VALID_ACTIONS_SHAPES[self.game_version][0]
-
-        # print(f"\n\n\nobs_batch {obs_batch}\n\n\n")
-
-        # assert len(obs_batch[0]) == info_state_length + valid_action_mask_length, f"len is {len(obs_batch[0])}"
 
         info_states = [obs[:info_state_length] for obs in obs_batch]
-        # valid_actions = [obs[info_state_length:]for obs in obs_batch]
         actions = []
         policy_probs = []
 
         for info_state in zip(info_states):
             assert self.policy_dict is not None
-            # print(f"keys: {list(self.policy_dict.keys())}")
-            # if self.policy_dict is None:
-            #     action_probs = valid_mask.copy() / sum(valid_mask)
-            # else:
             action_probs = self._get_action_probs_for_infoset(info_state[0])
 
             action = np.random.choice(range(self.action_space.n), p=action_probs)
-            # assert valid_mask[action] == 1.0
             actions.append(action)
             policy_probs.append(action_probs)
 
-        # return actions, [], {"action_probs": np.asarray(policy_probs)}
         return actions, [], {}
 
     def compute_gradients(self, postprocessed_batch):

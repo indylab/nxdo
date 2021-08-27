@@ -5,30 +5,28 @@ import time
 from typing import Dict, Type, List
 
 import ray
+from ray.rllib.agents import Trainer
+from ray.rllib.agents.callbacks import DefaultCallbacks
+from ray.rllib.agents.dqn import DQNTrainer
+from ray.rllib.env import BaseEnv
+from ray.rllib.evaluation import MultiAgentEpisode, RolloutWorker
+from ray.rllib.policy import Policy
 from ray.rllib.utils import merge_dicts, try_import_torch
 
-torch, _ = try_import_torch()
-from ray.rllib.agents import Trainer
-from ray.rllib.agents.dqn import DQNTrainer
-
-from ray.rllib.agents.callbacks import DefaultCallbacks
-from ray.rllib.evaluation import MultiAgentEpisode, RolloutWorker
-from ray.rllib.env import BaseEnv
-from ray.rllib.policy import Policy
-
-from grl.utils.strategy_spec import StrategySpec
-from grl.utils.common import pretty_dict_str
-from grl.utils.port_listings import get_client_port_for_service
 from grl.algos.p2sro.p2sro_manager import RemoteP2SROManagerClient
 from grl.algos.p2sro.p2sro_manager.utils import get_latest_metanash_strategies, PolicySpecDistribution
+from grl.rl_apps import GRL_SEED
 from grl.rl_apps.scenarios.catalog import scenario_catalog
 from grl.rl_apps.scenarios.psro_scenario import PSROScenario
-from grl.rl_apps.scenarios.stopping_conditions import StoppingCondition
-from grl.rl_apps import GRL_SEED
-
 from grl.rl_apps.scenarios.ray_setup import init_ray_for_scenario
-from grl.rllib_tools.space_saving_logger import get_trainer_logger_creator
+from grl.rl_apps.scenarios.stopping_conditions import StoppingCondition
 from grl.rllib_tools.policy_checkpoints import save_policy_checkpoint, load_pure_strat
+from grl.rllib_tools.space_saving_logger import get_trainer_logger_creator
+from grl.utils.common import pretty_dict_str
+from grl.utils.port_listings import get_client_port_for_service
+from grl.utils.strategy_spec import StrategySpec
+
+torch, _ = try_import_torch()
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +41,7 @@ def create_metadata_with_new_checkpoint_for_current_best_response(trainer: Train
                                                                   timesteps_training_br: int,
                                                                   episodes_training_br: int,
                                                                   active_policy_num: int = None,
-                                                                  ):
+                                                                  average_br_reward: float = None):
     return {
         "checkpoint_path": save_policy_checkpoint(trainer=trainer,
                                                   player=player,
@@ -54,9 +52,11 @@ def create_metadata_with_new_checkpoint_for_current_best_response(trainer: Train
                                                       "policy_num": active_policy_num,
                                                       "timesteps_training_br": timesteps_training_br,
                                                       "episodes_training_br": episodes_training_br,
+                                                      "average_br_reward": average_br_reward,
                                                   }),
         "timesteps_training_br": timesteps_training_br,
-        "episodes_training_br": episodes_training_br
+        "episodes_training_br": episodes_training_br,
+        "average_br_reward": average_br_reward,
     }
 
 
@@ -91,19 +91,21 @@ def update_all_workers_to_latest_metanash(trainer: Trainer,
         opponent_policy_distribution = None
     else:
         opponent_player = 0 if one_agent_plays_all_sides else metanash_player
-        print(f"latest payoff matrix:\n{latest_payoff_table.get_payoff_matrix_for_player(player=opponent_player)}")
-        print(f"metanash: {latest_strategies[opponent_player].probabilities_for_each_strategy()}")
+        print(f"latest payoff matrix for player {opponent_player}:\n"
+              f"{latest_payoff_table.get_payoff_matrix_for_player(player=opponent_player)}")
+        print(f"metanash for player {opponent_player}: "
+              f"{latest_strategies[opponent_player].probabilities_for_each_strategy()}")
 
-        # get the strategy for the opposing player.
+        # get the strategy distribution for the opposing player.
         opponent_policy_distribution = latest_strategies[opponent_player]
 
         # double check that these policy specs are for the opponent player
         assert opponent_player in opponent_policy_distribution.sample_policy_spec().get_pure_strat_indexes().keys()
 
-    def _set_opponent_policy_distribution_for_one_worker(worker: RolloutWorker):
+    def _set_opponent_policy_distribution_for_worker(worker: RolloutWorker):
         worker.opponent_policy_distribution = opponent_policy_distribution
 
-    trainer.workers.foreach_worker(_set_opponent_policy_distribution_for_one_worker)
+    trainer.workers.foreach_worker(_set_opponent_policy_distribution_for_worker)
 
 
 def sync_active_policy_br_and_metanash_with_p2sro_manager(trainer: DQNTrainer,
@@ -131,11 +133,13 @@ def sync_active_policy_br_and_metanash_with_p2sro_manager(trainer: DQNTrainer,
                                           one_agent_plays_all_sides=one_agent_plays_all_sides)
 
 
-def train_psro_best_response(player, results_dir, scenario_name, psro_manager_port: int, psro_manager_host: str,
-                             print_train_results=True):
+def train_psro_best_response(player: int, results_dir: str, scenario_name: str, psro_manager_port: int,
+                             psro_manager_host: str, print_train_results=True, previous_br_checkpoint_path=None) -> str:
     
     scenario: PSROScenario = scenario_catalog.get(scenario_name=scenario_name)
-    
+    if not isinstance(scenario, PSROScenario):
+        raise TypeError(f"Only instances of {PSROScenario} can be used here. {scenario.name} is a {type(scenario)}.")
+
     env_class = scenario.env_class
     env_config = scenario.env_config
     trainer_class = scenario.trainer_class
@@ -145,7 +149,7 @@ def train_psro_best_response(player, results_dir, scenario_name, psro_manager_po
         if player is None:
             player = 0
         else:
-            raise ValueError(f"Only use player 0 if treating the game as single agent symmetric "
+            raise ValueError(f"If treating the game as single agent symmetric, only use player 0 "
                              f"(one agent plays all sides).")
 
     p2sro = scenario.p2sro
@@ -154,15 +158,26 @@ def train_psro_best_response(player, results_dir, scenario_name, psro_manager_po
     psro_get_stopping_condition = scenario.psro_get_stopping_condition
     mix_metanash_with_uniform_dist_coeff = scenario.mix_metanash_with_uniform_dist_coeff
     allow_stochastic_best_response = scenario.allow_stochastic_best_responses
+    should_log_result_fn = scenario.ray_should_log_result_filter
 
     class P2SROPreAndPostEpisodeCallbacks(DefaultCallbacks):
+
+        # def on_episode_step(self, *, worker: RolloutWorker, base_env: BaseEnv, episode: MultiAgentEpisode,
+        #                     env_index: int,
+        #                     **kwargs):
+        #     super().on_episode_step(worker=worker, base_env=base_env, episode=episode, env_index=env_index, **kwargs)
+        #
+        #     # Debug render a single environment.
+        #     if worker.worker_index == 1 and env_index == 0:
+        #         base_env.get_unwrapped()[0].render()
 
         def on_episode_start(self, *, worker: RolloutWorker, base_env: BaseEnv,
                              policies: Dict[str, Policy],
                              episode: MultiAgentEpisode, env_index: int, **kwargs):
 
-            # Sample new pure strategy policy weights from the metanash of the subgame population for the best response to
-            # train against. For better runtime performance, consider loading new weights only every few episodes instead.
+            # Sample new pure strategy policy weights from the opponent strategy distribution for the best response to
+            # train against. For better runtime performance, this function can be modified to load new weights
+            # only every few episodes instead.
             resample_pure_strat_every_n_episodes = 1
             metanash_policy: Policy = policies[f"metanash"]
             opponent_policy_distribution: PolicySpecDistribution = worker.opponent_policy_distribution
@@ -184,6 +199,7 @@ def train_psro_best_response(player, results_dir, scenario_name, psro_manager_po
                            policies: Dict[str, Policy], episode: MultiAgentEpisode,
                            env_index: int, **kwargs):
 
+            # If using P2SRO, report payoff results of the actively training BR to the payoff table.
             if not p2sro:
                 return
 
@@ -194,13 +210,13 @@ def train_psro_best_response(player, results_dir, scenario_name, psro_manager_po
 
             br_policy_spec: StrategySpec = worker.policy_map["best_response"].policy_spec
             if br_policy_spec.pure_strat_index_for_player(player=worker.br_player) == 0:
-                # We're training policy 0 if True.
+                # We're training policy 0 if True (first iteration of PSRO).
                 # The PSRO subgame should be empty, and instead the metanash is a random neural network.
-                # No need to report results for this.
+                # No need to report payoff results for this.
                 return
 
-            # Report payoff results for individual episodes to the p2sro manager to keep a real-time approximation of the
-            # payoff matrix entries for (learning) active policies.
+            # Report payoff results for individual episodes to the p2sro manager to keep a real-time approximation
+            # of the payoff matrix entries for (learning) active policies.
             policy_specs_for_each_player: List[StrategySpec] = [None, None]
             payoffs_for_each_player: List[float] = [None, None]
             for (player, policy_name), reward in episode.agent_rewards.items():
@@ -211,6 +227,7 @@ def train_psro_best_response(player, results_dir, scenario_name, psro_manager_po
                 payoffs_for_each_player[player] = reward
             assert all(payoff is not None for payoff in payoffs_for_each_player)
 
+            # Send payoff result to the manager for inclusion in the payoff table.
             worker.p2sro_manager.submit_empirical_payoff_result(
                 policy_specs_for_each_player=tuple(policy_specs_for_each_player),
                 payoffs_for_each_player=tuple(payoffs_for_each_player),
@@ -220,8 +237,8 @@ def train_psro_best_response(player, results_dir, scenario_name, psro_manager_po
     other_player = 1 - player
     br_learner_name = f"new_learner_{player}"
 
-    def log(message, level=logging.INFO):
-        logger.log(level, f"({br_learner_name}): {message}")
+    def log(message):
+        print(f"({br_learner_name}): {message}")
 
     def select_policy(agent_id):
         if agent_id == player:
@@ -264,10 +281,16 @@ def train_psro_best_response(player, results_dir, scenario_name, psro_manager_po
     trainer = trainer_class(config=trainer_config,
                             logger_creator=get_trainer_logger_creator(
                                 base_dir=results_dir, scenario_name=scenario_name,
-                                should_log_result_fn=lambda result: result["training_iteration"] % 100 == 0))
+                                should_log_result_fn=should_log_result_fn))
 
     # scenario_name logged in on_train_result_callback
     trainer.scenario_name = scenario_name
+
+    if previous_br_checkpoint_path is not None:
+        def _set_br_initial_weights(worker: RolloutWorker):
+            br_policy = worker.policy_map["best_response"]
+            load_pure_strat(policy=br_policy, checkpoint_path=previous_br_checkpoint_path)
+        trainer.workers.foreach_worker(_set_br_initial_weights)
 
     active_policy_spec: StrategySpec = p2sro_manager.claim_new_active_policy_for_player(
         player=player, new_policy_metadata_dict=create_metadata_with_new_checkpoint_for_current_best_response(
@@ -294,8 +317,7 @@ def train_psro_best_response(player, results_dir, scenario_name, psro_manager_po
                                                           timesteps_training_br=0,
                                                           episodes_training_br=0)
 
-    # Perform main RL training loop. Stop if we reach max iters or saturate.
-    # Saturation is determined by checking if we improve by a minimum amount every n iters.
+    # Perform main RL training loop. Stop training according to our StoppingCondition.
     train_iter_count = 0
     episodes_since_last_sync_with_manager = 0
     stopping_condition: StoppingCondition = psro_get_stopping_condition()
@@ -342,14 +364,16 @@ def train_psro_best_response(player, results_dir, scenario_name, psro_manager_po
 
     log(f"Training stopped. Setting active policy {active_policy_num} as fixed.")
 
-    p2sro_manager.set_active_policy_as_fixed(
-        player=player, policy_num=active_policy_num,
-        final_metadata_dict=create_metadata_with_new_checkpoint_for_current_best_response(
+    final_policy_metadata = create_metadata_with_new_checkpoint_for_current_best_response(
             trainer=trainer, player=player, save_dir=checkpoint_dir(trainer=trainer),
             timesteps_training_br=total_timesteps_training_br,
             episodes_training_br=total_episodes_training_br,
-            active_policy_num=active_policy_num
-        ))
+            active_policy_num=active_policy_num,
+            average_br_reward=train_iter_results["policy_reward_mean"]["best_response"])
+
+    p2sro_manager.set_active_policy_as_fixed(
+        player=player, policy_num=active_policy_num,
+        final_metadata_dict=final_policy_metadata)
 
     trainer.cleanup()
     ray.shutdown()
@@ -367,17 +391,22 @@ def train_psro_best_response(player, results_dir, scenario_name, psro_manager_po
                 time.sleep(2.0)
                 wait_count += 1
 
+    return final_policy_metadata["checkpoint_path"]
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--player', type=int)
     parser.add_argument('--scenario', type=str)
+    parser.add_argument('--use_prev_brs', default=False, action='store_true')
     parser.add_argument('--psro_port', type=int, required=False, default=None)
     parser.add_argument('--psro_host', type=str, required=False, default='localhost')
     commandline_args = parser.parse_args()
 
     scenario_name = commandline_args.scenario
+    use_prev_brs = commandline_args.use_prev_brs
 
     psro_host = commandline_args.psro_host
     psro_port = commandline_args.psro_port
@@ -389,13 +418,17 @@ if __name__ == "__main__":
     results_dir = os.path.join(manager_log_dir, f"learners_player_{commandline_args.player}/")
     print(f"results dir is {results_dir}")
 
+    previous_br_checkpoint_path = None
     while True:
         # Train a br for the specified player, then repeat.
-        train_psro_best_response(
+        result = train_psro_best_response(
             player=commandline_args.player,
             results_dir=results_dir,
             scenario_name=scenario_name,
             psro_manager_port=psro_port,
             psro_manager_host=psro_host,
             print_train_results=True,
+            previous_br_checkpoint_path=previous_br_checkpoint_path
         )
+        if use_prev_brs:
+            previous_br_checkpoint_path = result

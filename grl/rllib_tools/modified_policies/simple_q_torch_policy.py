@@ -5,30 +5,21 @@ from typing import Dict, Tuple
 
 import gym
 import ray
-from ray.rllib.agents.dqn.simple_q_tf_policy import (
-    build_q_models, compute_q_values, get_distribution_inputs_and_class)
+from ray.rllib.agents.dqn.simple_q_tf_policy import Q_SCOPE, Q_TARGET_SCOPE
+from ray.rllib.agents.dqn.simple_q_tf_policy import (compute_q_values, get_distribution_inputs_and_class)
+from ray.rllib.models import ModelCatalog
+from ray.rllib.models.action_dist import ActionDistribution
 from ray.rllib.models.modelv2 import ModelV2
-from ray.rllib.models.torch.torch_action_dist import TorchCategorical, \
-    TorchDistributionWrapper
+from ray.rllib.models.torch.torch_action_dist import TorchCategorical
+from ray.rllib.models.torch.torch_action_dist import TorchDistributionWrapper
 from ray.rllib.policy import Policy
 from ray.rllib.policy.sample_batch import SampleBatch
 from ray.rllib.policy.torch_policy_template import build_torch_policy
-from ray.rllib.utils.framework import try_import_torch
-from ray.rllib.utils.torch_ops import huber_loss
-from ray.rllib.utils.typing import TensorType, TrainerConfigDict
-from ray.rllib.agents.sac import SACTorchPolicy
-from ray.rllib.utils.typing import TensorType
-from ray.rllib.policy import Policy
-from ray.rllib.models.modelv2 import ModelV2
-from ray.rllib.models.action_dist import ActionDistribution
-from ray.rllib.models.torch.torch_action_dist import TorchDistributionWrapper
-from ray.rllib.agents.dqn.simple_q_torch_policy import SimpleQTorchPolicy
-
-from ray.rllib.utils.typing import TensorType, TrainerConfigDict
-from ray.rllib.agents.dqn.simple_q_tf_policy import Q_SCOPE, Q_TARGET_SCOPE
 from ray.rllib.utils.error import UnsupportedSpaceException
-from ray.rllib.models import ModelCatalog
-from ray.rllib.models.torch.torch_action_dist import TorchCategorical
+from ray.rllib.utils.framework import try_import_torch
+from ray.rllib.utils.typing import TensorType, TrainerConfigDict
+
+from grl.rllib_tools.modified_policies.safe_set_weights_policy_mixin import SafeSetWeightsPolicyMixin
 
 torch, nn = try_import_torch()
 F = None
@@ -199,7 +190,7 @@ SimpleQTorchPolicyPatched = build_torch_policy(
     after_init=setup_late_mixins,
     extra_action_out_fn=_simple_dqn_extra_action_out_fn,
     make_model_and_action_dist=_build_q_model_and_distribution,
-    mixins=[TargetNetworkMixin],
+    mixins=[TargetNetworkMixin, SafeSetWeightsPolicyMixin],
     action_distribution_fn=get_distribution_inputs_and_class,
     extra_learn_fetches_fn=lambda policy: {"td_error": policy.td_error, "loss": policy.loss},
 )

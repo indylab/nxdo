@@ -2,9 +2,14 @@ from typing import Union, Type, Dict, Any, Callable
 
 from ray.rllib import MultiAgentEnv, Policy
 from ray.rllib.agents import Trainer
+from ray.rllib.utils.typing import ResultDict
 
 from grl.rl_apps.scenarios.scenario import RayScenario
 from grl.rl_apps.scenarios.stopping_conditions import StoppingCondition
+
+
+def psro_default_log_filter(result: ResultDict) -> bool:
+    return result["training_iteration"] % 10 == 0
 
 
 class PSROScenario(RayScenario):
@@ -28,11 +33,13 @@ class PSROScenario(RayScenario):
                  single_agent_symmetric_game: bool,
                  get_trainer_config: Callable[[MultiAgentEnv], Dict[str, Any]],
                  psro_get_stopping_condition: Callable[[], StoppingCondition],
-                 calc_exploitability_for_openspiel_env: bool):
+                 calc_exploitability_for_openspiel_env: bool,
+                 ray_should_log_result_filter: Callable[[ResultDict], bool] = psro_default_log_filter):
         super().__init__(name=name,
                          ray_cluster_cpus=ray_cluster_cpus,
                          ray_cluster_gpus=ray_cluster_gpus,
-                         ray_object_store_memory_cap_gigabytes=ray_object_store_memory_cap_gigabytes)
+                         ray_object_store_memory_cap_gigabytes=ray_object_store_memory_cap_gigabytes,
+                         ray_should_log_result_filter=ray_should_log_result_filter)
         self.env_class = env_class
         self.env_config = env_config
         self.mix_metanash_with_uniform_dist_coeff = mix_metanash_with_uniform_dist_coeff

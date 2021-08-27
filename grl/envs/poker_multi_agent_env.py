@@ -80,6 +80,9 @@ class PokerMultiAgentEnv(ValidActionsMultiAgentEnv):
         self.dummy_action_multiplier = env_config['dummy_action_multiplier']
         self._continuous_action_space = env_config['continuous_action_space']
 
+        self._individual_players_with_continuous_action_space = env_config.get("individual_players_with_continuous_action_space")
+        self._individual_players_with_orig_obs_space = env_config.get("individual_players_with_orig_obs_space")
+
         self._apply_penalty_for_invalid_actions = env_config["penalty_for_invalid_actions"]
         self._invalid_action_penalties = [False, False]
 
@@ -94,7 +97,9 @@ class PokerMultiAgentEnv(ValidActionsMultiAgentEnv):
         elif self.game_version == "universal_poker":
             self._is_universal_poker = True
             self._stack_size = env_config['universal_poker_stack_size']
-            num_rounds = 2
+            num_rounds = env_config.get('universal_poker_num_rounds', 2)
+            num_board_cards = " ".join(["0"] + ["1"] * (num_rounds-1))
+
             betting_mode = env_config.get("universal_poker_betting_mode", "nolimit")
             max_raises = str(env_config.get("universal_poker_max_raises", 8))
             if len(max_raises) == 0:
@@ -107,6 +112,7 @@ class PokerMultiAgentEnv(ValidActionsMultiAgentEnv):
                 "betting": betting_mode,
                 "numRanks": num_ranks,
                 "numRounds": num_rounds,
+                "numBoardCards": num_board_cards,
                 "numSuits": num_suits,
                 "stack": f"{env_config['universal_poker_stack_size']} {env_config['universal_poker_stack_size']}",
                 "blind": "1 1",
@@ -158,10 +164,9 @@ class PokerMultiAgentEnv(ValidActionsMultiAgentEnv):
 
             info_state = self.curr_time_step.observations["info_state"][player_id]
 
-            if self._append_valid_actions_mask_to_obs:
-                # Observation includes both the info_state and legal actions, but agent isn't forced to take legal actions.
-                # Taking an illegal action will result in a random legal action being played.
-                # Allows easy compatibility with standard RL implementations for small action-space games like this one.
+            force_orig_obs = self._individual_players_with_orig_obs_space is not None and player_id in self._individual_players_with_orig_obs_space
+
+            if self._append_valid_actions_mask_to_obs and not force_orig_obs:
                 obs[self.player_map(player_id)] = np.concatenate(
                     (np.asarray(info_state, dtype=np.float32), np.asarray(legal_actions_mask, dtype=np.float32)),
                     axis=0)
@@ -208,7 +213,8 @@ class PokerMultiAgentEnv(ValidActionsMultiAgentEnv):
         player_action = action_dict[self.player_map(curr_player_id)]
         orig_player_action = player_action
 
-        if self._continuous_action_space:
+        if self._continuous_action_space or \
+                (self._individual_players_with_continuous_action_space and curr_player_id in self._individual_players_with_continuous_action_space):
             player_action = parse_discrete_poker_action_from_continuous_space(
                 continuous_action=player_action, legal_actions_list=legal_actions,
                 total_num_discrete_actions_including_dummy=self.num_discrete_actions)
@@ -225,17 +231,13 @@ class PokerMultiAgentEnv(ValidActionsMultiAgentEnv):
                              f"action space: {self.action_space}\n"
                              f"base action space: {self._base_action_space}")
 
-        # If action is illegal, do a random legal action instead
         if player_action not in legal_actions:
             legal_actions_mask = np.zeros(self.openspiel_env.action_spec()["num_actions"])
             legal_actions_mask[legal_actions] = 1.0
-            raise ValueError(f"illegal actions are now not allowed.\n"
+            raise ValueError(f"illegal actions are not allowed.\n"
                              f"Action was {player_action}.\n"
                              f"Legal actions are {legal_actions}\n"
                              f"Legal actions vector is {legal_actions_mask}")
-            # player_action = random.choice(legal_actions)
-            # if self._apply_penalty_for_invalid_actions:
-            #     self._invalid_action_penalties[curr_player_id] = True
         try:
             self.curr_time_step = self.openspiel_env.step([player_action])
         except SpielError:

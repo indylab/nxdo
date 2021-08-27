@@ -1,48 +1,41 @@
+import copy
+import logging
+import os
+import time
+from copy import deepcopy
+from typing import List, Any, Tuple, Type, Dict, Union
+
+import deepdish
+import numpy as np
 import ray
+from gym.spaces import Discrete
+from ray.rllib.agents import Trainer
+from ray.rllib.agents.callbacks import DefaultCallbacks
+from ray.rllib.env import BaseEnv
+from ray.rllib.evaluation import MultiAgentEpisode, RolloutWorker
+from ray.rllib.policy import Policy
+from ray.rllib.policy.sample_batch import SampleBatch, MultiAgentBatch
 from ray.rllib.utils import merge_dicts, try_import_torch
+from ray.rllib.utils.typing import AgentID, PolicyID
+
+from grl.algos.nfsp_rllib.nfsp import get_store_to_avg_policy_buffer_fn
+from grl.algos.nxdo.action_space_conversion import RestrictedToBaseGameActionSpaceConverter
+from grl.algos.nxdo.opnsl_restricted_game import OpenSpielRestrictedGame, get_restricted_game_obs_conversions
+from grl.algos.nxdo.restricted_game import RestrictedGame
+from grl.rl_apps.nxdo.poker_utils import nxdo_nfsp_measure_exploitability_nonlstm
+from grl.rl_apps.scenarios.nxdo_scenario import NXDOScenario
+from grl.rl_apps.scenarios.ray_setup import init_ray_for_scenario
+from grl.rl_apps.scenarios.stopping_conditions import StoppingCondition
+from grl.rllib_tools.policy_checkpoints import create_get_pure_strat_cached
+from grl.rllib_tools.space_saving_logger import get_trainer_logger_creator
+from grl.rllib_tools.stat_deque import StatDeque
+from grl.utils.common import pretty_dict_str, datetime_str, ensure_dir, copy_attributes
+from grl.utils.strategy_spec import StrategySpec
 
 torch, _ = try_import_torch()
 
-import os
-import time
-import logging
-import numpy as np
-from typing import List, Any, Tuple, Type, Dict
-from copy import deepcopy
-
-from gym.spaces import Discrete
-import copy
-import deepdish
-
-from ray.rllib.agents import Trainer
-
-from ray.rllib.utils.typing import AgentID, PolicyID
-from ray.rllib.agents.callbacks import DefaultCallbacks
-from ray.rllib.evaluation import MultiAgentEpisode, RolloutWorker
-from ray.rllib.env import BaseEnv
-from ray.rllib.policy import Policy
-from ray.rllib.policy.sample_batch import SampleBatch, MultiAgentBatch
-from grl.rl_apps.scenarios.nxdo_scenario import NXDOScenario
-from grl.utils.common import pretty_dict_str, datetime_str, ensure_dir, copy_attributes
-from grl.rllib_tools.stat_deque import StatDeque
-from grl.algos.nfsp_rllib.nfsp import get_store_to_avg_policy_buffer_fn
-from grl.rllib_tools.space_saving_logger import SpaceSavingLogger, get_trainer_logger_creator
-from grl.rl_apps.scenarios.stopping_conditions import StoppingCondition
-from grl.utils.strategy_spec import StrategySpec
-from grl.algos.nxdo.restricted_game import RestrictedGame
-from grl.algos.nxdo.action_space_conversion import RestrictedToBaseGameActionSpaceConverter
-from grl.rl_apps.nxdo.poker_utils import nxdo_nfsp_measure_exploitability_nonlstm
-from grl.algos.nxdo.opnsl_restricted_game import OpenSpielRestrictedGame, get_restricted_game_obs_conversions
-from grl.rllib_tools.policy_checkpoints import save_policy_checkpoint, create_get_pure_strat_cached
-
-from grl.rl_apps.scenarios.ray_setup import init_ray_for_scenario
-
 logger = logging.getLogger(__name__)
 
-
-def should_log_trainer_result(result: dict) -> bool:
-    return ("z_avg_policy_exploitability" in result or
-            result["training_iteration"] % 1000 == 0)
 
 def checkpoint_dir(trainer: Trainer):
     return os.path.join(trainer.logdir, "br_checkpoints")
@@ -77,7 +70,7 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
                                              scenario: NXDOScenario,
                                              player_to_base_game_action_specs: Dict[int, List[StrategySpec]],
                                              stopping_condition: StoppingCondition,
-                                             manager_metadata: dict,
+                                             manager_metadata: Union[dict, None],
                                              print_train_results: bool = True):
 
     use_openspiel_restricted_game: bool = scenario.use_openspiel_restricted_game
@@ -94,15 +87,13 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
     calculate_openspiel_metanash: bool = scenario.calculate_openspiel_metanash
     calculate_openspiel_metanash_at_end: bool = scenario.calculate_openspiel_metanash_at_end
     calc_metanash_every_n_iters: int = scenario.calc_metanash_every_n_iters
+    should_log_result_fn = scenario.ray_should_log_result_filter
     metrics_smoothing_episodes_override: int = scenario.metanash_metrics_smoothing_episodes_override
 
     assert scenario.xdo_metanash_method == "nfsp"
 
-    ray_head_address = manager_metadata["ray_head_address"]
+    ray_head_address = manager_metadata.get("ray_head_address", None) if manager_metadata is not None else None
     init_ray_for_scenario(scenario=scenario, head_address=ray_head_address, logging_level=logging.INFO)
-
-    def log(message, level=logging.INFO):
-        logger.log(level, message)
 
     def select_policy(agent_id):
         random_sample = np.random.random()
@@ -124,9 +115,7 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
         return env_class(env_config=base_env_config)
 
     tmp_base_env = _create_base_env()
-    open_spiel_env_config = tmp_base_env.open_spiel_env_config if calculate_openspiel_metanash else None
-
-    restricted_env_config = {"create_env_fn": _create_base_env, }
+    restricted_env_config = {"create_env_fn": _create_base_env}
 
     if use_openspiel_restricted_game:
         restricted_game_class = OpenSpielRestrictedGame
@@ -139,6 +128,8 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
         restricted_game_action_spaces = [Discrete(n=len(player_to_base_game_action_specs[p])) for p in range(2)]
 
     assert all(restricted_game_action_spaces[0] == space for space in restricted_game_action_spaces)
+
+    print(f"\n\n\n\n\nRestricted game action spaces {restricted_game_action_spaces}\n\n\n\n\n\n")
 
     scenario_avg_trainer_config = get_avg_trainer_config(tmp_base_env)
     scenario_avg_trainer_config_exploration_config = scenario_avg_trainer_config.get("exploration_config", {})
@@ -183,13 +174,13 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
     for _policy_id in ["average_policy_0", "average_policy_1"]:
         if get_restricted_game_custom_model is not None:
             avg_trainer_config["multiagent"]["policies"][_policy_id][3]["model"] = {
-                "custom_model": get_restricted_game_custom_model(tmp_base_env)}
+                "custom_model": get_restricted_game_custom_model(tmp_env)}
 
     avg_trainer = avg_trainer_class(config=avg_trainer_config,
                                     logger_creator=get_trainer_logger_creator(
                                         base_dir=results_dir,
                                         scenario_name=f"nfsp_restricted_game_avg_trainer",
-                                        should_log_result_fn=should_log_trainer_result))
+                                        should_log_result_fn=should_log_result_fn))
 
     store_to_avg_policy_buffer = get_store_to_avg_policy_buffer_fn(nfsp_trainer=avg_trainer)
 
@@ -281,7 +272,9 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
 
             if (calculate_openspiel_metanash and
                     (training_iteration == 1 or training_iteration % calc_metanash_every_n_iters == 0)):
-                openspiel_game_version = base_env_config["version"]
+                base_env = _create_base_env()
+                open_spiel_env_config = base_env.open_spiel_env_config
+                openspiel_game_version = base_env.game_version
                 local_avg_policy_0 = trainer.workers.local_worker().policy_map["average_policy_0"]
                 local_avg_policy_1 = trainer.workers.local_worker().policy_map["average_policy_1"]
                 exploitability = nxdo_nfsp_measure_exploitability_nonlstm(
@@ -291,7 +284,7 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
                     open_spiel_env_config=open_spiel_env_config,
                     use_delegate_policy_exploration=scenario.allow_stochastic_best_responses
                 )
-                result["z_avg_policy_exploitability"] = exploitability
+                result["avg_policy_exploitability"] = exploitability
 
     br_trainer_config = {
         "log_level": "DEBUG",
@@ -335,16 +328,15 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
     for _policy_id in ["average_policy_0", "average_policy_1", "best_response_0", "best_response_1"]:
         if get_restricted_game_custom_model is not None:
             br_trainer_config["multiagent"]["policies"][_policy_id][3]["model"] = {
-                "custom_model": get_restricted_game_custom_model(tmp_base_env)}
+                "custom_model": get_restricted_game_custom_model(tmp_env)}
 
     br_trainer_config["metrics_smoothing_episodes"] = metrics_smoothing_episodes_override
-
 
     br_trainer = trainer_class(config=br_trainer_config,
                                logger_creator=get_trainer_logger_creator(
                                    base_dir=results_dir,
                                    scenario_name="nfsp_restricted_game_trainer",
-                                   should_log_result_fn=should_log_trainer_result))
+                                   should_log_result_fn=should_log_result_fn))
 
     avg_br_reward_deque = StatDeque.remote(max_items=br_trainer_config["metrics_smoothing_episodes"])
 
@@ -422,30 +414,31 @@ def train_off_policy_rl_nfsp_restricted_game(results_dir: str,
                     del train_iter_results["info"]["learner"]["best_response_0"]["td_error"]
                 if "td_error" in train_iter_results["info"]["learner"]["best_response_1"]:
                     del train_iter_results["info"]["learner"]["best_response_1"]["td_error"]
-                log(pretty_dict_str(train_iter_results))
-                log(f"Trainer logdir is {br_trainer.logdir}")
+                print(pretty_dict_str(train_iter_results))
+                print(f"Trainer logdir is {br_trainer.logdir}")
 
             if stopping_condition.should_stop_this_iter(latest_trainer_result=train_iter_results):
                 print("stopping condition met.")
-
-                if calculate_openspiel_metanash_at_end:
-                    openspiel_game_version = base_env_config["version"]
-                    local_avg_policy_0 = br_trainer.workers.local_worker().policy_map["average_policy_0"]
-                    local_avg_policy_1 = br_trainer.workers.local_worker().policy_map["average_policy_1"]
-                    exploitability = nxdo_nfsp_measure_exploitability_nonlstm(
-                        rllib_policies=[local_avg_policy_0, local_avg_policy_1],
-                        poker_game_version=openspiel_game_version,
-                        restricted_game_convertors=br_trainer.get_local_converters(),
-                        open_spiel_env_config=open_spiel_env_config,
-                        use_delegate_policy_exploration=scenario.allow_stochastic_best_responses
-                    )
-                    train_iter_results["z_avg_policy_exploitability"] = exploitability
-
                 final_train_result = deepcopy(train_iter_results)
                 break
 
-    if "z_avg_policy_exploitability" in final_train_result:
-        print(f"\n\nexploitability: {final_train_result['z_avg_policy_exploitability']}\n\n")
+    if calculate_openspiel_metanash_at_end:
+        base_env = _create_base_env()
+        open_spiel_env_config = base_env.open_spiel_env_config
+        openspiel_game_version = base_env.game_version
+        local_avg_policy_0 = br_trainer.workers.local_worker().policy_map["average_policy_0"]
+        local_avg_policy_1 = br_trainer.workers.local_worker().policy_map["average_policy_1"]
+        exploitability = nxdo_nfsp_measure_exploitability_nonlstm(
+            rllib_policies=[local_avg_policy_0, local_avg_policy_1],
+            poker_game_version=openspiel_game_version,
+            restricted_game_convertors=br_trainer.get_local_converters(),
+            open_spiel_env_config=open_spiel_env_config,
+            use_delegate_policy_exploration=scenario.allow_stochastic_best_responses
+        )
+        final_train_result["avg_policy_exploitability"] = exploitability
+
+    if "avg_policy_exploitability" in final_train_result:
+        print(f"\n\nexploitability: {final_train_result['avg_policy_exploitability']}\n\n")
 
     avg_policy_specs = []
     for player in range(2):

@@ -1,13 +1,10 @@
-from typing import Callable, List, Tuple
+from typing import List
 
-import numpy as np
 import pyspiel
-from open_spiel.python.algorithms import exploitability
 from open_spiel.python.algorithms.exploitability import exploitability
 from ray.rllib.policy import Policy
 
-from grl.rl_apps.psro.poker_utils import openspiel_policy_from_nonlstm_rllib_policy, \
-    tabular_policies_from_weighted_policies, JointPlayerPolicy
+from grl.rl_apps.psro.poker_utils import openspiel_policy_from_nonlstm_rllib_policy, JointPlayerPolicy
 
 
 def nfsp_measure_exploitability_nonlstm(rllib_policies: List[Policy],
@@ -18,13 +15,6 @@ def nfsp_measure_exploitability_nonlstm(rllib_policies: List[Policy],
             open_spiel_env_config = {
                 "players": pyspiel.GameParameter(2)
             }
-        elif poker_game_version in ["oshi_zumo_tiny"]:
-            poker_game_version = "oshi_zumo"
-            open_spiel_env_config = {
-                "coins": pyspiel.GameParameter(6),
-                "size": pyspiel.GameParameter(2),
-                "horizon": pyspiel.GameParameter(8),
-            }
         else:
             open_spiel_env_config = {}
 
@@ -32,59 +22,19 @@ def nfsp_measure_exploitability_nonlstm(rllib_policies: List[Policy],
                              open_spiel_env_config.items()}
 
     openspiel_game = pyspiel.load_game(poker_game_version, open_spiel_env_config)
+    if poker_game_version == "oshi_zumo":
+        openspiel_game = pyspiel.convert_to_turn_based(openspiel_game)
 
     opnsl_policies = []
     for rllib_policy in rllib_policies:
         openspiel_policy = openspiel_policy_from_nonlstm_rllib_policy(openspiel_game=openspiel_game,
-                                                                      rllib_policy=rllib_policy)
+                                                                      rllib_policy=rllib_policy,
+                                                                      game_version=poker_game_version,
+                                                                      game_parameters=open_spiel_env_config,
+        )
         opnsl_policies.append(openspiel_policy)
 
     nfsp_policy = JointPlayerPolicy(game=openspiel_game, policies=opnsl_policies)
-
-    # Exploitability is NashConv / num_players
-    if poker_game_version == "universal_poker":
-        print("Measuring exploitability for universal_poker policy. This will take a while...")
-    exploitability_result = exploitability(game=openspiel_game, policy=nfsp_policy)
-    return exploitability_result
-
-
-def snfsp_measure_exploitability_nonlstm(br_checkpoint_path_tuple_list: List[Tuple[str, str]],
-                                         set_policy_weights_fn: Callable,
-                                         rllib_policies: List[Policy],
-                                         poker_game_version: str):
-    if poker_game_version in ["kuhn_poker", "leduc_poker"]:
-        open_spiel_env_config = {
-            "players": pyspiel.GameParameter(2)
-        }
-    else:
-        open_spiel_env_config = {}
-
-    openspiel_game = pyspiel.load_game(poker_game_version, open_spiel_env_config)
-
-    def policy_iterable():
-        for checkpoint_path_tuple in br_checkpoint_path_tuple_list:
-            openspiel_policies = []
-            for player, player_rllib_policy in enumerate(rllib_policies):
-                checkpoint_path = checkpoint_path_tuple[player]
-                set_policy_weights_fn(player_rllib_policy, checkpoint_path)
-
-                single_openspiel_policy = openspiel_policy_from_nonlstm_rllib_policy(openspiel_game=openspiel_game,
-                                                                                     rllib_policy=player_rllib_policy)
-                openspiel_policies.append(single_openspiel_policy)
-            yield openspiel_policies
-
-    num_players = 2
-    weights = np.ones(shape=(len(br_checkpoint_path_tuple_list), num_players)) / len(br_checkpoint_path_tuple_list)
-
-    print(f"weights: {weights}")
-
-    avg_policies = tabular_policies_from_weighted_policies(game=openspiel_game,
-                                                           policy_iterable=policy_iterable(),
-                                                           weights=weights)
-
-    print(f"avg_policies: {avg_policies}")
-
-    nfsp_policy = JointPlayerPolicy(game=openspiel_game, policies=avg_policies)
 
     # Exploitability is NashConv / num_players
     if poker_game_version == "universal_poker":

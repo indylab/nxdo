@@ -1,41 +1,36 @@
-import ray
-from ray.rllib.utils import merge_dicts, try_import_torch
-
-torch, _ = try_import_torch()
-
+import argparse
+import logging
 import os
 import time
-import logging
-import random
-import tempfile
-from gym.spaces import Discrete
-
 from typing import Dict, List, Type
-from tables.exceptions import HDF5ExtError
-import deepdish
-import argparse
 
+import deepdish
+import ray
+from gym.spaces import Discrete
 from ray.rllib.agents import Trainer
 from ray.rllib.env.multi_agent_env import MultiAgentEnv
-from ray.rllib.agents.callbacks import DefaultCallbacks
-from ray.rllib.evaluation import MultiAgentEpisode, RolloutWorker
-from ray.rllib.env import BaseEnv
+from ray.rllib.evaluation import RolloutWorker
 from ray.rllib.policy import Policy
+from ray.rllib.utils import merge_dicts, try_import_torch
 from ray.rllib.utils.typing import AgentID, PolicyID
-from grl.utils.strategy_spec import StrategySpec
-from grl.utils.common import pretty_dict_str, datetime_str, ensure_dir
-from grl.algos.nxdo.nxdo_manager.remote import RemoteNXDOManagerClient
+from tables.exceptions import HDF5ExtError
+
 from grl.algos.nxdo.action_space_conversion import RestrictedToBaseGameActionSpaceConverter
+from grl.algos.nxdo.nxdo_manager.remote import RemoteNXDOManagerClient
+from grl.algos.nxdo.opnsl_restricted_game import OpenSpielRestrictedGame, get_restricted_game_obs_conversions
 from grl.algos.nxdo.restricted_game import RestrictedGame
-from grl.rllib_tools.space_saving_logger import SpaceSavingLogger, get_trainer_logger_creator
-from grl.rllib_tools.policy_checkpoints import load_pure_strat, save_policy_checkpoint, create_get_pure_strat_cached
+from grl.rl_apps import GRL_SEED
 from grl.rl_apps.scenarios.catalog import scenario_catalog
 from grl.rl_apps.scenarios.nxdo_scenario import NXDOScenario
 from grl.rl_apps.scenarios.ray_setup import init_ray_for_scenario
 from grl.rl_apps.scenarios.stopping_conditions import StoppingCondition
-from grl.algos.nxdo.opnsl_restricted_game import OpenSpielRestrictedGame, get_restricted_game_obs_conversions
+from grl.rllib_tools.policy_checkpoints import load_pure_strat, create_get_pure_strat_cached
+from grl.rllib_tools.space_saving_logger import get_trainer_logger_creator
+from grl.utils.common import pretty_dict_str, datetime_str, ensure_dir
 from grl.utils.port_listings import get_client_port_for_service
-from grl.rl_apps import GRL_SEED
+from grl.utils.strategy_spec import StrategySpec
+
+torch, _ = try_import_torch()
 
 logger = logging.getLogger(__name__)
 
@@ -112,21 +107,6 @@ def set_best_response_active_policy_spec_and_player_for_all_workers(trainer,
     trainer.workers.foreach_worker(_set_p2sro_policy_spec_on_best_response_policy)
 
 
-class P2SROPreAndPostEpisodeCallbacks(DefaultCallbacks):
-
-    def on_episode_start(self, *, worker: "RolloutWorker", base_env: BaseEnv, policies: Dict[PolicyID, Policy],
-                         episode: MultiAgentEpisode, env_index: int, **kwargs):
-        super().on_episode_start(worker=worker, base_env=base_env, policies=policies, episode=episode,
-                                 env_index=env_index, **kwargs)
-        avg_policy: Policy = worker.policy_map["metanash"]
-        if not hasattr(avg_policy, "cfp_br_specs") or not avg_policy.cfp_br_specs:
-            return
-        new_br_spec = random.choice(avg_policy.cfp_br_specs)
-        if hasattr(avg_policy, "policy_spec") and new_br_spec == avg_policy.policy_spec:
-            return
-        load_pure_strat(policy=avg_policy, pure_strat_spec=new_br_spec)
-
-
 def set_restricted_game_conversations_for_all_workers(
         trainer: Trainer,
         delegate_policy_id: PolicyID,
@@ -181,8 +161,11 @@ def train_nxdo_best_response(br_player: int,
                              scenario_name: str,
                              nxdo_manager_port: int,
                              nxdo_manager_host: str,
-                             print_train_results: bool = True):
+                             print_train_results: bool = True,
+                             previous_br_checkpoint_path=None):
     scenario: NXDOScenario = scenario_catalog.get(scenario_name=scenario_name)
+    if not isinstance(scenario, NXDOScenario):
+        raise TypeError(f"Only instances of {NXDOScenario} can be used here. {scenario.name} is a {type(scenario)}.")
 
     use_openspiel_restricted_game: bool = scenario.use_openspiel_restricted_game
     get_restricted_game_custom_model = scenario.get_restricted_game_custom_model
@@ -193,8 +176,10 @@ def train_nxdo_best_response(br_player: int,
     policy_classes: Dict[str, Type[Policy]] = scenario.policy_classes_br
     get_trainer_config = scenario.get_trainer_config_br
     nxdo_br_get_stopping_condition = scenario.get_stopping_condition_br
+    should_log_result_fn = scenario.ray_should_log_result_filter
     nxdo_metanash_method: str = scenario.xdo_metanash_method
-    use_cfp_metanash = (nxdo_metanash_method == "cfp")
+    if nxdo_metanash_method != "nfsp":
+        raise NotImplementedError("Only 'nfsp' is currently supported for the nxdo_metanash_method")
 
     nxdo_manager = RemoteNXDOManagerClient(n_players=2,
                                            port=nxdo_manager_port,
@@ -206,20 +191,11 @@ def train_nxdo_best_response(br_player: int,
     br_params = nxdo_manager.claim_new_active_policy_for_player(player=br_player)
     metanash_specs_for_players, delegate_specs_for_players, active_policy_num = br_params
 
-    if metanash_specs_for_players is not None and use_cfp_metanash:
-        cfp_metanash_specs_for_players = {}
-        for p, player_metanash_spec in metanash_specs_for_players.items():
-            player_cfp_json_specs = player_metanash_spec.metadata["cfp_pure_strat_specs"]
-            player_cfp_specs = [StrategySpec.from_json(json_spec) for json_spec in player_cfp_json_specs]
-            cfp_metanash_specs_for_players[p] = player_cfp_specs
-    else:
-        cfp_metanash_specs_for_players = None
-
     other_player = 1 - br_player
     br_learner_name = f"policy {active_policy_num} player {br_player}"
 
-    def log(message, level=logging.INFO):
-        logger.log(level, f"({br_learner_name}): {message}")
+    def log(message):
+        print(f"({br_learner_name}): {message}")
 
     def select_policy(agent_id):
         if agent_id == br_player:
@@ -231,7 +207,7 @@ def train_nxdo_best_response(br_player: int,
 
     restricted_env_config = {
         "create_env_fn": lambda: env_class(env_config=base_env_config),
-        "raise_if_no_restricted_players": metanash_specs_for_players is not None
+        "raise_if_no_restricted_players": metanash_specs_for_players is not None,
     }
     tmp_base_env = env_class(env_config=base_env_config)
 
@@ -258,7 +234,6 @@ def train_nxdo_best_response(br_player: int,
         other_player_restricted_obs_space = tmp_env.observation_space
 
     trainer_config = {
-        "callbacks": P2SROPreAndPostEpisodeCallbacks,
         "env": restricted_game_class,
         "env_config": restricted_env_config,
         "gamma": 1.0,
@@ -270,11 +245,11 @@ def train_nxdo_best_response(br_player: int,
             "policies": {
                 f"metanash": (metanash_class, other_player_restricted_obs_space, other_player_restricted_action_space,
                               {"explore": False}),
-                f"metanash_delegate": (
-                policy_classes["best_response"], tmp_env.base_observation_space, tmp_env.base_action_space,
-                {"explore": scenario.allow_stochastic_best_responses}),
-                f"best_response": (
-                policy_classes["best_response"], tmp_env.base_observation_space, tmp_env.base_action_space, {}),
+
+                f"metanash_delegate": (policy_classes["best_response"], tmp_env.base_observation_space, tmp_env.base_action_space,
+                            {"explore": scenario.allow_stochastic_best_responses}),
+
+                f"best_response": (policy_classes["best_response"], tmp_env.base_observation_space, tmp_env.base_action_space, {}),
             },
             "policy_mapping_fn": select_policy,
         },
@@ -282,7 +257,7 @@ def train_nxdo_best_response(br_player: int,
 
     if metanash_specs_for_players is not None and get_restricted_game_custom_model is not None:
         trainer_config["multiagent"]["policies"]["metanash"][3]["model"] = {
-            "custom_model": get_restricted_game_custom_model(tmp_base_env)}
+            "custom_model": get_restricted_game_custom_model(tmp_env)}
 
     trainer_config = merge_dicts(trainer_config, get_trainer_config(tmp_base_env))
 
@@ -291,52 +266,49 @@ def train_nxdo_best_response(br_player: int,
 
     trainer = trainer_class(config=trainer_config, logger_creator=get_trainer_logger_creator(
         base_dir=results_dir, scenario_name=scenario_name,
-        should_log_result_fn=lambda result: result["training_iteration"] % 100 == 0))
+        should_log_result_fn=should_log_result_fn))
 
-    if use_cfp_metanash and cfp_metanash_specs_for_players:
-        # metanash is uniform distribution of pure strat specs
-        def _set_worker_metanash_cfp_specs(worker: RolloutWorker):
-            worker.policy_map["metanash"].cfp_br_specs = cfp_metanash_specs_for_players[other_player]
-
-        trainer.workers.foreach_worker(_set_worker_metanash_cfp_specs)
-    elif not use_cfp_metanash:
-        # metanash is single pure strat spec
-        def _set_worker_metanash(worker: RolloutWorker):
-            if metanash_specs_for_players is not None:
-                metanash_policy = worker.policy_map["metanash"]
-                load_pure_strat(policy=metanash_policy, pure_strat_spec=metanash_specs_for_players[other_player])
-
-        trainer.workers.foreach_worker(_set_worker_metanash)
+    # metanash is single pure strat spec
+    def _set_worker_metanash(worker: RolloutWorker):
+        if metanash_specs_for_players is not None:
+            metanash_policy = worker.policy_map["metanash"]
+            metanash_strategy_spec: StrategySpec = metanash_specs_for_players[other_player]
+            load_pure_strat(policy=metanash_policy, pure_strat_spec=metanash_strategy_spec)
+    trainer.workers.foreach_worker(_set_worker_metanash)
 
     trainer.weights_cache = {}
     if delegate_specs_for_players:
         if use_openspiel_restricted_game:
-            set_restricted_game_conversions_for_all_workers_openspiel(trainer=trainer,
-                                                                      tmp_base_env=tmp_base_env,
-                                                                      delegate_policy_id="metanash_delegate",
-                                                                      agent_id_to_restricted_game_specs={
-                                                                          other_player: delegate_specs_for_players[
-                                                                              other_player]},
-                                                                      load_policy_spec_fn=load_pure_strat)
+            set_restricted_game_conversions_for_all_workers_openspiel(
+                trainer=trainer,
+                tmp_base_env=tmp_base_env,
+                delegate_policy_id="metanash_delegate",
+                agent_id_to_restricted_game_specs={
+                    other_player: delegate_specs_for_players[other_player]
+                },
+                load_policy_spec_fn=load_pure_strat)
         else:
-            set_restricted_game_conversations_for_all_workers(trainer=trainer, delegate_policy_id="metanash_delegate",
-                                                              agent_id_to_restricted_game_specs={
-                                                                  other_player: delegate_specs_for_players[
-                                                                      other_player]},
-                                                              load_policy_spec_fn=create_get_pure_strat_cached(
-                                                                  cache=trainer.weights_cache))
+            set_restricted_game_conversations_for_all_workers(
+                trainer=trainer,
+                delegate_policy_id="metanash_delegate",
+                agent_id_to_restricted_game_specs={
+                    other_player: delegate_specs_for_players[other_player]
+                },
+                load_policy_spec_fn=create_get_pure_strat_cached(cache=trainer.weights_cache))
 
     log(f"got policy {active_policy_num}")
 
-    # Perform main RL training loop. Stop if we reach max iters or saturate.
-    # Saturation is determined by checking if we improve by a minimum amount every n iters.
-    train_iter_count = 0
+    if previous_br_checkpoint_path is not None:
+        def _set_br_initial_weights(worker: RolloutWorker):
+            br_policy = worker.policy_map["best_response"]
+            load_pure_strat(policy=br_policy, checkpoint_path=previous_br_checkpoint_path)
+        trainer.workers.foreach_worker(_set_br_initial_weights)
 
+    # Perform main RL training loop. Stop according to our StoppingCondition.
     stopping_condition: StoppingCondition = nxdo_br_get_stopping_condition()
 
     while True:
         train_iter_results = trainer.train()  # do a step (or several) in the main RL loop
-        train_iter_count += 1
 
         if print_train_results:
             train_iter_results["p2sro_active_policy_num"] = active_policy_num
@@ -359,15 +331,16 @@ def train_nxdo_best_response(br_player: int,
 
     log(f"Training stopped. Setting active policy {active_policy_num} as fixed.")
 
-    nxdo_manager.submit_final_br_policy(
-        player=br_player, policy_num=active_policy_num,
-        metadata_dict=create_metadata_with_new_checkpoint_for_current_best_response(
+    final_policy_metadata = create_metadata_with_new_checkpoint_for_current_best_response(
             trainer=trainer, player=br_player, save_dir=checkpoint_dir(trainer=trainer),
             timesteps_training_br=total_timesteps_training_br,
             episodes_training_br=total_episodes_training_br,
             active_policy_num=active_policy_num,
             average_br_reward=float(br_reward_this_iter),
-        ))
+        )
+    nxdo_manager.submit_final_br_policy(
+        player=br_player, policy_num=active_policy_num,
+        metadata_dict=final_policy_metadata)
 
     # trainer.cleanup()
     # del trainer
@@ -385,6 +358,7 @@ def train_nxdo_best_response(br_player: int,
             time.sleep(2.0)
             wait_count += 1
 
+    return final_policy_metadata["checkpoint_path"]
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
@@ -392,23 +366,29 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--player', type=int)
     parser.add_argument('--scenario', type=str)
+    parser.add_argument('--use_prev_brs', default=False, action='store_true')
     parser.add_argument('--nxdo_port', type=int, required=False, default=None)
     parser.add_argument('--nxdo_host', type=str, required=False, default='localhost')
     commandline_args = parser.parse_args()
 
     scenario_name = commandline_args.scenario
+    use_prev_brs = commandline_args.use_prev_brs
 
     nxdo_host = commandline_args.nxdo_host
     nxdo_port = commandline_args.nxdo_port
     if nxdo_port is None:
         nxdo_port = get_client_port_for_service(service_name=f"seed_{GRL_SEED}_{scenario_name}")
 
+    previous_br_checkpoint_path = None
     while True:
         # Train a br for each player, then repeat.
-        train_nxdo_best_response(
+        result = train_nxdo_best_response(
             br_player=commandline_args.player,
             scenario_name=scenario_name,
             nxdo_manager_port=nxdo_port,
             nxdo_manager_host=nxdo_host,
             print_train_results=True,
+            previous_br_checkpoint_path=previous_br_checkpoint_path
         )
+        if use_prev_brs:
+            previous_br_checkpoint_path = result

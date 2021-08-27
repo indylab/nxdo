@@ -2,7 +2,9 @@ import datetime
 import json
 import numbers
 import os
-from typing import Tuple
+import socket
+from contextlib import closing
+from typing import Tuple, Union
 
 import numpy as np
 import yaml
@@ -14,7 +16,18 @@ def data_dir() -> str:
     return os.path.join(os.path.dirname(grl.__file__), "data")
 
 
-def check_if_jsonable(check_dict):
+def assets_dir() -> str:
+    return os.path.join(os.path.dirname(grl.__file__), "assets")
+
+
+def find_free_port():
+    with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
+        s.bind(('', 0))
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        return s.getsockname()[1]
+
+
+def check_if_jsonable(check_dict) -> Tuple[bool, Union[Exception, None]]:
     try:
         json.dumps(check_dict, cls=SafeFallbackJSONEncoder)
     except (TypeError, OverflowError) as json_err:
