@@ -1,7 +1,5 @@
 
-## Research Collab Codebase for NXDO
-
-[XDO: A Double Oracle Algorithm for Extensive-Form Games](https://arxiv.org/pdf/2103.06426.pdf)
+## Code for [XDO: A Double Oracle Algorithm for Extensive-Form Games](https://arxiv.org/abs/2103.06426)
 
 Includes [RLlib](https://docs.ray.io/en/master/rllib.html) PyTorch implementations of NXDO, PSRO, and NFSP.
 
